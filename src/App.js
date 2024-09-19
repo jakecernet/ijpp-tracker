@@ -1,158 +1,132 @@
-import React from "react";
-import { BrowserRouter as Router, Route, Link, Routes } from "react-router-dom";
+"use client";
+
+import { useState } from "react";
+import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain, FaSearch, FaBars } from "react-icons/fa";
 import "./App.css";
 
-import { MapContainer, TileLayer } from "react-leaflet";
+import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 
-function App() {
-	const arrivals = [
-		{
-			id: 1,
-			type: "Bus",
-			route: "42",
-			destination: "Downtown",
-			arrivalTime: "5 min",
-		},
-		{
-			id: 2,
-			type: "Train",
-			route: "Blue Line",
-			destination: "Airport",
-			arrivalTime: "12 min",
-		},
-		{
-			id: 3,
-			type: "Bus",
-			route: "15",
-			destination: "University",
-			arrivalTime: "18 min",
-		},
-		{
-			id: 4,
-			type: "Train",
-			route: "Red Line",
-			destination: "Suburbs",
-			arrivalTime: "25 min",
-		},
-	];
+export default function Component() {
+	const [activeTab, setActiveTab] = useState("map");
 
 	return (
-		<Router>
-			<div className="app">
-				<header>
-					<div className="container">
-						<div className="header-content">
-							<Link to="/" className="logo">
-								<FaBus />
-								<FaTrain />
-								<span>IJPP Tracker</span>
-							</Link>
-							<button
-								className="mobile-menu-button"
-								onClick={() => {
-									if (
-										document.getElementById("nav").style
-											.height === "0px"
-									) {
-										document.getElementById(
-											"nav"
-										).style.height = "240px";
-									} else {
-										document.getElementById(
-											"nav"
-										).style.height = "0px";
-									}
-								}}>
-								<FaBars />
-							</button>
-						</div>
-						<nav id="nav" style={{ height: "0px" }}>
-							<Link to="/">Home</Link>
-							<Link to="/routes">Routes</Link>
-							<Link to="/alerts">Alerts</Link>
-							<Link to="/about">About</Link>
-						</nav>
-					</div>
-				</header>
-				<main>
-					<div className="container">
-						<div className="main-content">
-							<div className="map-section">
-								<h2>Zemljevid</h2>
-								<div className="map-placeholder">
-									<MapContainer
-										center={[45.4211, -75.6903]}
-										zoom={20}
-										scrollWheelZoom={true}
-										attributionControl={false}
-										preferCanvas={false}
-										style={{
-											height: "100%",
-											width: "85%",
-											borderRadius: "10px",
-											marginTop: "10px",
-										}}>
-										<TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" />
-									</MapContainer>
-								</div>
-							</div>
-							<div className="arrivals-section">
-								<h2>Prihodi</h2>
-								<div className="search-bar">
-									<input
-										type="text"
-										placeholder="Search routes..."
-									/>
-									<button>
-										<FaSearch />
-										<span className="sr-only">Search</span>
-									</button>
-								</div>
-								<table className="arrivals-table">
-									<thead>
-										<tr>
-											<th>Type</th>
-											<th>Route</th>
-											<th>Destination</th>
-											<th>Arrival</th>
-										</tr>
-									</thead>
-									<tbody>
-										{arrivals.map((arrival) => (
-											<tr key={arrival.id}>
-												<td>
-													{arrival.type === "Bus" ? (
-														<FaBus />
-													) : (
-														<FaTrain />
-													)}
-												</td>
-												<td>{arrival.route}</td>
-												<td>{arrival.destination}</td>
-												<td>{arrival.arrivalTime}</td>
-											</tr>
-										))}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					</div>
-				</main>
-				<footer>
-					<div className="container">
-						<div className="footer-content">
-							<p>
-								&copy; 2024 IJPP Tracker. All rights reserved.
-							</p>
-						</div>
-					</div>
-				</footer>
+		<div className="mobile-container">
+			<div className="header">
+				<div>
+					<FaBus />
+					<FaTrain />
+				</div>
+				<div>
+					<span>IJPP Tracker</span>
+				</div>
 			</div>
-		</Router>
+			<div className="content">
+				{activeTab === "map" && (
+					<div className="tab-content">
+						<h2>Live Bus Map</h2>
+						<div className="map-container">
+							<MapContainer
+								center={[46, 16]}
+								zoom={13}
+								style={{ height: "100%", width: "100%" }}
+								attributionControl={false}
+								scrollWheelZoom={true}>
+								<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+							</MapContainer>
+						</div>
+					</div>
+				)}
+
+				{activeTab === "arrivals" && (
+					<div className="tab-content">
+						<h2>Arrivals</h2>
+						<input
+							type="text"
+							placeholder="Search for a bus route"
+							className="search-input"
+						/>
+						<div className="arrival-item">
+							<h3>Route 42</h3>
+							<p>Next arrival: 5 minutes</p>
+						</div>
+						<div className="arrival-item">
+							<h3>Route 15</h3>
+							<p>Next arrival: 12 minutes</p>
+						</div>
+					</div>
+				)}
+
+				{activeTab === "stations" && (
+					<div className="tab-content">
+						<h2>Stations Near You</h2>
+						<div className="station-item">
+							<MapPin size={24} />
+							<div>
+								<h3>Central Station</h3>
+								<p>0.3 miles away</p>
+							</div>
+						</div>
+						<div className="station-item">
+							<MapPin size={24} />
+							<div>
+								<h3>Market Street Stop</h3>
+								<p>0.5 miles away</p>
+							</div>
+						</div>
+					</div>
+				)}
+
+				{activeTab === "settings" && (
+					<div className="tab-content">
+						<h2>Settings</h2>
+						<div className="setting-item">
+							<label htmlFor="notifications">
+								Enable Notifications
+							</label>
+							<input type="checkbox" id="notifications" />
+						</div>
+						<input
+							type="text"
+							placeholder="Home Address"
+							className="setting-input"
+						/>
+						<input
+							type="text"
+							placeholder="Work Address"
+							className="setting-input"
+						/>
+						<button className="save-button">Save Settings</button>
+					</div>
+				)}
+			</div>
+			<nav className="bottom-nav">
+				<button
+					onClick={() => setActiveTab("map")}
+					className={activeTab === "map" ? "active" : ""}>
+					<Map size={24} />
+					<span>Map</span>
+				</button>
+				<button
+					onClick={() => setActiveTab("arrivals")}
+					className={activeTab === "arrivals" ? "active" : ""}>
+					<Clock size={24} />
+					<span>Arrivals</span>
+				</button>
+				<button
+					onClick={() => setActiveTab("stations")}
+					className={activeTab === "stations" ? "active" : ""}>
+					<MapPin size={24} />
+					<span>Near You</span>
+				</button>
+				<button
+					onClick={() => setActiveTab("settings")}
+					className={activeTab === "settings" ? "active" : ""}>
+					<Settings size={24} />
+					<span>Settings</span>
+				</button>
+			</nav>
+		</div>
 	);
 }
-
-export default App;
