@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
-import { FaBus, FaTrain, FaSearch, FaBars } from "react-icons/fa";
+import { FaBus, FaTrain} from "react-icons/fa";
 import "./App.css";
 
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
