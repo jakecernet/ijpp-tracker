@@ -18,17 +18,23 @@ const icon = new L.Icon({
 const busIcon = new L.Icon({
 	iconUrl: "https://cdn-icons-png.flaticon.com/512/7561/7561230.png",
 	iconSize: [40, 40],
-	iconAnchor: [25, 50],
+	iconAnchor: [20, 40],
 });
 
 const busPositions = [
 	[46.0569, 14.5058],
-	[46.0560, 14.5458],
+	[46.056, 14.5458],
 	[46.0559, 14.5053],
 	[46.0575, 14.5088],
 	[46.0576, 14.5055],
 	[46.0527, 14.49775],
 	[46.0412, 14.5],
+	[46.1212, 14.5525],
+	[46.17, 14.3403],
+	[45.9667, 14.29785],
+	[45.9667, 14.2986],
+	[46.1884, 14.884],
+	[46.1527, 14.624],
 ];
 
 export default function Component() {
