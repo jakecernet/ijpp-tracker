@@ -2,14 +2,23 @@
 
 import { useState } from "react";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
-import { FaBus, FaTrain} from "react-icons/fa";
+import { FaBus, FaTrain } from "react-icons/fa";
 import "./App.css";
 
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+
+const icon = new L.Icon({
+	iconUrl: "https://cdn-icons-png.flaticon.com/512/6618/6618280.png",
+	iconSize: [50, 50],
+	iconAnchor: [25, 50],
+});
 
 export default function Component() {
 	const [activeTab, setActiveTab] = useState("map");
+	const [activeStation, setActiveStation] = useState("Kolodvor");
+	const [position, setPosition] = useState([46.0569, 14.5058]);
 
 	return (
 		<div className="mobile-container">
@@ -28,12 +37,16 @@ export default function Component() {
 						<h2>Live Bus Map</h2>
 						<div className="map-container">
 							<MapContainer
-								center={[46, 16]}
+								center={[46.0569, 14.5058]}
 								zoom={13}
 								style={{ height: "100%", width: "100%" }}
 								attributionControl={false}
 								scrollWheelZoom={true}>
 								<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+								<Marker
+									position={position}
+									icon={icon}
+								/>
 							</MapContainer>
 						</div>
 					</div>
@@ -41,38 +54,67 @@ export default function Component() {
 
 				{activeTab === "arrivals" && (
 					<div className="tab-content">
-						<h2>Arrivals</h2>
+						<h2>Prihodi na: {activeStation}</h2>
 						<input
 							type="text"
 							placeholder="Search for a bus route"
 							className="search-input"
 						/>
 						<div className="arrival-item">
-							<h3>Route 42</h3>
-							<p>Next arrival: 5 minutes</p>
+							<h3>6B</h3>
+							<p>Naslednji prihod: 5 minut</p>
 						</div>
 						<div className="arrival-item">
-							<h3>Route 15</h3>
-							<p>Next arrival: 12 minutes</p>
+							<h3>18L</h3>
+							<p>Naslednji prihod: 10 minut</p>
+						</div>
+						<div className="arrival-item">
+							<h3>46</h3>
+							<p>Naslednji prihod: 15 minut</p>
 						</div>
 					</div>
 				)}
 
 				{activeTab === "stations" && (
 					<div className="tab-content">
-						<h2>Stations Near You</h2>
-						<div className="station-item">
+						<h2>Postaje v bližini</h2>
+						<div
+							className="station-item"
+							onClick={() => {
+								setActiveStation("Kolodvor");
+								setActiveTab("arrivals");
+								setPosition([46.0580, 14.5088]);
+							}}>
 							<MapPin size={24} />
 							<div>
-								<h3>Central Station</h3>
-								<p>0.3 miles away</p>
+								<h3>Kolodvor</h3>
+								<p>0.150 km</p>
 							</div>
 						</div>
-						<div className="station-item">
+						<div
+							className="station-item"
+							onClick={() => {
+								setActiveStation("Bavarski dvor");
+								setActiveTab("arrivals");
+								setPosition([46.0560, 14.5058]);
+							}}>
 							<MapPin size={24} />
 							<div>
-								<h3>Market Street Stop</h3>
-								<p>0.5 miles away</p>
+								<h3>Bavarski dvor</h3>
+								<p>0.500 km</p>
+							</div>
+						</div>
+						<div
+							className="station-item"
+							onClick={() => {
+								setActiveStation("Razstavišče");
+								setActiveTab("arrivals");
+								setPosition([46.0590, 14.5068]);
+							}}>
+							<MapPin size={24} />
+							<div>
+								<h3>Razstavišče</h3>
+								<p>0.750 km</p>
 							</div>
 						</div>
 					</div>
