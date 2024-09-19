@@ -15,6 +15,22 @@ const icon = new L.Icon({
 	iconAnchor: [25, 50],
 });
 
+const busIcon = new L.Icon({
+	iconUrl: "https://cdn-icons-png.flaticon.com/512/7561/7561230.png",
+	iconSize: [40, 40],
+	iconAnchor: [25, 50],
+});
+
+const busPositions = [
+	[46.0569, 14.5058],
+	[46.0560, 14.5458],
+	[46.0559, 14.5053],
+	[46.0575, 14.5088],
+	[46.0576, 14.5055],
+	[46.0527, 14.49775],
+	[46.0412, 14.5],
+];
+
 export default function Component() {
 	const [activeTab, setActiveTab] = useState("map");
 	const [activeStation, setActiveStation] = useState("Kolodvor");
@@ -43,10 +59,14 @@ export default function Component() {
 								attributionControl={false}
 								scrollWheelZoom={true}>
 								<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-								<Marker
-									position={position}
-									icon={icon}
-								/>
+								<Marker position={position} icon={icon} />
+								{busPositions.map((position, index) => (
+									<Marker
+										key={index}
+										position={position}
+										icon={busIcon}
+									/>
+								))}
 							</MapContainer>
 						</div>
 					</div>
@@ -72,6 +92,14 @@ export default function Component() {
 							<h3>46</h3>
 							<p>Naslednji prihod: 15 minut</p>
 						</div>
+						<div className="arrival-item">
+							<h3>48P</h3>
+							<p>Naslednji prihod: 20 minut</p>
+						</div>
+						<div className="arrival-item">
+							<h3>69</h3>
+							<p>Naslednji prihod: 36 minut</p>
+						</div>
 					</div>
 				)}
 
@@ -83,7 +111,7 @@ export default function Component() {
 							onClick={() => {
 								setActiveStation("Kolodvor");
 								setActiveTab("arrivals");
-								setPosition([46.0580, 14.5088]);
+								setPosition([46.058, 14.5088]);
 							}}>
 							<MapPin size={24} />
 							<div>
@@ -96,7 +124,7 @@ export default function Component() {
 							onClick={() => {
 								setActiveStation("Bavarski dvor");
 								setActiveTab("arrivals");
-								setPosition([46.0560, 14.5058]);
+								setPosition([46.056, 14.5058]);
 							}}>
 							<MapPin size={24} />
 							<div>
@@ -109,12 +137,25 @@ export default function Component() {
 							onClick={() => {
 								setActiveStation("Razstavišče");
 								setActiveTab("arrivals");
-								setPosition([46.0590, 14.5068]);
+								setPosition([46.059, 14.5068]);
 							}}>
 							<MapPin size={24} />
 							<div>
 								<h3>Razstavišče</h3>
 								<p>0.750 km</p>
+							</div>
+						</div>
+						<div
+							className="station-item"
+							onClick={() => {
+								setActiveStation("Tivoli");
+								setActiveTab("arrivals");
+								setPosition([46.0569, 14.5058]);
+							}}>
+							<MapPin size={24} />
+							<div>
+								<h3>Bleiweisova</h3>
+								<p>1.000 km</p>
 							</div>
 						</div>
 					</div>
