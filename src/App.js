@@ -8,6 +8,7 @@ import "./App.css";
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { useEffect } from "react";
 
 const icon = new L.Icon({
 	iconUrl: "https://cdn-icons-png.flaticon.com/512/6618/6618280.png",
@@ -21,26 +22,68 @@ const busIcon = new L.Icon({
 	iconAnchor: [20, 40],
 });
 
-const busPositions = [
-	[46.0569, 14.5058],
-	[46.056, 14.5458],
-	[46.0559, 14.5053],
-	[46.0575, 14.5088],
-	[46.0576, 14.5055],
-	[46.0527, 14.49775],
-	[46.0412, 14.5],
-	[46.1212, 14.5525],
-	[46.17, 14.3403],
-	[45.9667, 14.29785],
-	[45.9667, 14.2986],
-	[46.1884, 14.884],
-	[46.1527, 14.624],
-];
-
 export default function Component() {
 	const [activeTab, setActiveTab] = useState("map");
 	const [activeStation, setActiveStation] = useState("Kolodvor");
 	const [position, setPosition] = useState([46.0569, 14.5058]);
+	const [gpsPositons, setGpsPositions] = useState([]);
+
+	useEffect(() => {
+		const trips = {};
+		fetch("https://ojpp.si/api/vehicle_locations")
+			.then((response) => response.json())
+			.then((data) => {
+				const newPositions = []; // New array to collect positions
+				data.features.forEach((feature) => {
+					const properties = feature.properties;
+					const operatorVehicleId = properties?.operator_vehicle_id;
+					if (operatorVehicleId) {
+						if (!trips[operatorVehicleId]) {
+							trips[operatorVehicleId] = [];
+						}
+						const gpsLocation = feature.geometry.coordinates;
+						gpsLocation.reverse(); // Reverse the array
+						const formattedGpsLocation = gpsLocation
+							.join(", ")
+							.replace(",", ", ");
+						properties.gpsLocation = formattedGpsLocation;
+						trips[operatorVehicleId].push(properties);
+						newPositions.push(gpsLocation); // Push to the new array
+					}
+				});
+
+				setGpsPositions(newPositions); // Update the state with new positions
+
+				for (const operatorVehicleId in trips) {
+					if (trips.hasOwnProperty(operatorVehicleId)) {
+						console.log(
+							`Trip for operator vehicle ID ${operatorVehicleId}:`
+						);
+						trips[operatorVehicleId].forEach((properties) => {
+							for (const key in properties) {
+								if (properties.hasOwnProperty(key)) {
+									const value = properties[key];
+									const formattedKey = key.replace(/"/g, "");
+									const formattedValue =
+										typeof value === "string"
+											? value.replace(/"/g, "")
+											: value;
+									console.log(
+										`${formattedKey}: ${formattedValue}`
+									);
+								}
+							}
+						});
+						console.log("---");
+					}
+				}
+
+				console.log(newPositions);
+			})
+			.catch((error) => {
+				console.error("An error occurred:", error);
+			});
+	}, []);
 
 	return (
 		<div className="mobile-container">
@@ -66,10 +109,10 @@ export default function Component() {
 								scrollWheelZoom={true}>
 								<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 								<Marker position={position} icon={icon} />
-								{busPositions.map((position, index) => (
+								{gpsPositons.map((gpsPositon, index) => (
 									<Marker
 										key={index}
-										position={position}
+										position={gpsPositon}
 										icon={busIcon}
 									/>
 								))}

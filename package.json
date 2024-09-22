@@ -11,6 +11,7 @@
     "lucide-react": "^0.441.0",
     "next": "^14.2.12",
     "nextjs": "^0.0.3",
+    "node-fetch": "^3.3.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-feather": "^2.0.10",
