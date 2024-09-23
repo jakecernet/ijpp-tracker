@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain } from "react-icons/fa";
-import "./App.css";
-
 import { MapContainer, TileLayer, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect } from "react";
+import "./App.css";
+
+import arrivaPNG from "./arriva.png";
+import lppPNG from "./lpp.png";
+import nomagoPNG from "./nomago.png";
+import marpromPNG from "./marprom.png";
 
 const icon = new L.Icon({
 	iconUrl: "https://cdn-icons-png.flaticon.com/512/6618/6618280.png",
@@ -16,10 +19,28 @@ const icon = new L.Icon({
 	iconAnchor: [25, 50],
 });
 
-const busIcon = new L.Icon({
-	iconUrl: "https://cdn-icons-png.flaticon.com/512/7561/7561230.png",
-	iconSize: [40, 40],
-	iconAnchor: [20, 40],
+const lppIcon = new L.Icon({
+	iconUrl: lppPNG,
+	iconSize: [35, 35],
+	iconAnchor: [17.5, 35],
+});
+
+const arrivaIcon = new L.Icon({
+	iconUrl: arrivaPNG,
+	iconSize: [35, 35],
+	iconAnchor: [17.5, 35],
+});
+
+const nomagoIcon = new L.Icon({
+	iconUrl: nomagoPNG,
+	iconSize: [35, 35],
+	iconAnchor: [17.5, 35],
+});
+
+const marpromIcon = new L.Icon({
+	iconUrl: marpromPNG,
+	iconSize: [35, 35],
+	iconAnchor: [17.5, 35],
 });
 
 export default function Component() {
@@ -27,63 +48,67 @@ export default function Component() {
 	const [activeStation, setActiveStation] = useState("Kolodvor");
 	const [position, setPosition] = useState([46.0569, 14.5058]);
 	const [gpsPositons, setGpsPositions] = useState([]);
+	const [trips, setTrips] = useState({});
+	const [operatorIds, setOperatorIds] = useState([]);
 
 	useEffect(() => {
-		const trips = {};
+		console.log("Fetching vehicle locations...");
 		fetch("https://ojpp.si/api/vehicle_locations")
 			.then((response) => response.json())
 			.then((data) => {
-				const newPositions = []; // New array to collect positions
+				const newPositions = [];
+				const newTrips = {};
+
 				data.features.forEach((feature) => {
 					const properties = feature.properties;
 					const operatorVehicleId = properties?.operator_vehicle_id;
+
 					if (operatorVehicleId) {
-						if (!trips[operatorVehicleId]) {
-							trips[operatorVehicleId] = [];
+						if (!newTrips[operatorVehicleId]) {
+							newTrips[operatorVehicleId] = [];
 						}
+
 						const gpsLocation = feature.geometry.coordinates;
-						gpsLocation.reverse(); // Reverse the array
+						gpsLocation.reverse();
+
+						const operator = properties.operator_name;
+
+						newPositions.push({
+							gpsLocation, 
+							operator,
+						});
+
 						const formattedGpsLocation = gpsLocation
 							.join(", ")
 							.replace(",", ", ");
 						properties.gpsLocation = formattedGpsLocation;
-						trips[operatorVehicleId].push(properties);
-						newPositions.push(gpsLocation); // Push to the new array
+						newTrips[operatorVehicleId].push(properties);
 					}
 				});
 
-				setGpsPositions(newPositions); // Update the state with new positions
-
-				for (const operatorVehicleId in trips) {
-					if (trips.hasOwnProperty(operatorVehicleId)) {
-						console.log(
-							`Trip for operator vehicle ID ${operatorVehicleId}:`
-						);
-						trips[operatorVehicleId].forEach((properties) => {
-							for (const key in properties) {
-								if (properties.hasOwnProperty(key)) {
-									const value = properties[key];
-									const formattedKey = key.replace(/"/g, "");
-									const formattedValue =
-										typeof value === "string"
-											? value.replace(/"/g, "")
-											: value;
-									console.log(
-										`${formattedKey}: ${formattedValue}`
-									);
-								}
-							}
-						});
-						console.log("---");
-					}
-				}
-
-				console.log(newPositions);
+				setGpsPositions(newPositions);
+				setTrips(newTrips);
 			})
 			.catch((error) => {
 				console.error("An error occurred:", error);
 			});
 	}, []);
+
+
+	function getBusIcon(operator_id) {
+		switch (operator_id) {
+			case "Javno podjetje Ljubljanski potniški promet d.o.o.":
+				return lppIcon;
+			case "Nomago d.o.o.":
+				return nomagoIcon;
+			case "Arriva d.o.o.":
+				return arrivaIcon;
+			case "Javno podjetje za mestni potniški promet Marprom, d.o.o.": // Marprom
+				return marpromIcon;
+			default: // LPP or other operators
+				return icon;
+		}
+	}
 
 	return (
 		<div className="mobile-container">
@@ -109,13 +134,18 @@ export default function Component() {
 								scrollWheelZoom={true}>
 								<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 								<Marker position={position} icon={icon} />
-								{gpsPositons.map((gpsPositon, index) => (
-									<Marker
-										key={index}
-										position={gpsPositon}
-										icon={busIcon}
-									/>
-								))}
+								{gpsPositons.map((gpsPositon, index) => {
+									const operatorName = gpsPositon.operator; // Access operator name directly
+									console.log("Operator name:", operatorName);
+
+									return (
+										<Marker
+											key={index}
+											position={gpsPositon.gpsLocation} // GPS coordinates
+											icon={getBusIcon(operatorName)} // Use the correct icon based on the operator
+										/>
+									);
+								})}
 							</MapContainer>
 						</div>
 					</div>
