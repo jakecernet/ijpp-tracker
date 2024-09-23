@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain } from "react-icons/fa";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "./App.css";
@@ -45,8 +46,8 @@ const marpromIcon = new L.Icon({
 
 const stopIcon = new L.Icon({
 	iconUrl: "https://cdn-icons-png.flaticon.com/512/7561/7561230.png",
-	iconSize: [20, 20],
-	iconAnchor: [10, 20],
+	iconSize: [30, 30],
+	iconAnchor: [15, 30],
 });
 
 export default function Component() {
@@ -169,35 +170,54 @@ export default function Component() {
 								scrollWheelZoom={true}>
 								<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 								<Marker position={position} icon={icon} />
-								{gpsPositons.map((gpsPositon, index) => {
-									const operatorName = gpsPositon.operator; // Access operator name directly
-									console.log("Operator name:", operatorName);
-
-									return (
-										<Marker
-											key={index}
-											position={gpsPositon.gpsLocation}
-											icon={getBusIcon(operatorName)}
-											title={gpsPositon.route}>
-											<Popup>
-												<p>{gpsPositon.route}</p>
-												<p>{gpsPositon.operator}</p>
-												<p>{gpsPositon.gpsLocation}</p>
-											</Popup>
-										</Marker>
-									);
-								})}
-								{busStops.map((busStop, index) => {
-									return (
-										<Marker
-											key={index}
-											position={busStop.gpsLocation}
-											icon={stopIcon}
-											title={busStop.name}>
-											<Popup>{busStop.name}</Popup>
-										</Marker>
-									);
-								})}
+								<MarkerClusterGroup
+									showCoverageOnHover={false}
+									spiderfyOnMaxZoom={false}
+									disableClusteringAtZoom={10}
+									maxClusterRadius={30}>
+									{gpsPositons.map((gpsPositon, index) => {
+										const operatorName =
+											gpsPositon.operator;
+										console.log(
+											"Operator name:",
+											operatorName
+										);
+										return (
+											<Marker
+												key={index}
+												position={
+													gpsPositon.gpsLocation
+												}
+												icon={getBusIcon(operatorName)}
+												title={gpsPositon.route}>
+												<Popup>
+													<p>{gpsPositon.route}</p>
+													<p>{gpsPositon.operator}</p>
+													<p>
+														{gpsPositon.gpsLocation}
+													</p>
+												</Popup>
+											</Marker>
+										);
+									})}
+								</MarkerClusterGroup>
+								<MarkerClusterGroup
+									showCoverageOnHover={false}
+									spiderfyOnMaxZoom={false}
+									disableClusteringAtZoom={16}
+									maxClusterRadius={30}>
+									{busStops.map((busStop, index) => {
+										return (
+											<Marker
+												key={index}
+												position={busStop.gpsLocation}
+												icon={stopIcon}
+												title={busStop.name}>
+												<Popup>{busStop.name}</Popup>
+											</Marker>
+										);
+									})}
+								</MarkerClusterGroup>
 							</MapContainer>
 						</div>
 					</div>
