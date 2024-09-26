@@ -60,7 +60,7 @@ function getBusIcon(operator_id) {
 	}
 }
 
-const Map = ({ position, gpsPositons, busStops }) => {
+const Map = ({ position, gpsPositons, busStops, setLocation, setActiveStation }) => {
 	return (
 		<div>
 			<h2>Live Bus Map</h2>
@@ -108,7 +108,16 @@ const Map = ({ position, gpsPositons, busStops }) => {
 									position={busStop.gpsLocation}
 									icon={stopIcon}
 									title={busStop.name}>
-									<Popup>{busStop.name}</Popup>
+									<Popup>
+										<h3>{busStop.name}</h3>
+										<button
+											onClick={() => {
+												setLocation(busStop.gpsLocation);
+												setActiveStation(busStop.name);
+											}}>
+											Tukaj sem
+										</button>
+									</Popup>
 								</Marker>
 							);
 						})}

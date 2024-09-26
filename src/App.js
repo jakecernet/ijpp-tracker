@@ -7,7 +7,7 @@ import "./App.css";
 
 import MapTab from "./tabs/map";
 
-export default function Component() {
+export default function App() {
 	const [activeTab, setActiveTab] = useState("map");
 	const [activeStation, setActiveStation] = useState("Kolodvor");
 	const [position, setPosition] = useState([46.0569, 14.5058]);
@@ -103,126 +103,133 @@ export default function Component() {
 				</div>
 			</div>
 			<div className="content">
-				{activeTab === "map" && (
+				<div
+					className={`tab-content ${
+						activeTab === "map" ? "active" : ""
+					}`}>
 					<MapTab
 						position={position}
 						gpsPositons={gpsPositons}
-						trips={trips}
 						busStops={busStops}
+						setLocation={setPosition}
+						setActiveStation={setActiveStation}
 					/>
-				)}
+				</div>
 
-				{activeTab === "arrivals" && (
-					<div className="tab-content">
-						<h2>Prihodi na: {activeStation}</h2>
-						<input
-							type="text"
-							placeholder="Search for a bus route"
-							className="search-input"
-						/>
-						<div className="arrival-item">
-							<h3>6B</h3>
-							<p>Naslednji prihod: 5 minut</p>
-						</div>
-						<div className="arrival-item">
-							<h3>18L</h3>
-							<p>Naslednji prihod: 10 minut</p>
-						</div>
-						<div className="arrival-item">
-							<h3>46</h3>
-							<p>Naslednji prihod: 15 minut</p>
-						</div>
-						<div className="arrival-item">
-							<h3>48P</h3>
-							<p>Naslednji prihod: 20 minut</p>
-						</div>
-						<div className="arrival-item">
-							<h3>69</h3>
-							<p>Naslednji prihod: 36 minut</p>
+				<div
+					className={`tab-content ${
+						activeTab === "arrivals" ? "active" : ""
+					}`}>
+					<h2>Prihodi na: {activeStation}</h2>
+					<input
+						type="text"
+						placeholder="Search for a bus route"
+						className="search-input"
+					/>
+					<div className="arrival-item">
+						<h3>6B</h3>
+						<p>Naslednji prihod: 5 minut</p>
+					</div>
+					<div className="arrival-item">
+						<h3>18L</h3>
+						<p>Naslednji prihod: 10 minut</p>
+					</div>
+					<div className="arrival-item">
+						<h3>46</h3>
+						<p>Naslednji prihod: 15 minut</p>
+					</div>
+					<div className="arrival-item">
+						<h3>48P</h3>
+						<p>Naslednji prihod: 20 minut</p>
+					</div>
+					<div className="arrival-item">
+						<h3>69</h3>
+						<p>Naslednji prihod: 36 minut</p>
+					</div>
+				</div>
+
+				<div
+					className={`tab-content ${
+						activeTab === "stations" ? "active" : ""
+					}`}>
+					<h2>Postaje v bližini</h2>
+					<div
+						className="station-item"
+						onClick={() => {
+							setActiveStation("Kolodvor");
+							setActiveTab("arrivals");
+							setPosition([46.058, 14.5088]);
+						}}>
+						<MapPin size={24} />
+						<div>
+							<h3>Kolodvor</h3>
+							<p>0.150 km</p>
 						</div>
 					</div>
-				)}
-
-				{activeTab === "stations" && (
-					<div className="tab-content">
-						<h2>Postaje v bližini</h2>
-						<div
-							className="station-item"
-							onClick={() => {
-								setActiveStation("Kolodvor");
-								setActiveTab("arrivals");
-								setPosition([46.058, 14.5088]);
-							}}>
-							<MapPin size={24} />
-							<div>
-								<h3>Kolodvor</h3>
-								<p>0.150 km</p>
-							</div>
-						</div>
-						<div
-							className="station-item"
-							onClick={() => {
-								setActiveStation("Bavarski dvor");
-								setActiveTab("arrivals");
-								setPosition([46.056, 14.5058]);
-							}}>
-							<MapPin size={24} />
-							<div>
-								<h3>Bavarski dvor</h3>
-								<p>0.500 km</p>
-							</div>
-						</div>
-						<div
-							className="station-item"
-							onClick={() => {
-								setActiveStation("Razstavišče");
-								setActiveTab("arrivals");
-								setPosition([46.059, 14.5068]);
-							}}>
-							<MapPin size={24} />
-							<div>
-								<h3>Razstavišče</h3>
-								<p>0.750 km</p>
-							</div>
-						</div>
-						<div
-							className="station-item"
-							onClick={() => {
-								setActiveStation("Tivoli");
-								setActiveTab("arrivals");
-								setPosition([46.0569, 14.5058]);
-							}}>
-							<MapPin size={24} />
-							<div>
-								<h3>Bleiweisova</h3>
-								<p>1.000 km</p>
-							</div>
+					<div
+						className="station-item"
+						onClick={() => {
+							setActiveStation("Bavarski dvor");
+							setActiveTab("arrivals");
+							setPosition([46.056, 14.5058]);
+						}}>
+						<MapPin size={24} />
+						<div>
+							<h3>Bavarski dvor</h3>
+							<p>0.500 km</p>
 						</div>
 					</div>
-				)}
-
-				{activeTab === "settings" && (
-					<div className="tab-content">
-						<h2>Settings</h2>
-						<div className="setting-item">
-							<label htmlFor="notifications">
-								Enable Notifications
-							</label>
-							<input type="checkbox" id="notifications" />
+					<div
+						className="station-item"
+						onClick={() => {
+							setActiveStation("Razstavišče");
+							setActiveTab("arrivals");
+							setPosition([46.059, 14.5068]);
+						}}>
+						<MapPin size={24} />
+						<div>
+							<h3>Razstavišče</h3>
+							<p>0.750 km</p>
 						</div>
-						<input
-							type="text"
-							placeholder="Home Address"
-							className="setting-input"
-						/>
-						<input
-							type="text"
-							placeholder="Work Address"
-							className="setting-input"
-						/>
-						<button className="save-button">Save Settings</button>
 					</div>
-				)}
+					<div
+						className="station-item"
+						onClick={() => {
+							setActiveStation("Tivoli");
+							setActiveTab("arrivals");
+							setPosition([46.0569, 14.5058]);
+						}}>
+						<MapPin size={24} />
+						<div>
+							<h3>Bleiweisova</h3>
+							<p>1.000 km</p>
+						</div>
+					</div>
+				</div>
+
+				<div
+					className={`tab-content ${
+						activeTab === "settings" ? "active" : ""
+					}`}>
+					<h2>Settings</h2>
+					<div className="setting-item">
+						<label htmlFor="notifications">
+							Enable Notifications
+						</label>
+						<input type="checkbox" id="notifications" />
+					</div>
+					<input
+						type="text"
+						placeholder="Home Address"
+						className="setting-input"
+					/>
+					<input
+						type="text"
+						placeholder="Work Address"
+						className="setting-input"
+					/>
+					<button className="save-button">Save Settings</button>
+				</div>
 			</div>
 			<nav className="bottom-nav">
 				<button
