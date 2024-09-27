@@ -66,7 +66,7 @@ const Map = ({ position, gpsPositons, busStops, setLocation, setActiveStation })
 			<h2>Live Bus Map</h2>
 			<div className="map-container">
 				<MapContainer
-					center={[46.0569, 14.5058]}
+					center={position}
 					zoom={13}
 					style={{ height: "100%", width: "100%" }}
 					attributionControl={false}
@@ -112,7 +112,9 @@ const Map = ({ position, gpsPositons, busStops, setLocation, setActiveStation })
 										<h3>{busStop.name}</h3>
 										<button
 											onClick={() => {
-												setLocation(busStop.gpsLocation);
+												setLocation(
+													busStop.gpsLocation
+												);
 												setActiveStation(busStop.name);
 											}}>
 											Tukaj sem

@@ -9,8 +9,8 @@ import MapTab from "./tabs/map";
 
 export default function App() {
 	const [activeTab, setActiveTab] = useState("map");
-	const [activeStation, setActiveStation] = useState("Kolodvor");
-	const [position, setPosition] = useState([46.0569, 14.5058]);
+	const [activeStation, setActiveStation] = useState("Dob 2");
+	const [position, setPosition] = useState([46.155539, 14.632712]);
 	const [gpsPositons, setGpsPositions] = useState([]);
 	const [trips, setTrips] = useState({});
 	const [busStops, setBusStops] = useState([]);
@@ -32,7 +32,7 @@ export default function App() {
 							newTrips[operatorVehicleId] = [];
 						}
 
-						const gpsLocation = feature.geometry.coordinates;
+						const gpsLocation = feature.geometry?.coordinates;
 						gpsLocation.reverse();
 
 						const operator = properties.operator_name;
