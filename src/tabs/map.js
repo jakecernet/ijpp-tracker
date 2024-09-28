@@ -1,5 +1,5 @@
-import React from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import React, { useState, useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -60,19 +60,58 @@ function getBusIcon(operator_id) {
 	}
 }
 
-const Map = ({ position, gpsPositons, busStops, setLocation, setActiveStation }) => {
+function MapCenter({ center }) {
+	const map = useMap();
+	useEffect(() => {
+		map.setView(center);
+	}, [center, map]);
+	return null;
+}
+
+const Map = ({
+	position,
+	gpsPositons,
+	busStops,
+	setLocation,
+	setActiveStation,
+}) => {
+	const saveStationToLocalStorage = (name, coordinates) => {
+		const stationData = {
+			name: name,
+			coordinates: coordinates,
+		};
+		localStorage.setItem("currentStation", JSON.stringify(stationData));
+	};
+
+	const [savedStation, setSavedStation] = useState(null);
+	const [mapCenter, setMapCenter] = useState(position);
+
+	useEffect(() => {
+		const savedStationData = JSON.parse(
+			localStorage.getItem("currentStation")
+		);
+		if (savedStationData) {
+			const { name, coordinates } = savedStationData;
+			setActiveStation(name);
+			setLocation(coordinates);
+			setSavedStation(savedStationData);
+			setMapCenter(coordinates);
+		}
+	}, [setActiveStation, setLocation]);
+
 	return (
 		<div>
 			<h2>Live Bus Map</h2>
 			<div className="map-container">
 				<MapContainer
-					center={position}
+					center={mapCenter}
 					zoom={13}
 					style={{ height: "100%", width: "100%" }}
 					attributionControl={false}
 					scrollWheelZoom={true}>
+					<MapCenter center={mapCenter} />
 					<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-					<Marker position={position} icon={icon} />
+					<Marker position={mapCenter} icon={icon} />
 					<MarkerClusterGroup
 						showCoverageOnHover={false}
 						spiderfyOnMaxZoom={false}
@@ -116,6 +155,13 @@ const Map = ({ position, gpsPositons, busStops, setLocation, setActiveStation })
 													busStop.gpsLocation
 												);
 												setActiveStation(busStop.name);
+												saveStationToLocalStorage(
+													busStop.name,
+													busStop.gpsLocation
+												);
+												setMapCenter(
+													busStop.gpsLocation
+												);
 											}}>
 											Tukaj sem
 										</button>
