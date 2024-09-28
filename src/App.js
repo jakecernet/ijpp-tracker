@@ -6,6 +6,7 @@ import { FaBus, FaTrain } from "react-icons/fa";
 import "./App.css";
 
 import MapTab from "./tabs/map";
+import NearMeTab from "./tabs/nearMe";
 
 export default function App() {
 	const [activeTab, setActiveTab] = useState("map");
@@ -124,7 +125,6 @@ export default function App() {
 						setActiveStation={setActiveStation}
 					/>
 				</div>
-
 				<div
 					className={`tab-content ${
 						activeTab === "arrivals" ? "active" : ""
@@ -156,66 +156,19 @@ export default function App() {
 						<p>Naslednji prihod: 36 minut</p>
 					</div>
 				</div>
-
 				<div
 					className={`tab-content ${
 						activeTab === "stations" ? "active" : ""
 					}`}>
-					<h2>Postaje v bližini</h2>
-					<div
-						className="station-item"
-						onClick={() => {
-							setActiveStation("Kolodvor");
-							setActiveTab("arrivals");
-							setPosition([46.058, 14.5088]);
-						}}>
-						<MapPin size={24} />
-						<div>
-							<h3>Kolodvor</h3>
-							<p>0.150 km</p>
-						</div>
-					</div>
-					<div
-						className="station-item"
-						onClick={() => {
-							setActiveStation("Bavarski dvor");
-							setActiveTab("arrivals");
-							setPosition([46.056, 14.5058]);
-						}}>
-						<MapPin size={24} />
-						<div>
-							<h3>Bavarski dvor</h3>
-							<p>0.500 km</p>
-						</div>
-					</div>
-					<div
-						className="station-item"
-						onClick={() => {
-							setActiveStation("Razstavišče");
-							setActiveTab("arrivals");
-							setPosition([46.059, 14.5068]);
-						}}>
-						<MapPin size={24} />
-						<div>
-							<h3>Razstavišče</h3>
-							<p>0.750 km</p>
-						</div>
-					</div>
-					<div
-						className="station-item"
-						onClick={() => {
-							setActiveStation("Tivoli");
-							setActiveTab("arrivals");
-							setPosition([46.0569, 14.5058]);
-						}}>
-						<MapPin size={24} />
-						<div>
-							<h3>Bleiweisova</h3>
-							<p>1.000 km</p>
-						</div>
-					</div>
+					<NearMeTab
+						position={position}
+						activeStation={activeStation}
+						setPosition={setPosition}
+						setActiveStation={setActiveStation}
+						setActiveTab={setActiveTab}
+						busStops={busStops}
+					/>
 				</div>
-
 				<div
 					className={`tab-content ${
 						activeTab === "settings" ? "active" : ""

@@ -100,7 +100,7 @@ const Map = ({
 	}, [setActiveStation, setLocation]);
 
 	return (
-		<div>
+		<div className="insideDiv">
 			<h2>Live Bus Map</h2>
 			<div className="map-container">
 				<MapContainer
@@ -111,7 +111,7 @@ const Map = ({
 					scrollWheelZoom={true}>
 					<MapCenter center={mapCenter} />
 					<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-					<Marker position={mapCenter} icon={icon} />
+					<Marker position={mapCenter} icon={icon}/>
 					<MarkerClusterGroup
 						showCoverageOnHover={false}
 						spiderfyOnMaxZoom={false}

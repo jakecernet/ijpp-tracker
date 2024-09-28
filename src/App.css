@@ -53,6 +53,12 @@ body {
   display: flex;
 }
 
+.insideDiv {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 h2 {
   font-size: 24px;
 }
