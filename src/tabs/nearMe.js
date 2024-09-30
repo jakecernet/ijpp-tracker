@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const calculateDistance = (position, busStops) => {
 	const earthRadius = 6371; // Radius of the Earth in kilometers
@@ -20,7 +20,7 @@ const calculateDistance = (position, busStops) => {
 		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 		const distance = earthRadius * c;
 
-		busStop.distance = distance.toFixed(1); // Round distance to 3 decimal points
+		busStop.distance = distance.toFixed(1); // Round distance to 1 decimal point
 	});
 };
 
@@ -37,18 +37,39 @@ const NearMe = ({
 	setActiveTab,
 	busStops,
 }) => {
+	const [stationSelected, setStationSelected] = useState(false);
+
 	useEffect(() => {
-		setPosition(position);
-		calculateDistance(position, busStops);
-		console.log("Position: ", position);
-	}, [position]);
+		if (activeStation && activeStation !== "Dob 2") {
+			setStationSelected(true);
+			setPosition(position);
+			calculateDistance(position, busStops);
+			console.log("Position: ", position);
+		} else {
+			setStationSelected(false);
+		}
+	}, [position, activeStation, busStops, setPosition]);
+
+	if (!stationSelected) {
+		return (
+			<div className="insideDiv">
+				<h2>Postaje v bližini</h2>
+				<p>
+					Please select a station on the map to see nearby stations.
+				</p>
+			</div>
+		);
+	}
 
 	return (
 		<div className="insideDiv">
 			<h2>Postaje v bližini {activeStation}</h2>
 			{busStops
-				.filter((busStop) => busStop.distance <= 10 && busStop.name !== activeStation) 
-				.sort((a, b) => a.distance - b.distance) 
+				.filter(
+					(busStop) =>
+						busStop.distance <= 10 && busStop.name !== activeStation
+				)
+				.sort((a, b) => a.distance - b.distance)
 				.map((busStop, index) => {
 					return (
 						<div
@@ -58,8 +79,17 @@ const NearMe = ({
 								setActiveStation(busStop.name);
 								setActiveTab("arrivals");
 								setPosition(busStop.gpsLocation);
-								localStorage.setItem("activeStation", busStop.name);
-								localStorage.setItem("currentStation", busStop.gpsLocation);
+								localStorage.setItem(
+									"activeStation",
+									busStop.name
+								);
+								localStorage.setItem(
+									"currentStation",
+									JSON.stringify({
+										name: busStop.name,
+										coordinates: busStop.gpsLocation,
+									})
+								);
 							}}>
 							<MapPin size={24} />
 							<div>
