@@ -74,6 +74,7 @@ const Map = ({
 	busStops,
 	setLocation,
 	setActiveStation,
+	setActiveTab,
 }) => {
 	const saveStationToLocalStorage = (name, coordinates) => {
 		const stationData = {
@@ -162,6 +163,7 @@ const Map = ({
 												setMapCenter(
 													busStop.gpsLocation
 												);
+												setActiveTab("arrivals");
 											}}>
 											Tukaj sem
 										</button>

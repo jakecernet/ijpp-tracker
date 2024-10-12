@@ -123,6 +123,7 @@ export default function App() {
 						busStops={busStops}
 						setLocation={setPosition}
 						setActiveStation={setActiveStation}
+						setActiveTab={setActiveTab}
 					/>
 				</div>
 				<div
@@ -198,25 +199,25 @@ export default function App() {
 					onClick={() => setActiveTab("map")}
 					className={activeTab === "map" ? "active" : ""}>
 					<Map size={24} />
-					<span>Map</span>
+					<span>Zemljevid</span>
 				</button>
 				<button
 					onClick={() => setActiveTab("arrivals")}
 					className={activeTab === "arrivals" ? "active" : ""}>
 					<Clock size={24} />
-					<span>Arrivals</span>
+					<span>Prihodi</span>
 				</button>
 				<button
 					onClick={() => setActiveTab("stations")}
 					className={activeTab === "stations" ? "active" : ""}>
 					<MapPin size={24} />
-					<span>Near You</span>
+					<span>V bližini</span>
 				</button>
 				<button
 					onClick={() => setActiveTab("settings")}
 					className={activeTab === "settings" ? "active" : ""}>
 					<Settings size={24} />
-					<span>Settings</span>
+					<span>Nastavitve</span>
 				</button>
 			</nav>
 		</div>

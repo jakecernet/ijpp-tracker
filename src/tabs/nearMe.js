@@ -55,7 +55,7 @@ const NearMe = ({
 			<div className="insideDiv">
 				<h2>Postaje v bližini</h2>
 				<p>
-					Please select a station on the map to see nearby stations.
+					Prosimo izberite postajo na zemljevidu.
 				</p>
 			</div>
 		);
