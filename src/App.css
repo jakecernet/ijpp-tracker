@@ -79,22 +79,22 @@ h2 {
   object-fit: cover;
 }
 
-.leaflet-popup-content-wrapper{
-  background-color: #555!important;
-  color: #fff!important;
+.leaflet-popup-content-wrapper {
+  background-color: #555 !important;
+  color: #fff !important;
 
-  .leaflet-popup-content{
+  .leaflet-popup-content {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 10px 10px 10px 10px!important;
+    margin: 10px 10px 10px 10px !important;
 
-    h3{
+    h3 {
       font-size: 15px;
       margin-bottom: 10px;
     }
 
-    button{
+    button {
       background-color: #007bff;
       color: #fff;
       border: none;
