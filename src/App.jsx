@@ -176,7 +176,11 @@ function App() {
 					<NavLink to="/map">
 						<button
 							onClick={() => setCurrentUrl("/map")}
-							className={currentUrl === "/map" ? "active" : ""}>
+							className={
+								currentUrl === "/map" || currentUrl === "/"
+									? "active"
+									: ""
+							}>
 							<Map size={24} />
 							<span>Zemljevid</span>
 						</button>
