@@ -120,7 +120,6 @@ const Map = ({
 						maxClusterRadius={30}>
 						{gpsPositons.map((gpsPositon, index) => {
 							const operatorName = gpsPositon.operator;
-							console.log("Operator name:", operatorName);
 							return (
 								<Marker
 									key={index}

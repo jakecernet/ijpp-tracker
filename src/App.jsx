@@ -1,20 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+	BrowserRouter as Router,
+	NavLink,
+	Routes,
+	Route,
+} from "react-router-dom";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain } from "react-icons/fa";
 import "./App.css";
 
 import MapTab from "./tabs/map";
 import NearMeTab from "./tabs/nearMe";
+import ArrivalsTab from "./tabs/arrivals";
+import SettingsTab from "./tabs/settings";
 
-export default function App() {
-	const [activeTab, setActiveTab] = useState("map");
+function App() {
+	const [activeTab, setActiveTab] = useState(document.location.pathname);
 	const [activeStation, setActiveStation] = useState("Dob 2");
 	const [position, setPosition] = useState([46.056, 14.5058]);
 	const [gpsPositons, setGpsPositions] = useState([]);
 	const [trips, setTrips] = useState({});
 	const [busStops, setBusStops] = useState([]);
+	const [currentUrl, setCurrentUrl] = useState(document.location.pathname);
 
 	useEffect(() => {
 		const savedStation = JSON.parse(localStorage.getItem("currentStation"));
@@ -102,124 +111,110 @@ export default function App() {
 	}, []);
 
 	return (
-		<div className="mobile-container">
-			<div className="header">
-				<div>
-					<FaBus />
-					<FaTrain />
+		<Router>
+			<div className="mobile-container">
+				<div className="header">
+					<div>
+						<FaBus />
+						<FaTrain />
+					</div>
+					<div>
+						<span>IJPP Tracker</span>
+					</div>
 				</div>
-				<div>
-					<span>IJPP Tracker</span>
+				<div className="content">
+					<Routes>
+						<Route
+							path="/*"
+							element={
+								<MapTab
+									position={position}
+									gpsPositons={gpsPositons}
+									busStops={busStops}
+									setLocation={setPosition}
+									setActiveStation={setActiveStation}
+									setActiveTab={setActiveTab}
+								/>
+							}
+						/>
+						<Route
+							path="/map"
+							element={
+								<MapTab
+									position={position}
+									gpsPositons={gpsPositons}
+									busStops={busStops}
+									setLocation={setPosition}
+									setActiveStation={setActiveStation}
+									setActiveTab={setActiveTab}
+								/>
+							}
+						/>
+						<Route
+							path="/arrivals"
+							element={
+								<ArrivalsTab activeStation={activeStation} />
+							}
+						/>
+						<Route
+							path="/stations"
+							element={
+								<NearMeTab
+									position={position}
+									activeStation={activeStation}
+									setPosition={setPosition}
+									setActiveStation={setActiveStation}
+									setActiveTab={setActiveTab}
+									busStops={busStops}
+								/>
+							}
+						/>
+						<Route path="/settings" element={<SettingsTab />} />
+					</Routes>
 				</div>
+				<nav className="bottom-nav">
+					<NavLink to="/map">
+						<button
+							onClick={() => setCurrentUrl("/map")}
+							className={currentUrl === "/map" ? "active" : ""}>
+							<Map size={24} />
+							<span>Zemljevid</span>
+						</button>
+					</NavLink>
+					<NavLink to="/arrivals">
+						<button
+							onClick={() => setCurrentUrl("/arrivals")}
+							className={
+								currentUrl === "/arrivals" ? "active" : ""
+							}>
+							<Clock size={24} />
+							<span>Prihodi</span>
+						</button>
+					</NavLink>
+					<NavLink to="/stations">
+						<button
+							onClick={() => setCurrentUrl("/stations")}
+							className={
+								currentUrl === "/stations" ? "active" : ""
+							}>
+							<MapPin size={24} />
+							<span>V bližini</span>
+						</button>
+					</NavLink>
+					<NavLink to="/settings">
+						<button
+							onClick={() => setCurrentUrl("/settings")}
+							className={
+								currentUrl === "/settings" ? "active" : ""
+							}>
+							<Settings size={24} />
+							<span>Nastavitve</span>
+						</button>
+					</NavLink>
+				</nav>
 			</div>
-			<div className="content">
-				<div
-					className={`tab-content ${
-						activeTab === "map" ? "active" : ""
-					}`}>
-					<MapTab
-						position={position}
-						gpsPositons={gpsPositons}
-						busStops={busStops}
-						setLocation={setPosition}
-						setActiveStation={setActiveStation}
-						setActiveTab={setActiveTab}
-					/>
-				</div>
-				<div
-					className={`tab-content ${
-						activeTab === "arrivals" ? "active" : ""
-					}`}>
-					<h2>Prihodi na: {activeStation}</h2>
-					<input
-						type="text"
-						placeholder="Search for a bus route"
-						className="search-input"
-					/>
-					<div className="arrival-item">
-						<h3>6B</h3>
-						<p>Naslednji prihod: 5 minut</p>
-					</div>
-					<div className="arrival-item">
-						<h3>18L</h3>
-						<p>Naslednji prihod: 10 minut</p>
-					</div>
-					<div className="arrival-item">
-						<h3>46</h3>
-						<p>Naslednji prihod: 15 minut</p>
-					</div>
-					<div className="arrival-item">
-						<h3>48P</h3>
-						<p>Naslednji prihod: 20 minut</p>
-					</div>
-					<div className="arrival-item">
-						<h3>69</h3>
-						<p>Naslednji prihod: 36 minut</p>
-					</div>
-				</div>
-				<div
-					className={`tab-content ${
-						activeTab === "stations" ? "active" : ""
-					}`}>
-					<NearMeTab
-						position={position}
-						activeStation={activeStation}
-						setPosition={setPosition}
-						setActiveStation={setActiveStation}
-						setActiveTab={setActiveTab}
-						busStops={busStops}
-					/>
-				</div>
-				<div
-					className={`tab-content ${
-						activeTab === "settings" ? "active" : ""
-					}`}>
-					<h2>Settings</h2>
-					<div className="setting-item">
-						<label htmlFor="notifications">
-							Enable Notifications
-						</label>
-						<input type="checkbox" id="notifications" />
-					</div>
-					<input
-						type="text"
-						placeholder="Home Address"
-						className="setting-input"
-					/>
-					<input
-						type="text"
-						placeholder="Work Address"
-						className="setting-input"
-					/>
-					<button className="save-button">Save Settings</button>
-				</div>
-			</div>
-			<nav className="bottom-nav">
-				<button
-					onClick={() => setActiveTab("map")}
-					className={activeTab === "map" ? "active" : ""}>
-					<Map size={24} />
-					<span>Zemljevid</span>
-				</button>
-				<button
-					onClick={() => setActiveTab("arrivals")}
-					className={activeTab === "arrivals" ? "active" : ""}>
-					<Clock size={24} />
-					<span>Prihodi</span>
-				</button>
-				<button
-					onClick={() => setActiveTab("stations")}
-					className={activeTab === "stations" ? "active" : ""}>
-					<MapPin size={24} />
-					<span>V bližini</span>
-				</button>
-				<button
-					onClick={() => setActiveTab("settings")}
-					className={activeTab === "settings" ? "active" : ""}>
-					<Settings size={24} />
-					<span>Nastavitve</span>
-				</button>
-			</nav>
-		</div>
+		</Router>
 	);
 }
+
+export default App;
