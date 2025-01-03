@@ -1,11 +1,11 @@
 import { MapPin } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const calculateDistance = (position, busStops) => {
+const calculateDistance = (userLocation, busStops) => {
 	const earthRadius = 6371; // Radius of the Earth in kilometers
 	busStops.forEach((busStop) => {
-		const lat1 = position[0];
-		const lon1 = position[1];
+		const lat1 = userLocation[0];
+		const lon1 = userLocation[1];
 		const lat2 = busStop.gpsLocation[0];
 		const lon2 = busStop.gpsLocation[1];
 		const dLat = toRadians(lat2 - lat1);
@@ -30,44 +30,23 @@ const toRadians = (degrees) => {
 };
 
 const NearMe = ({
-	position,
-	activeStation,
+	userLocation,
 	setPosition,
 	setActiveStation,
 	setActiveTab,
 	busStops,
 }) => {
-	const [stationSelected, setStationSelected] = useState(false);
-
 	useEffect(() => {
-		if (activeStation && activeStation !== "Dob 2") {
-			setStationSelected(true);
-			setPosition(position);
-			calculateDistance(position, busStops);
-			console.log("Position: ", position);
-		} else {
-			setStationSelected(false);
-		}
-	}, [position, activeStation, busStops, setPosition]);
-
-	if (!stationSelected) {
-		return (
-			<div className="insideDiv">
-				<h2>Postaje v bližini</h2>
-				<p>
-					Prosimo izberite postajo na zemljevidu.
-				</p>
-			</div>
-		);
-	}
+		calculateDistance(userLocation, busStops);
+	}, [userLocation, busStops]);
 
 	return (
 		<div className="insideDiv">
-			<h2>Postaje v bližini {activeStation}</h2>
+			<h2>Postaje v bližini</h2>
 			{busStops
 				.filter(
 					(busStop) =>
-						busStop.distance <= 10 && busStop.name !== activeStation
+						busStop.distance <= 10 && busStop.distance > 0
 				)
 				.sort((a, b) => a.distance - b.distance)
 				.map((busStop, index) => {

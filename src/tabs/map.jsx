@@ -4,10 +4,11 @@ import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-import arrivaPNG from "../arriva.png";
-import lppPNG from "../lpp.png";
-import nomagoPNG from "../nomago.png";
-import marpromPNG from "../marprom.png";
+import arrivaPNG from "../img/arriva.png";
+import lppPNG from "../img/lpp.png";
+import nomagoPNG from "../img/nomago.png";
+import marpromPNG from "../img/marprom.png";
+import userPNG from "../img/user.png";
 
 const icon = new L.Icon({
 	iconUrl: "https://cdn-icons-png.flaticon.com/512/6618/6618280.png",
@@ -35,6 +36,12 @@ const nomagoIcon = new L.Icon({
 
 const marpromIcon = new L.Icon({
 	iconUrl: marpromPNG,
+	iconSize: [35, 35],
+	iconAnchor: [17.5, 35],
+});
+
+const userIcon = new L.Icon({
+	iconUrl: userPNG,
 	iconSize: [35, 35],
 	iconAnchor: [17.5, 35],
 });
@@ -75,6 +82,7 @@ const Map = ({
 	setLocation,
 	setActiveStation,
 	setActiveTab,
+	userLocation,
 }) => {
 	const saveStationToLocalStorage = (name, coordinates) => {
 		const stationData = {
@@ -112,7 +120,7 @@ const Map = ({
 					scrollWheelZoom={true}>
 					<MapCenter center={mapCenter} />
 					<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-					<Marker position={mapCenter} icon={icon}/>
+					<Marker position={mapCenter} icon={icon} />
 					<MarkerClusterGroup
 						showCoverageOnHover={false}
 						spiderfyOnMaxZoom={false}
@@ -171,6 +179,11 @@ const Map = ({
 							);
 						})}
 					</MarkerClusterGroup>
+					<Marker
+						position={userLocation}
+						icon={userIcon}
+						title="Tukaj sem"
+					/>
 				</MapContainer>
 			</div>
 		</div>

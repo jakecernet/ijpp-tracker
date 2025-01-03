@@ -24,6 +24,11 @@ function App() {
 	const [trips, setTrips] = useState({});
 	const [busStops, setBusStops] = useState([]);
 	const [currentUrl, setCurrentUrl] = useState(document.location.pathname);
+	const [userLocation, setUserLocation] = useState(
+		localStorage.getItem("userLocation")
+			? JSON.parse(localStorage.getItem("userLocation"))
+			: [46.056, 14.5058]
+	);
 
 	useEffect(() => {
 		const savedStation = JSON.parse(localStorage.getItem("currentStation"));
@@ -110,6 +115,26 @@ function App() {
 			});
 	}, []);
 
+	useEffect(() => {
+		if (navigator.geolocation) {
+			navigator.geolocation.getCurrentPosition(
+				(position) => {
+					const { latitude, longitude } = position.coords;
+					setUserLocation([latitude, longitude]);
+					localStorage.setItem(
+						"userLocation",
+						JSON.stringify([latitude, longitude])
+					);
+				},
+				(error) => {
+					console.error("Error getting user's location:", error);
+				}
+			);
+		} else {
+			console.error("Geolocation is not supported by this browser.");
+		}
+	}, []);
+
 	return (
 		<Router>
 			<div className="mobile-container">
@@ -147,6 +172,7 @@ function App() {
 									setLocation={setPosition}
 									setActiveStation={setActiveStation}
 									setActiveTab={setActiveTab}
+									userLocation={userLocation}
 								/>
 							}
 						/>
@@ -160,12 +186,11 @@ function App() {
 							path="/stations"
 							element={
 								<NearMeTab
-									position={position}
-									activeStation={activeStation}
 									setPosition={setPosition}
 									setActiveStation={setActiveStation}
 									setActiveTab={setActiveTab}
 									busStops={busStops}
+									userLocation={userLocation}
 								/>
 							}
 						/>
