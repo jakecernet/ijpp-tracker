@@ -17,7 +17,6 @@ import ArrivalsTab from "./tabs/arrivals";
 import SettingsTab from "./tabs/settings";
 
 function App() {
-	const [activeTab, setActiveTab] = useState(document.location.pathname);
 	const [activeStation, setActiveStation] = useState("Dob 2");
 	const [position, setPosition] = useState([46.056, 14.5058]);
 	const [gpsPositons, setGpsPositions] = useState([]);
@@ -158,7 +157,7 @@ function App() {
 									busStops={busStops}
 									setLocation={setPosition}
 									setActiveStation={setActiveStation}
-									setActiveTab={setActiveTab}
+									userLocation={userLocation}
 								/>
 							}
 						/>
@@ -171,7 +170,6 @@ function App() {
 									busStops={busStops}
 									setLocation={setPosition}
 									setActiveStation={setActiveStation}
-									setActiveTab={setActiveTab}
 									userLocation={userLocation}
 								/>
 							}
@@ -188,7 +186,6 @@ function App() {
 								<NearMeTab
 									setPosition={setPosition}
 									setActiveStation={setActiveStation}
-									setActiveTab={setActiveTab}
 									busStops={busStops}
 									userLocation={userLocation}
 								/>

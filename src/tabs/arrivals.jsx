@@ -1,8 +1,6 @@
-import { act } from "react";
-
 const ArrivalsTab = ({ activeStation }) => {
 	return (
-		<div>
+		<div className="insideDiv">
 			<h2>Prihodi na: {activeStation}</h2>
 			<input
 				type="text"

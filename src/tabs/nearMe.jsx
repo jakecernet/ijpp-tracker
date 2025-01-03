@@ -33,7 +33,6 @@ const NearMe = ({
 	userLocation,
 	setPosition,
 	setActiveStation,
-	setActiveTab,
 	busStops,
 }) => {
 	useEffect(() => {
@@ -56,7 +55,7 @@ const NearMe = ({
 							className="station-item"
 							onClick={() => {
 								setActiveStation(busStop.name);
-								setActiveTab("arrivals");
+								window.location.href = "/arrivals";
 								setPosition(busStop.gpsLocation);
 								localStorage.setItem(
 									"activeStation",

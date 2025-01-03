@@ -182,8 +182,11 @@ const Map = ({
 					<Marker
 						position={userLocation}
 						icon={userIcon}
-						title="Tukaj sem"
-					/>
+						title="Tukaj sem">
+						<Popup>
+							<h3>Vaša lokacija</h3>
+						</Popup>
+					</Marker>
 				</MapContainer>
 			</div>
 		</div>
