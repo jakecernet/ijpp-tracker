@@ -55,7 +55,7 @@ const NearMe = ({
 							className="station-item"
 							onClick={() => {
 								setActiveStation(busStop.name);
-								window.location.href = "/arrivals";
+								window.location.href = "/#/arrivals";
 								setPosition(busStop.gpsLocation);
 								localStorage.setItem(
 									"activeStation",
