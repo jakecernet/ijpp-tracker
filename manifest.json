@@ -1,0 +1,8 @@
+{
+    "name": "IJPP Tracker",
+    "short_name": "IJPP Tracker",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#fff",
+    "theme_color": "#3f51b5"
+}
