@@ -1,32 +1,42 @@
-const ArrivalsTab = ({ activeStation }) => {
+import { useState, useEffect } from "react";
+import { Search } from "lucide-react";
+
+const ArrivalsTab = ({ activeStation, stopArrivals }) => {
+	const [arrivals, setArrivals] = useState([]);
+
+	useEffect(() => {
+		const formattedArrivals = stopArrivals.map((arrival) => ({
+			routeName: arrival.routeName ? arrival.routeName : "N/A",
+			timeArrival: arrival.timeArrival ? arrival.timeArrival : "N/A",
+			timeDeparture: arrival.timeDeparture
+				? arrival.timeDeparture
+				: "N/A",
+			operator: arrival.operator ? arrival.operator : "N/A",
+		}));
+		setArrivals(formattedArrivals);
+	}, [stopArrivals]);
+
 	return (
 		<div className="insideDiv">
-			<h2>Prihodi na: {activeStation}</h2>
-			<input
-				type="text"
-				placeholder="Search for a bus route"
-				className="search-input"
-			/>
-			<div className="arrival-item">
-				<h3>6B</h3>
-				<p>Naslednji prihod: 5 minut</p>
+			<h2>Prihodi na: {activeStation.name}</h2>
+			<div className="search-container">
+				<Search className="search-icon" />
+				<input
+					type="text"
+					placeholder="Išči po številki linije"
+					className="search-input"
+				/>
 			</div>
-			<div className="arrival-item">
-				<h3>18L</h3>
-				<p>Naslednji prihod: 10 minut</p>
-			</div>
-			<div className="arrival-item">
-				<h3>46</h3>
-				<p>Naslednji prihod: 15 minut</p>
-			</div>
-			<div className="arrival-item">
-				<h3>48P</h3>
-				<p>Naslednji prihod: 20 minut</p>
-			</div>
-			<div className="arrival-item">
-				<h3>69</h3>
-				<p>Naslednji prihod: 36 minut</p>
-			</div>
+			{arrivals.map((arrival, index) => (
+				Date.parse(arrival.timeArrival) <= Date.now() ? null : (
+				<div key={index} className="arrival-item">
+					<h3>{arrival.routeName}</h3>
+					<p>Prihod: {arrival.timeArrival}</p>
+					<p>Odhod: {arrival.timeDeparture}</p>
+					<p>Prevoznik: {arrival.operator}</p>
+				</div>
+				)
+			))}
 		</div>
 	);
 };

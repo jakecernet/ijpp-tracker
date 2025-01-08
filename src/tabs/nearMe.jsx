@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 const calculateDistance = (userLocation, busStops) => {
 	const earthRadius = 6371; // Radius of the Earth in kilometers
@@ -29,12 +29,7 @@ const toRadians = (degrees) => {
 	return degrees * (Math.PI / 180);
 };
 
-const NearMe = ({
-	userLocation,
-	setPosition,
-	setActiveStation,
-	busStops,
-}) => {
+const NearMe = ({ userLocation, setActiveStation, busStops }) => {
 	useEffect(() => {
 		calculateDistance(userLocation, busStops);
 	}, [userLocation, busStops]);
@@ -44,8 +39,7 @@ const NearMe = ({
 			<h2>Postaje v bližini</h2>
 			{busStops
 				.filter(
-					(busStop) =>
-						busStop.distance <= 10 && busStop.distance > 0
+					(busStop) => busStop.distance <= 10 && busStop.distance > 0
 				)
 				.sort((a, b) => a.distance - b.distance)
 				.map((busStop, index) => {
@@ -54,20 +48,9 @@ const NearMe = ({
 							key={index}
 							className="station-item"
 							onClick={() => {
-								setActiveStation(busStop.name);
+								setActiveStation(busStop);
 								window.location.href = "/#/arrivals";
-								setPosition(busStop.gpsLocation);
-								localStorage.setItem(
-									"activeStation",
-									busStop.name
-								);
-								localStorage.setItem(
-									"currentStation",
-									JSON.stringify({
-										name: busStop.name,
-										coordinates: busStop.gpsLocation,
-									})
-								);
+								localStorage.setItem("activeStation", JSON.stringify(busStop));
 							}}>
 							<MapPin size={24} />
 							<div>

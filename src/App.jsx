@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-	HashRouter as Router,
-	NavLink,
-	Routes,
-	Route,
-} from "react-router-dom";
+import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain } from "react-icons/fa";
 import "./App.css";
@@ -17,10 +12,14 @@ import ArrivalsTab from "./tabs/arrivals";
 import SettingsTab from "./tabs/settings";
 
 function App() {
-	const [activeStation, setActiveStation] = useState("Dob 2");
-	const [position, setPosition] = useState([46.056, 14.5058]);
+	const [activeStation, setActiveStation] = useState(
+		localStorage.getItem("activeStation")
+			? JSON.parse(localStorage.getItem("activeStation"))
+			: []
+	);
 	const [gpsPositons, setGpsPositions] = useState([]);
 	const [trips, setTrips] = useState({});
+	const stopArrivals = [];
 	const [busStops, setBusStops] = useState([]);
 	const [currentUrl, setCurrentUrl] = useState(document.location.pathname);
 	const [userLocation, setUserLocation] = useState(
@@ -28,18 +27,16 @@ function App() {
 			? JSON.parse(localStorage.getItem("userLocation"))
 			: [46.056, 14.5058]
 	);
+	const [busStopArrivals, setBusStopArrivals] = useState([]);
 
 	useEffect(() => {
-		const savedStation = JSON.parse(localStorage.getItem("currentStation"));
+		const savedStation = JSON.parse(localStorage.getItem("activeStation"));
 		if (savedStation) {
-			const { name, coordinates } = savedStation;
-			setActiveStation(name);
-			setPosition(coordinates);
+			setActiveStation(savedStation);
 		}
 	}, []);
 
 	useEffect(() => {
-		console.log("Fetching vehicle locations...");
 		fetch("https://ojpp.si/api/vehicle_locations")
 			.then((response) => response.json())
 			.then((data) => {
@@ -86,7 +83,6 @@ function App() {
 				console.error("An error occurred:", error);
 			});
 
-		console.log("Fetching bus stop locations...");
 		fetch("https://ojpp.si/api/stop_locations")
 			.then((response) => response.json())
 			.then((data) => {
@@ -96,6 +92,7 @@ function App() {
 					const properties = feature.properties;
 					const name = feature.properties.name;
 					const gpsLocation = feature.geometry.coordinates;
+					const id = feature.properties.id;
 					gpsLocation.reverse();
 
 					const formattedGpsLocation = gpsLocation
@@ -106,13 +103,48 @@ function App() {
 					newBusStops.push({
 						name,
 						gpsLocation,
+						id,
 					});
 				});
 
 				setBusStops(newBusStops);
 				console.log("Bus stops:", newBusStops);
 			});
-	}, []);
+
+		fetch(
+			`https://ojpp.si/api/stop_locations/` +
+				activeStation.id +
+				`/arrivals`
+		)
+			.then((response) => {
+				if (!response.ok) {
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+				return response.json();
+			})
+			.then((data) => {
+				const arrivals = data.map((arrival) => ({
+					tripId: arrival.trip_id,
+					routeId: arrival.route_id,
+					routeName: arrival.route_name,
+					timeArrival: arrival.time_arrival,
+					timeDeparture: arrival.time_departure,
+					operator: arrival.operator.name,
+				}));
+				setBusStopArrivals(arrivals);
+				localStorage.setItem(
+					"busStopArrivals",
+					JSON.stringify(arrivals)
+				);
+				console.log("Stop arrivals:", arrivals);
+			})
+			.catch((error) => {
+				console.error(
+					"An error occurred while fetching stop arrivals:",
+					error
+				);
+			});
+	}, [activeStation]);
 
 	useEffect(() => {
 		if (navigator.geolocation) {
@@ -152,10 +184,9 @@ function App() {
 							path="/*"
 							element={
 								<MapTab
-									position={position}
 									gpsPositons={gpsPositons}
 									busStops={busStops}
-									setLocation={setPosition}
+									activeStation={activeStation}
 									setActiveStation={setActiveStation}
 									userLocation={userLocation}
 								/>
@@ -165,10 +196,9 @@ function App() {
 							path="/map"
 							element={
 								<MapTab
-									position={position}
 									gpsPositons={gpsPositons}
 									busStops={busStops}
-									setLocation={setPosition}
+									activeStation={activeStation}
 									setActiveStation={setActiveStation}
 									userLocation={userLocation}
 								/>
@@ -177,14 +207,16 @@ function App() {
 						<Route
 							path="/arrivals"
 							element={
-								<ArrivalsTab activeStation={activeStation} />
+								<ArrivalsTab
+									activeStation={activeStation}
+									stopArrivals={busStopArrivals}
+								/>
 							}
 						/>
 						<Route
 							path="/stations"
 							element={
 								<NearMeTab
-									setPosition={setPosition}
 									setActiveStation={setActiveStation}
 									busStops={busStops}
 									userLocation={userLocation}

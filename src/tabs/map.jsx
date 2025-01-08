@@ -76,37 +76,21 @@ function MapCenter({ center }) {
 }
 
 const Map = ({
-	position,
 	gpsPositons,
 	busStops,
-	setLocation,
+	activeStation,
 	setActiveStation,
-	setActiveTab,
 	userLocation,
 }) => {
-	const saveStationToLocalStorage = (name, coordinates) => {
-		const stationData = {
-			name: name,
-			coordinates: coordinates,
-		};
-		localStorage.setItem("currentStation", JSON.stringify(stationData));
-	};
-
-	const [savedStation, setSavedStation] = useState(null);
+	const activeStation2 = activeStation;
+	const position = activeStation2.gpsLocation;
 	const [mapCenter, setMapCenter] = useState(position);
 
 	useEffect(() => {
-		const savedStationData = JSON.parse(
-			localStorage.getItem("currentStation")
-		);
-		if (savedStationData) {
-			const { name, coordinates } = savedStationData;
-			setActiveStation(name);
-			setLocation(coordinates);
-			setSavedStation(savedStationData);
-			setMapCenter(coordinates);
+		if (activeStation2) {
+			setMapCenter(activeStation.gpsLocation);
 		}
-	}, [setActiveStation, setLocation]);
+	}, [setMapCenter]);
 
 	return (
 		<div className="insideDiv">
@@ -159,18 +143,19 @@ const Map = ({
 										<h3>{busStop.name}</h3>
 										<button
 											onClick={() => {
-												setLocation(
-													busStop.gpsLocation
-												);
-												setActiveStation(busStop.name);
-												saveStationToLocalStorage(
-													busStop.name,
-													busStop.gpsLocation
-												);
+												setActiveStation(JSON.stringify(busStop));
 												setMapCenter(
 													busStop.gpsLocation
 												);
-												setActiveTab("arrivals");
+												localStorage.setItem(
+													"activeStation",
+													JSON.stringify({
+														name: busStop.name,
+														coordinates:
+															busStop.gpsLocation,
+														id: busStop.id,
+													})
+												);
 											}}>
 											Tukaj sem
 										</button>
