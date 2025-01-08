@@ -83,12 +83,12 @@ const Map = ({
 	userLocation,
 }) => {
 	const activeStation2 = activeStation;
-	const position = activeStation2.gpsLocation;
+	const position = activeStation2.gpsLocation ? activeStation2.gpsLocation : userLocation;
 	const [mapCenter, setMapCenter] = useState(position);
 
 	useEffect(() => {
 		if (activeStation2) {
-			setMapCenter(activeStation.gpsLocation);
+			setMapCenter(activeStation.gpsLocation ? activeStation.gpsLocation : userLocation);
 		}
 	}, [setMapCenter]);
 

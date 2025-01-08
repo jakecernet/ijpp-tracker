@@ -15,7 +15,7 @@ function App() {
 	const [activeStation, setActiveStation] = useState(
 		localStorage.getItem("activeStation")
 			? JSON.parse(localStorage.getItem("activeStation"))
-			: []
+			: ["Vrhnika", [46.057, 14.295], 12197]
 	);
 	const [gpsPositons, setGpsPositions] = useState([]);
 	const [trips, setTrips] = useState({});
