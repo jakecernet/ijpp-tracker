@@ -19,13 +19,25 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 					let arrivalDate = null;
 					let departureDate = null;
 
+					if (arrival.timeArrival == null) {
+						arrival.timeArrival = arrival.timeDeparture;
+					}
+
+					if (arrival.timeDeparture == null) {
+						arrival.timeDeparture = arrival.timeArrival;
+					}
+
 					if (arrival.timeArrival) {
-						const [hours, minutes] = arrival.timeArrival.split(":").map(Number);
+						const [hours, minutes] = arrival.timeArrival
+							.split(":")
+							.map(Number);
 						arrivalDate = set(now, { hours, minutes, seconds: 0 });
 					}
 
 					if (arrival.timeDeparture) {
-						const [depHours, depMinutes] = arrival.timeDeparture.split(":").map(Number);
+						const [depHours, depMinutes] = arrival.timeDeparture
+							.split(":")
+							.map(Number);
 						departureDate = set(arrivalDate || now, {
 							hours: depHours,
 							minutes: depMinutes,
@@ -72,19 +84,29 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 
 	const formatArrivalTime = (arrivalTime) => {
 		if (!arrivalTime) return "N/A";
+		return format(arrivalTime, "HH:mm", { locale: sl });
+	};
 
-		const now = new Date();
-		const minutesUntilArrival = Math.round(
-			(arrivalTime.getTime() - now.getTime()) / (1000 * 60)
-		);
+	const formatRelativeTime = (arrivalTime) => {
+		if (!arrivalTime) return "N/A";
+		return formatDistanceToNow(arrivalTime, {
+			addSuffix: false,
+			locale: sl,
+		});
+	};
 
-		if (useRelativeTime && minutesUntilArrival <= 60) {
-			return formatDistanceToNow(arrivalTime, {
-				addSuffix: true,
-				locale: sl,
-			});
-		} else {
-			return format(arrivalTime, "HH:mm", { locale: sl });
+	const shortenOperatorName = (operator) => {
+		switch (operator) {
+			case "Javno podjetje Ljubljanski potniški promet d.o.o.":
+				return "LPP";
+			case "Arriva d.o.o.":
+				return "Arriva";
+			case "Nomago d.o.o.":
+				return "Nomago";
+			case "Avtobusni promet Murska Sobota d.d.":
+				return "AP Murska Sobota";
+			default:
+				return operator;
 		}
 	};
 
@@ -101,24 +123,18 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 				/>
 				<Search className="search-icon" />
 			</div>
-			<div className="toggle-container">
-				<label>
-					<input
-						type="checkbox"
-						checked={useRelativeTime}
-						onChange={() => setUseRelativeTime(!useRelativeTime)}
-					/>
-					Uporabi relativni čas za bližnje prihode
-				</label>
-			</div>
 			{error && <p className="error-message">{error}</p>}
 			{!error &&
 				filteredArrivals.map((arrival, index) => (
 					<div key={index} className="arrival-item">
 						<h3>{arrival.routeName}</h3>
-						<p>Prihod: {formatArrivalTime(arrival.timeArrival)}</p>
-						<p>Odhod: {formatArrivalTime(arrival.timeDeparture)}</p>
-						<p>Prevoznik: {arrival.operator}</p>
+						<>
+							Prihod: {formatArrivalTime(arrival.timeArrival)} (
+							{formatRelativeTime(arrival.timeArrival)})
+						</>
+						<p>
+							Prevoznik: {shortenOperatorName(arrival.operator)}
+						</p>
 					</div>
 				))}
 			{!stationSelected && (
