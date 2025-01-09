@@ -1,5 +1,5 @@
+import React, { useEffect, useMemo } from "react";
 import { MapPin } from "lucide-react";
-import { useEffect, useState } from "react";
 
 const calculateDistance = (userLocation, busStops) => {
 	const earthRadius = 6371; // Radius of the Earth in kilometers
@@ -28,64 +28,48 @@ const toRadians = (degrees) => {
 	return degrees * (Math.PI / 180);
 };
 
-const NearMe = ({ userLocation, setActiveStation, busStops, setCurentUrl }) => {
-	/* const [stationSelected, setStationSelected] = useState(() => {
-		const activeStation = localStorage.getItem("activeStation");
-		if (activeStation) {
-			return JSON.parse(activeStation).id !== 123456789;
-		} else {
-			return false;
-		}
-	}); */
+const StationItem = React.memo(({ busStop, onSelect }) => (
+	<div className="station-item" onClick={onSelect}>
+		<MapPin size={24} />
+		<div>
+			<h3>{busStop.name}</h3>
+			<p>{busStop.distance} km</p>
+		</div>
+	</div>
+));
 
+const NearMe = ({ userLocation, setActiveStation, busStops, setCurentUrl }) => {
 	useEffect(() => {
 		calculateDistance(userLocation, busStops);
-		/* if (localStorage.getItem("activeStation")) {
-			if (
-				JSON.parse(localStorage.getItem("activeStation")).id ==
-				123456789
-			) {
-				setStationSelected(true);
-			}
-		} */
 	}, [userLocation, busStops]);
+
+	const sortedBusStops = useMemo(() => {
+		return busStops
+			.filter((busStop) => busStop.distance <= 10 && busStop.distance > 0)
+			.sort((a, b) => a.distance - b.distance);
+	}, [busStops]);
 
 	return (
 		<div className="insideDiv">
 			<h2>Postaje v bližini</h2>
-			{/* {stationSelected ? null : (
-				<p>Prosimo izberite postajo iz seznama ali na zemljevidu.</p>
-			)} */}
 			<p>Prosimo izberite postajo iz seznama ali na zemljevidu.</p>
-			{busStops
-				.filter(
-					(busStop) => busStop.distance <= 10 && busStop.distance > 0
-				)
-				.sort((a, b) => a.distance - b.distance)
-				.map((busStop, index) => {
-					return (
-						<div
-							key={index}
-							className="station-item"
-							onClick={() => {
-								setActiveStation(busStop);
-								window.location.href = "/#/arrivals";
-								localStorage.setItem(
-									"activeStation",
-									JSON.stringify(busStop)
-								);
-								setCurentUrl("/arrivals");
-							}}>
-							<MapPin size={24} />
-							<div>
-								<h3>{busStop.name}</h3>
-								<p>{busStop.distance} km</p>
-							</div>
-						</div>
-					);
-				})}
+			{sortedBusStops.map((busStop, index) => (
+				<StationItem
+					key={index}
+					busStop={busStop}
+					onSelect={() => {
+						setActiveStation(busStop);
+						window.location.href = "/#/arrivals";
+						localStorage.setItem(
+							"activeStation",
+							JSON.stringify(busStop)
+						);
+						setCurentUrl("/arrivals");
+					}}
+				/>
+			))}
 		</div>
 	);
 };
 
-export default NearMe;
+export default React.memo(NearMe);

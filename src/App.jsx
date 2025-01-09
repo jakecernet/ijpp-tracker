@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { lazy, Suspense, useState, useEffect } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain } from "react-icons/fa";
 import "./App.css";
 
-import MapTab from "./tabs/map";
-import NearMeTab from "./tabs/nearMe";
-import ArrivalsTab from "./tabs/arrivals";
-import SettingsTab from "./tabs/settings";
+const MapTab = lazy(() => import("./tabs/map"));
+const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
+const NearMeTab = lazy(() => import("./tabs/nearMe"));
+const SettingsTab = lazy(() => import("./tabs/settings"));
 
 function App() {
 	const [activeStation, setActiveStation] = useState(
@@ -188,55 +188,57 @@ function App() {
 					</div>
 				</div>
 				<div className="content">
-					<Routes>
-						<Route
-							path="/*"
-							element={
-								<MapTab
-									gpsPositons={gpsPositons}
-									busStops={busStops}
-									activeStation={activeStation}
-									setActiveStation={setActiveStation}
-									userLocation={userLocation}
-									setCurentUrl={setCurrentUrl}
-								/>
-							}
-						/>
-						<Route
-							path="/map"
-							element={
-								<MapTab
-									gpsPositons={gpsPositons}
-									busStops={busStops}
-									activeStation={activeStation}
-									setActiveStation={setActiveStation}
-									userLocation={userLocation}
-									setCurentUrl={setCurrentUrl}
-								/>
-							}
-						/>
-						<Route
-							path="/arrivals"
-							element={
-								<ArrivalsTab
-									activeStation={activeStation}
-									stopArrivals={busStopArrivals}
-								/>
-							}
-						/>
-						<Route
-							path="/stations"
-							element={
-								<NearMeTab
-									setActiveStation={setActiveStation}
-									busStops={busStops}
-									userLocation={userLocation}
-									setCurentUrl={setCurrentUrl}
-								/>
-							}
-						/>
-						<Route path="/settings" element={<SettingsTab />} />
-					</Routes>
+					<Suspense fallback={<div>Loading...</div>}>
+						<Routes>
+							<Route
+								path="/*"
+								element={
+									<MapTab
+										gpsPositons={gpsPositons}
+										busStops={busStops}
+										activeStation={activeStation}
+										setActiveStation={setActiveStation}
+										userLocation={userLocation}
+										setCurentUrl={setCurrentUrl}
+									/>
+								}
+							/>
+							<Route
+								path="/map"
+								element={
+									<MapTab
+										gpsPositons={gpsPositons}
+										busStops={busStops}
+										activeStation={activeStation}
+										setActiveStation={setActiveStation}
+										userLocation={userLocation}
+										setCurentUrl={setCurrentUrl}
+									/>
+								}
+							/>
+							<Route
+								path="/arrivals"
+								element={
+									<ArrivalsTab
+										activeStation={activeStation}
+										stopArrivals={busStopArrivals}
+									/>
+								}
+							/>
+							<Route
+								path="/stations"
+								element={
+									<NearMeTab
+										setActiveStation={setActiveStation}
+										busStops={busStops}
+										userLocation={userLocation}
+										setCurentUrl={setCurrentUrl}
+									/>
+								}
+							/>
+							<Route path="/settings" element={<SettingsTab />} />
+						</Routes>
+					</Suspense>
 				</div>
 				<nav className="bottom-nav">
 					<NavLink to="/map">
