@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
-import { format, formatDistanceToNow, set, isBefore } from "date-fns";
+import { format, formatDistanceToNow, parseISO, set, isBefore } from "date-fns";
 import { sl } from "date-fns/locale";
 
 const ArrivalsTab = ({ activeStation, stopArrivals }) => {
@@ -8,30 +8,51 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 	const [stationSelected, setStationSelected] = useState(false);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [useRelativeTime, setUseRelativeTime] = useState(true);
+	const [error, setError] = useState(null);
 
 	useEffect(() => {
 		if (stopArrivals.length === 0) return;
 		const now = new Date();
-		const formattedArrivals = stopArrivals
-			.map((arrival) => {
-				const [hours, minutes] = arrival.timeArrival
-					.split(":")
-					.map(Number);
-				let arrivalDate = set(now, { hours, minutes, seconds: 0 });
+		try {
+			const formattedArrivals = stopArrivals
+				.map((arrival) => {
+					let arrivalDate = null;
+					let departureDate = null;
 
-				return {
-					routeName: arrival.routeName || "N/A",
-					timeArrival: arrivalDate,
-					timeDeparture: set(arrivalDate, {
-						hours: Number(arrival.timeDeparture.split(":")[0]),
-						minutes: Number(arrival.timeDeparture.split(":")[1]),
-					}),
-					operator: arrival.operator || "N/A",
-				};
-			})
-			.filter((arrival) => arrival.timeArrival > now)
-			.sort((a, b) => a.timeArrival.getTime() - b.timeArrival.getTime());
-		setArrivals(formattedArrivals);
+					if (arrival.timeArrival) {
+						const [hours, minutes] = arrival.timeArrival.split(":").map(Number);
+						arrivalDate = set(now, { hours, minutes, seconds: 0 });
+					}
+
+					if (arrival.timeDeparture) {
+						const [depHours, depMinutes] = arrival.timeDeparture.split(":").map(Number);
+						departureDate = set(arrivalDate || now, {
+							hours: depHours,
+							minutes: depMinutes,
+							seconds: 0,
+						});
+					}
+
+					return {
+						routeName: arrival.routeName || "N/A",
+						timeArrival: arrivalDate,
+						timeDeparture: departureDate,
+						operator: arrival.operator || "N/A",
+					};
+				})
+				.filter((item) => !item.timeArrival || item.timeArrival > now)
+				.sort((a, b) => {
+					if (!a.timeArrival && !b.timeArrival) return 0;
+					if (!a.timeArrival) return 1;
+					if (!b.timeArrival) return -1;
+					return a.timeArrival.getTime() - b.timeArrival.getTime();
+				});
+			setArrivals(formattedArrivals);
+			setError(null);
+		} catch (err) {
+			console.error("Error processing arrivals:", err);
+			setError("Napaka pri obdelavi podatkov o prihodih.");
+		}
 	}, [stopArrivals]);
 
 	useEffect(() => {
@@ -50,6 +71,8 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 	}, [arrivals, searchTerm]);
 
 	const formatArrivalTime = (arrivalTime) => {
+		if (!arrivalTime) return "N/A";
+
 		const now = new Date();
 		const minutesUntilArrival = Math.round(
 			(arrivalTime.getTime() - now.getTime()) / (1000 * 60)
@@ -88,20 +111,22 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 					Uporabi relativni čas za bližnje prihode
 				</label>
 			</div>
-			{filteredArrivals.map((arrival, index) => (
-				<div key={index} className="arrival-item">
-					<h3>{arrival.routeName}</h3>
-					<p>Prihod: {formatArrivalTime(arrival.timeArrival)}</p>
-					<p>Odhod: {formatArrivalTime(arrival.timeDeparture)}</p>
-					<p>Prevoznik: {arrival.operator}</p>
-				</div>
-			))}
+			{error && <p className="error-message">{error}</p>}
+			{!error &&
+				filteredArrivals.map((arrival, index) => (
+					<div key={index} className="arrival-item">
+						<h3>{arrival.routeName}</h3>
+						<p>Prihod: {formatArrivalTime(arrival.timeArrival)}</p>
+						<p>Odhod: {formatArrivalTime(arrival.timeDeparture)}</p>
+						<p>Prevoznik: {arrival.operator}</p>
+					</div>
+				))}
 			{!stationSelected && (
 				<p className="no-station-selected">
 					Ni izbrane postaje. Izberi postajo na zemljevidu.
 				</p>
 			)}
-			{stationSelected && filteredArrivals.length === 0 && (
+			{stationSelected && !error && filteredArrivals.length === 0 && (
 				<p className="no-arrivals">
 					Ni prihajajočih prihodov za izbrano postajo.
 				</p>
