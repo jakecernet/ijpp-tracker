@@ -1,5 +1,5 @@
 import { MapPin } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const calculateDistance = (userLocation, busStops) => {
 	const earthRadius = 6371; // Radius of the Earth in kilometers
@@ -20,23 +20,43 @@ const calculateDistance = (userLocation, busStops) => {
 		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 		const distance = earthRadius * c;
 
-		busStop.distance = distance.toFixed(1); // Round distance to 1 decimal point
+		busStop.distance = distance.toFixed(1);
 	});
 };
 
-// Helper function to convert degrees to radians
 const toRadians = (degrees) => {
 	return degrees * (Math.PI / 180);
 };
 
-const NearMe = ({ userLocation, setActiveStation, busStops }) => {
+const NearMe = ({ userLocation, setActiveStation, busStops, setCurentUrl }) => {
+	/* const [stationSelected, setStationSelected] = useState(() => {
+		const activeStation = localStorage.getItem("activeStation");
+		if (activeStation) {
+			return JSON.parse(activeStation).id !== 123456789;
+		} else {
+			return false;
+		}
+	}); */
+
 	useEffect(() => {
 		calculateDistance(userLocation, busStops);
+		/* if (localStorage.getItem("activeStation")) {
+			if (
+				JSON.parse(localStorage.getItem("activeStation")).id ==
+				123456789
+			) {
+				setStationSelected(true);
+			}
+		} */
 	}, [userLocation, busStops]);
 
 	return (
 		<div className="insideDiv">
 			<h2>Postaje v bližini</h2>
+			{/* {stationSelected ? null : (
+				<p>Prosimo izberite postajo iz seznama ali na zemljevidu.</p>
+			)} */}
+			<p>Prosimo izberite postajo iz seznama ali na zemljevidu.</p>
 			{busStops
 				.filter(
 					(busStop) => busStop.distance <= 10 && busStop.distance > 0
@@ -50,7 +70,11 @@ const NearMe = ({ userLocation, setActiveStation, busStops }) => {
 							onClick={() => {
 								setActiveStation(busStop);
 								window.location.href = "/#/arrivals";
-								localStorage.setItem("activeStation", JSON.stringify(busStop));
+								localStorage.setItem(
+									"activeStation",
+									JSON.stringify(busStop)
+								);
+								setCurentUrl("/arrivals");
 							}}>
 							<MapPin size={24} />
 							<div>

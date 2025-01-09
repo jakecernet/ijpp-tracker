@@ -15,13 +15,13 @@ function App() {
 	const [activeStation, setActiveStation] = useState(
 		localStorage.getItem("activeStation")
 			? JSON.parse(localStorage.getItem("activeStation"))
-			: ["Vrhnika", [46.057, 14.295], 12197]
+			: ["Vrhnika", [46.057, 14.295], 123456789]
 	);
 	const [gpsPositons, setGpsPositions] = useState([]);
 	const [trips, setTrips] = useState({});
 	const stopArrivals = [];
 	const [busStops, setBusStops] = useState([]);
-	const [currentUrl, setCurrentUrl] = useState(document.location.pathname);
+	const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
 	const [userLocation, setUserLocation] = useState(
 		localStorage.getItem("userLocation")
 			? JSON.parse(localStorage.getItem("userLocation"))
@@ -33,6 +33,9 @@ function App() {
 		const savedStation = JSON.parse(localStorage.getItem("activeStation"));
 		if (savedStation) {
 			setActiveStation(savedStation);
+		} else {
+			document.location.href = "/#/stations";
+			setCurrentUrl("/stations");
 		}
 	}, []);
 
@@ -83,33 +86,40 @@ function App() {
 				console.error("An error occurred:", error);
 			});
 
-		fetch("https://ojpp.si/api/stop_locations")
-			.then((response) => response.json())
-			.then((data) => {
-				const newBusStops = [];
+		if (!localStorage.getItem("busStops")) {
+			fetch("https://ojpp.si/api/stop_locations")
+				.then((response) => response.json())
+				.then((data) => {
+					const newBusStops = [];
 
-				data.features.forEach((feature) => {
-					const properties = feature.properties;
-					const name = feature.properties.name;
-					const gpsLocation = feature.geometry.coordinates;
-					const id = feature.properties.id;
-					gpsLocation.reverse();
+					data.features.forEach((feature) => {
+						const properties = feature.properties;
+						const name = feature.properties.name;
+						const gpsLocation = feature.geometry.coordinates;
+						const id = feature.properties.id;
+						gpsLocation.reverse();
 
-					const formattedGpsLocation = gpsLocation
-						.join(", ")
-						.replace(",", ", ");
-					properties.gpsLocation = formattedGpsLocation;
+						const formattedGpsLocation = gpsLocation
+							.join(", ")
+							.replace(",", ", ");
+						properties.gpsLocation = formattedGpsLocation;
 
-					newBusStops.push({
-						name,
-						gpsLocation,
-						id,
+						newBusStops.push({
+							name,
+							gpsLocation,
+							id,
+						});
 					});
-				});
 
-				setBusStops(newBusStops);
-				console.log("Bus stops:", newBusStops);
-			});
+					setBusStops(newBusStops);
+					localStorage.setItem(
+						"busStops",
+						JSON.stringify(newBusStops)
+					);
+				});
+		} else {
+			setBusStops(JSON.parse(localStorage.getItem("busStops")));
+		}
 
 		fetch(
 			`https://ojpp.si/api/stop_locations/` +
@@ -136,7 +146,6 @@ function App() {
 					"busStopArrivals",
 					JSON.stringify(arrivals)
 				);
-				console.log("Stop arrivals:", arrivals);
 			})
 			.catch((error) => {
 				console.error(
@@ -189,6 +198,7 @@ function App() {
 									activeStation={activeStation}
 									setActiveStation={setActiveStation}
 									userLocation={userLocation}
+									setCurentUrl={setCurrentUrl}
 								/>
 							}
 						/>
@@ -201,6 +211,7 @@ function App() {
 									activeStation={activeStation}
 									setActiveStation={setActiveStation}
 									userLocation={userLocation}
+									setCurentUrl={setCurrentUrl}
 								/>
 							}
 						/>
@@ -220,6 +231,7 @@ function App() {
 									setActiveStation={setActiveStation}
 									busStops={busStops}
 									userLocation={userLocation}
+									setCurentUrl={setCurrentUrl}
 								/>
 							}
 						/>

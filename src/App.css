@@ -106,6 +106,13 @@ h2 {
   }
 }
 
+.search-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
 .search-input,
 .setting-input {
   width: 100%;
