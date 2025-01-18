@@ -1,6 +1,4 @@
-"use client";
-
-import React, { lazy, Suspense, useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings } from "lucide-react";
 import { FaBus, FaTrain } from "react-icons/fa";
@@ -17,9 +15,7 @@ function App() {
 			? JSON.parse(localStorage.getItem("activeStation"))
 			: ["Vrhnika", [46.057, 14.295], 123456789]
 	);
-	const [gpsPositons, setGpsPositions] = useState([]);
-	const [trips, setTrips] = useState({});
-	const stopArrivals = [];
+	const [gpsPositions, setGpsPositions] = useState([]);
 	const [busStops, setBusStops] = useState([]);
 	const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
 	const [userLocation, setUserLocation] = useState(
@@ -40,120 +36,55 @@ function App() {
 	}, []);
 
 	useEffect(() => {
-		fetch("https://ojpp.si/api/vehicle_locations")
-			.then((response) => response.json())
-			.then((data) => {
-				const newPositions = [];
-				const newTrips = {};
-
-				data.features.forEach((feature) => {
-					const properties = feature.properties;
-					const operatorVehicleId = properties?.operator_vehicle_id;
-
-					if (operatorVehicleId) {
-						if (!newTrips[operatorVehicleId]) {
-							newTrips[operatorVehicleId] = [];
-						}
-
-						const gpsLocation = feature.geometry?.coordinates;
-						gpsLocation.reverse();
-
-						const operator = properties.operator_name;
-
-						if (properties.route_name == null) {
-							properties.route_name = "Neznana linija";
-						}
-						const route = properties.route_name;
-
-						newPositions.push({
-							gpsLocation,
-							operator,
-							route,
-						});
-
-						const formattedGpsLocation = gpsLocation
-							.join(", ")
-							.replace(",", ", ");
-						properties.gpsLocation = formattedGpsLocation;
-						newTrips[operatorVehicleId].push(properties);
-					}
-				});
-
+		const fetchGpsPositions = async () => {
+			try {
+				const response = await fetch(
+					"https://ojpp.si/api/vehicle_locations"
+				);
+				const data = await response.json();
+				const newPositions = data.features.map((feature) => ({
+					gpsLocation: feature.geometry.coordinates.reverse(),
+					operator: feature.properties.operator_name,
+					route: feature.properties.route_name || "Neznana linija",
+				}));
 				setGpsPositions(newPositions);
-				setTrips(newTrips);
-			})
-			.catch((error) => {
-				console.error("An error occurred:", error);
-			});
+			} catch (error) {
+				console.error("Error fetching GPS positions:", error);
+			}
+		};
 
-		if (!localStorage.getItem("busStops")) {
-			fetch("https://ojpp.si/api/stop_locations")
-				.then((response) => response.json())
-				.then((data) => {
-					const newBusStops = [];
-
-					data.features.forEach((feature) => {
-						const properties = feature.properties;
-						const name = feature.properties.name;
-						const gpsLocation = feature.geometry.coordinates;
-						const id = feature.properties.id;
-						gpsLocation.reverse();
-
-						const formattedGpsLocation = gpsLocation
-							.join(", ")
-							.replace(",", ", ");
-						properties.gpsLocation = formattedGpsLocation;
-
-						newBusStops.push({
-							name,
-							gpsLocation,
-							id,
-						});
-					});
-
+		const fetchBusStops = async () => {
+			try {
+				if (!localStorage.getItem("busStops")) {
+					const response = await fetch(
+						"https://ojpp.si/api/stop_locations"
+					);
+					const data = await response.json();
+					const newBusStops = data.features.map((feature) => ({
+						name: feature.properties.name,
+						gpsLocation: feature.geometry.coordinates.reverse(),
+						id: feature.properties.id,
+					}));
 					setBusStops(newBusStops);
 					localStorage.setItem(
 						"busStops",
 						JSON.stringify(newBusStops)
 					);
-				});
-		} else {
-			setBusStops(JSON.parse(localStorage.getItem("busStops")));
-		}
-
-		fetch(
-			`https://ojpp.si/api/stop_locations/` +
-				activeStation.id +
-				`/arrivals`
-		)
-			.then((response) => {
-				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`);
+				} else {
+					setBusStops(JSON.parse(localStorage.getItem("busStops")));
 				}
-				return response.json();
-			})
-			.then((data) => {
-				const arrivals = data.map((arrival) => ({
-					tripId: arrival.trip_id,
-					routeId: arrival.route_id,
-					routeName: arrival.route_name,
-					timeArrival: arrival.time_arrival,
-					timeDeparture: arrival.time_departure,
-					operator: arrival.operator.name,
-				}));
-				setBusStopArrivals(arrivals);
-				localStorage.setItem(
-					"busStopArrivals",
-					JSON.stringify(arrivals)
-				);
-			})
-			.catch((error) => {
-				console.error(
-					"An error occurred while fetching stop arrivals:",
-					error
-				);
-			});
-	}, [activeStation]);
+			} catch (error) {
+				console.error("Error fetching bus stops:", error);
+			}
+		};
+
+		fetchGpsPositions();
+		fetchBusStops();
+
+		const intervalId = setInterval(fetchGpsPositions, 30000); // Update every 30 seconds
+
+		return () => clearInterval(intervalId);
+	}, []);
 
 	useEffect(() => {
 		if (navigator.geolocation) {
@@ -175,6 +106,39 @@ function App() {
 		}
 	}, []);
 
+	useEffect(() => {
+		const fetchBusStopArrivals = async () => {
+			try {
+				const response = await fetch(
+					`https://ojpp.si/api/stop_locations/${activeStation.id}/arrivals`
+				);
+				if (!response.ok) {
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+				const data = await response.json();
+				const arrivals = data.map((arrival) => ({
+					tripId: arrival.trip_id,
+					routeId: arrival.route_id,
+					routeName: arrival.route_name,
+					timeArrival: arrival.time_arrival,
+					timeDeparture: arrival.time_departure,
+					operator: arrival.operator.name,
+				}));
+				setBusStopArrivals(arrivals);
+				localStorage.setItem(
+					"busStopArrivals",
+					JSON.stringify(arrivals)
+				);
+			} catch (error) {
+				console.error("Error fetching bus stop arrivals:", error);
+			}
+		};
+
+		if (activeStation && activeStation.id) {
+			fetchBusStopArrivals();
+		}
+	}, [activeStation]);
+
 	return (
 		<Router>
 			<div className="mobile-container">
@@ -194,7 +158,7 @@ function App() {
 								path="/*"
 								element={
 									<MapTab
-										gpsPositons={gpsPositons}
+										gpsPositions={gpsPositions}
 										busStops={busStops}
 										activeStation={activeStation}
 										setActiveStation={setActiveStation}
@@ -207,7 +171,7 @@ function App() {
 								path="/map"
 								element={
 									<MapTab
-										gpsPositons={gpsPositons}
+										gpsPositions={gpsPositions}
 										busStops={busStops}
 										activeStation={activeStation}
 										setActiveStation={setActiveStation}

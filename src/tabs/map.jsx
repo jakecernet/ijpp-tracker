@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import {
+	MapContainer,
+	TileLayer,
+	Marker,
+	Popup,
+	useMap,
+	useMapEvents,
+	FeatureGroup,
+} from "react-leaflet";
 import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -47,137 +55,138 @@ const operatorIcons = {
 		createOperatorIcon(marpromPNG),
 };
 
-const getBusIcon = (operator_id) =>
-	operatorIcons[operator_id] ||
+const getBusIcon = (operator) =>
+	operatorIcons[operator] ||
 	createOperatorIcon(
 		"https://cdn-icons-png.flaticon.com/512/6618/6618280.png"
 	);
 
-const Map = ({
-	gpsPositons,
-	busStops,
-	activeStation,
-	setActiveStation,
-	userLocation,
-	setCurentUrl,
-}) => {
-	const activeStation2 = useMemo(() => activeStation, [activeStation]);
-	const position = useMemo(
-		() =>
-			activeStation2.gpsLocation
-				? activeStation2.gpsLocation
-				: userLocation,
-		[activeStation2.gpsLocation, userLocation]
-	);
+const Map = React.memo(
+	({
+		gpsPositions,
+		busStops,
+		activeStation,
+		setActiveStation,
+		userLocation,
+		setCurentUrl,
+	}) => {
+		const [map, setMap] = useState(null);
+		const position = useMemo(
+			() => activeStation.coordinates || userLocation,
+			[activeStation, userLocation]
+		);
 
-	const [mapCenter, setMapCenter] = useState(position);
+		const [mapCenter, setMapCenter] = useState(position);
 
-	useEffect(() => {
-		setMapCenter(position);
-	}, [position]);
+		useEffect(() => {
+			setMapCenter(position);
+		}, [position]);
 
-	const handleStationClick = useCallback(
-		(busStop) => {
-			setActiveStation(JSON.stringify(busStop));
-			setMapCenter(busStop.gpsLocation);
-			localStorage.setItem(
-				"activeStation",
-				JSON.stringify({
+		const handleStationClick = useCallback(
+			(busStop) => {
+				setActiveStation({
 					name: busStop.name,
 					coordinates: busStop.gpsLocation,
 					id: busStop.id,
-				})
-			);
-			setCurentUrl("/arrivals");
-			document.location.href = "/#/arrivals";
-		},
-		[setActiveStation, setCurentUrl]
-	);
+				});
+				setMapCenter(busStop.gpsLocation);
+				localStorage.setItem(
+					"activeStation",
+					JSON.stringify({
+						name: busStop.name,
+						coordinates: busStop.gpsLocation,
+						id: busStop.id,
+					})
+				);
+				setCurentUrl("/arrivals");
+				document.location.href = "/#/arrivals";
+			},
+			[setActiveStation, setCurentUrl]
+		);
 
-	const memoizedGpsPositions = useMemo(
-		() =>
-			gpsPositons.map((gpsPositon, index) => (
-				<Marker
-					key={`gps-${index}`}
-					position={gpsPositon.gpsLocation}
-					icon={getBusIcon(gpsPositon.operator)}
-					title={gpsPositon.route}>
-					<Popup>
-						<p>{gpsPositon.route}</p>
-						<p>{gpsPositon.operator}</p>
-						<p>{gpsPositon.gpsLocation}</p>
-					</Popup>
-				</Marker>
-			)),
-		[gpsPositons]
-	);
-
-	const memoizedBusStops = useMemo(
-		() =>
-			busStops.map((busStop, index) => (
-				<Marker
-					key={`stop-${index}`}
-					position={busStop.gpsLocation}
-					icon={stopIcon}
-					title={busStop.name}>
-					<Popup>
-						<h3>{busStop.name}</h3>
-						<button onClick={() => handleStationClick(busStop)}>
-							Tukaj sem
-						</button>
-					</Popup>
-				</Marker>
-			)),
-		[busStops, handleStationClick]
-	);
-
-	return (
-		<div className="insideDiv">
-			<h2>Live Bus Map</h2>
-			<div className="map-container">
-				<MapContainer
-					center={mapCenter}
-					zoom={13}
-					style={{ height: "100%", width: "100%" }}
-					attributionControl={false}
-					scrollWheelZoom={true}>
-					<MapCenter center={mapCenter} />
-					<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+		const memoizedGpsPositions = useMemo(
+			() =>
+				gpsPositions.map((gpsPosition, index) => (
 					<Marker
-						position={mapCenter}
-						icon={L.icon({
-							iconUrl:
-								"https://cdn-icons-png.flaticon.com/512/6618/6618280.png",
-							iconSize: [50, 50],
-							iconAnchor: [25, 50],
-						})}
-					/>
-					<MarkerClusterGroup
-						showCoverageOnHover={false}
-						spiderfyOnMaxZoom={false}
-						disableClusteringAtZoom={10}
-						maxClusterRadius={30}>
-						{memoizedGpsPositions}
-					</MarkerClusterGroup>
-					<MarkerClusterGroup
-						showCoverageOnHover={false}
-						spiderfyOnMaxZoom={false}
-						disableClusteringAtZoom={16}
-						maxClusterRadius={30}>
-						{memoizedBusStops}
-					</MarkerClusterGroup>
-					<Marker
-						position={userLocation}
-						icon={userIcon}
-						title="Tukaj sem">
+						key={`gps-${index}`}
+						position={gpsPosition.gpsLocation}
+						icon={getBusIcon(gpsPosition.operator)}
+						title={gpsPosition.route}>
 						<Popup>
-							<h3>Vaša lokacija</h3>
+							<p>{gpsPosition.route}</p>
+							<p>{gpsPosition.operator}</p>
+							<p>{gpsPosition.gpsLocation.join(", ")}</p>
 						</Popup>
 					</Marker>
-				</MapContainer>
-			</div>
-		</div>
-	);
-};
+				)),
+			[gpsPositions]
+		);
 
-export default React.memo(Map);
+		const memoizedBusStops = useMemo(
+			() =>
+				busStops.map((busStop, index) => (
+					<Marker
+						key={`stop-${index}`}
+						position={busStop.gpsLocation}
+						icon={stopIcon}
+						title={busStop.name}>
+						<Popup>
+							<h3>{busStop.name}</h3>
+							<button onClick={() => handleStationClick(busStop)}>
+								Tukaj sem
+							</button>
+						</Popup>
+					</Marker>
+				)),
+			[busStops, handleStationClick]
+		);
+
+		return (
+			<div className="insideDiv">
+				<h2>Live Bus Map</h2>
+				<div className="map-container">
+					<MapContainer
+						center={mapCenter}
+						zoom={13}
+						style={{ height: "100%", width: "100%" }}
+						attributionControl={false}
+						scrollWheelZoom={true}
+						whenCreated={setMap}>
+						<MapCenter center={mapCenter} />
+						<TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+						<FeatureGroup>
+							<MarkerClusterGroup
+								showCoverageOnHover={false}
+								spiderfyOnMaxZoom={false}
+								disableClusteringAtZoom={10}
+								maxClusterRadius={30}>
+								{memoizedGpsPositions}
+							</MarkerClusterGroup>
+						</FeatureGroup>
+						<FeatureGroup>
+							<MarkerClusterGroup
+								showCoverageOnHover={false}
+								spiderfyOnMaxZoom={false}
+								disableClusteringAtZoom={16}
+								maxClusterRadius={30}>
+								{memoizedBusStops}
+							</MarkerClusterGroup>
+						</FeatureGroup>
+						{userLocation && (
+							<Marker
+								position={userLocation}
+								icon={userIcon}
+								title="Tukaj sem">
+								<Popup>
+									<h3>Vaša lokacija</h3>
+								</Popup>
+							</Marker>
+						)}
+					</MapContainer>
+				</div>
+			</div>
+		);
+	}
+);
+
+export default Map;
