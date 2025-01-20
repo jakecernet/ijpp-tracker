@@ -14,6 +14,7 @@ import arrivaPNG from "../img/arriva.png";
 import lppPNG from "../img/lpp.png";
 import nomagoPNG from "../img/nomago.png";
 import marpromPNG from "../img/marprom.png";
+import murskaPNG from "../img/murska.png";
 import userPNG from "../img/user.png";
 import busStopPNG from "../img/busStop.png";
 import locationPNG from "../img/location.png";
@@ -52,6 +53,7 @@ const operatorIcons = {
     "Nomago d.o.o.": createOperatorIcon(nomagoPNG),
     "Arriva d.o.o.": createOperatorIcon(arrivaPNG),
     "Javno podjetje za mestni potniški promet Marprom, d.o.o.": createOperatorIcon(marpromPNG),
+	"Avtobusni promet Murska Sobota d.d.": createOperatorIcon(murskaPNG),
 };
 
 function getBusIcon(operator) {
