@@ -16,6 +16,8 @@ import lppPNG from "../img/lpp.png";
 import nomagoPNG from "../img/nomago.png";
 import marpromPNG from "../img/marprom.png";
 import userPNG from "../img/user.png";
+import busStopPNG from "../img/busStop.png";
+import locationPNG from "../img/location.png";
 
 const MapCenter = React.memo(({ center }) => {
 	const map = useMap();
@@ -28,7 +30,7 @@ const MapCenter = React.memo(({ center }) => {
 });
 
 const stopIcon = new L.Icon({
-	iconUrl: "https://cdn-icons-png.flaticon.com/512/7561/7561230.png",
+	iconUrl: busStopPNG,
 	iconSize: [30, 30],
 	iconAnchor: [15, 30],
 });
@@ -56,10 +58,7 @@ const operatorIcons = {
 };
 
 const getBusIcon = (operator) =>
-	operatorIcons[operator] ||
-	createOperatorIcon(
-		"https://cdn-icons-png.flaticon.com/512/6618/6618280.png"
-	);
+	operatorIcons[operator] || createOperatorIcon(locationPNG);
 
 const Map = React.memo(
 	({
