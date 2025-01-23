@@ -138,20 +138,53 @@ h2 {
   gap: 15px;
 }
 
-.setting-item {
+.settings {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+  flex-direction: column;
+  gap: 20px;
 
-.save-button {
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  padding: 10px;
-  border-radius: 4px;
-  font-size: 16px;
-  cursor: pointer;
+  .setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-direction: column;
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+
+      div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        text-align: right;
+
+        input[type="checkbox"] {
+          width: 20px;
+          height: 20px;
+        }
+
+        input[type="range"] {
+          width: 100%;
+        }
+
+        label {
+          font-size: 16px;
+        }
+      }
+    }
+  }
+
+  .save-button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+  }
 }
 
 .bottom-nav {

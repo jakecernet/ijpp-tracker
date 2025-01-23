@@ -24,6 +24,29 @@ function App() {
 			: [46.056, 14.5058]
 	);
 	const [busStopArrivals, setBusStopArrivals] = useState([]);
+	const [activeOperators, setActiveOperators] = useState(
+		localStorage.getItem("activeOperators")
+			? JSON.parse(localStorage.getItem("activeOperators"))
+			: ["lpp", "arriva", "nomago", "murska"]
+	);
+	const [radius, setRadius] = useState(
+		localStorage.getItem("radius") || 20
+	);
+
+	function activeOperatorsNormal(activeOperators) {
+		switch (activeOperators) {
+			case "lpp":
+				return "Javno podjetje Ljubljanski potniški promet d.o.o.";
+			case "arriva":
+				return "Arriva d.o.o.";
+			case "nomago":
+				return "Nomago d.o.o.";
+			case "murska":
+				return "Avtobusni promet Murska Sobota d.d.";
+			default:
+				return activeOperators;
+		}
+	}
 
 	useEffect(() => {
 		const savedStation = JSON.parse(localStorage.getItem("activeStation"));
@@ -42,36 +65,66 @@ function App() {
 					"https://ojpp.si/api/vehicle_locations"
 				);
 				const data = await response.json();
-				const newPositions = data.features.map((feature) => ({
-					gpsLocation: feature.geometry.coordinates.reverse(),
-					operator: feature.properties.operator_name,
-					route: feature.properties.route_name || "Neznana linija",
-				}));
+				const newPositions = data.features
+					.filter((feature) => {
+						const operatorName =
+							feature.properties.operator_name.toLowerCase();
+						return activeOperatorsNormal(activeOperators).includes(
+							operatorName
+						);
+					})
+					.map((feature) => ({
+						gpsLocation: feature.geometry.coordinates.reverse(),
+						operator: feature.properties.operator_name,
+						route:
+							feature.properties.route_name || "Neznana linija",
+					}));
 				setGpsPositions(newPositions);
+				console.log(newPositions);
 			} catch (error) {
 				console.error("Error fetching GPS positions:", error);
 			}
 		};
 
 		const fetchBusStops = async () => {
+			const distance = (lat1, lon1, lat2, lon2) => {
+				const R = 6371;
+				const dLat = ((lat2 - lat1) * Math.PI) / 180;
+				const dLon = ((lon2 - lon1) * Math.PI) / 180;
+				const a =
+					Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+					Math.cos((lat1 * Math.PI) / 180) *
+						Math.cos((lat2 * Math.PI) / 180) *
+						Math.sin(dLon / 2) * Math.sin(dLon / 2);
+				return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+			};
+
 			try {
 				if (!localStorage.getItem("busStops")) {
-					const response = await fetch(
-						"https://ojpp.si/api/stop_locations"
-					);
+					const response = await fetch("https://ojpp.si/api/stop_locations");
 					const data = await response.json();
 					const newBusStops = data.features.map((feature) => ({
 						name: feature.properties.name,
 						gpsLocation: feature.geometry.coordinates.reverse(),
 						id: feature.properties.id,
 					}));
-					setBusStops(newBusStops);
-					localStorage.setItem(
-						"busStops",
-						JSON.stringify(newBusStops)
-					);
+					const filteredBusStops = newBusStops.filter((stop) => {
+						const [lat, lon] = stop.gpsLocation;
+						return (
+							distance(userLocation[0], userLocation[1], lat, lon) <= +radius
+						);
+					});
+					setBusStops(filteredBusStops);
+					localStorage.setItem("busStops", JSON.stringify(filteredBusStops));
 				} else {
-					setBusStops(JSON.parse(localStorage.getItem("busStops")));
+					const storedBusStops = JSON.parse(localStorage.getItem("busStops"));
+					const filteredBusStops = storedBusStops.filter((stop) => {
+						const [lat, lon] = stop.gpsLocation;
+						return (
+							distance(userLocation[0], userLocation[1], lat, lon) <= +radius
+						);
+					});
+					setBusStops(filteredBusStops);
 				}
 			} catch (error) {
 				console.error("Error fetching bus stops:", error);
@@ -200,7 +253,17 @@ function App() {
 									/>
 								}
 							/>
-							<Route path="/settings" element={<SettingsTab />} />
+							<Route
+								path="/settings"
+								element={
+									<SettingsTab
+										setActiveOperators={setActiveOperators}
+										activeOperators={activeOperators}
+										radius={radius}
+										setRadius={setRadius}
+									/>
+								}
+							/>
 						</Routes>
 					</Suspense>
 				</div>
