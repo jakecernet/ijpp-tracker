@@ -29,23 +29,41 @@ function App() {
 			? JSON.parse(localStorage.getItem("activeOperators"))
 			: ["lpp", "arriva", "nomago", "murska"]
 	);
-	const [radius, setRadius] = useState(
-		localStorage.getItem("radius") || 20
+	const [radius, setRadius] = useState(localStorage.getItem("radius") || 20);
+	const [busRadius, setBusRadius] = useState(
+		localStorage.getItem("busRadius") || 20
 	);
 
 	function activeOperatorsNormal(activeOperators) {
-		switch (activeOperators) {
-			case "lpp":
-				return "Javno podjetje Ljubljanski potniški promet d.o.o.";
-			case "arriva":
-				return "Arriva d.o.o.";
-			case "nomago":
-				return "Nomago d.o.o.";
-			case "murska":
-				return "Avtobusni promet Murska Sobota d.d.";
-			default:
-				return activeOperators;
-		}
+		return activeOperators.map((operator) => {
+			switch (operator) {
+				case "lpp":
+					return "Javno podjetje Ljubljanski potniški promet d.o.o.";
+				case "arriva":
+					return "Arriva d.o.o.";
+				case "nomago":
+					return "Nomago d.o.o.";
+				case "murska":
+					return "Avtobusni promet Murska Sobota d.d.";
+				default:
+					return "Javno podjetje Ljubljanski potniški promet d.o.o.";
+			}
+		});
+	}
+
+	function calculateDistance(userLocation, busStopLocation) {
+		const R = 6371;
+		const dLat = ((busStopLocation[0] - userLocation[0]) * Math.PI) / 180;
+		const dLon = ((busStopLocation[1] - userLocation[1]) * Math.PI) / 180;
+		const a =
+			Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+			Math.cos((userLocation[0] * Math.PI) / 180) *
+				Math.cos((busStopLocation[0] * Math.PI) / 180) *
+				Math.sin(dLon / 2) *
+				Math.sin(dLon / 2);
+		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		const distance = R * c;
+		return distance;
 	}
 
 	useEffect(() => {
@@ -67,10 +85,15 @@ function App() {
 				const data = await response.json();
 				const newPositions = data.features
 					.filter((feature) => {
-						const operatorName =
-							feature.properties.operator_name.toLowerCase();
+						const operatorName = feature.properties.operator_name;
 						return activeOperatorsNormal(activeOperators).includes(
 							operatorName
+						);
+					})
+					.filter((feature) => {
+						const [lon, lat] = feature.geometry.coordinates;
+						return (
+							calculateDistance(userLocation, [lat, lon]) <= busRadius
 						);
 					})
 					.map((feature) => ({
@@ -80,7 +103,6 @@ function App() {
 							feature.properties.route_name || "Neznana linija",
 					}));
 				setGpsPositions(newPositions);
-				console.log(newPositions);
 			} catch (error) {
 				console.error("Error fetching GPS positions:", error);
 			}
@@ -95,13 +117,16 @@ function App() {
 					Math.sin(dLat / 2) * Math.sin(dLat / 2) +
 					Math.cos((lat1 * Math.PI) / 180) *
 						Math.cos((lat2 * Math.PI) / 180) *
-						Math.sin(dLon / 2) * Math.sin(dLon / 2);
+						Math.sin(dLon / 2) *
+						Math.sin(dLon / 2);
 				return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 			};
 
 			try {
 				if (!localStorage.getItem("busStops")) {
-					const response = await fetch("https://ojpp.si/api/stop_locations");
+					const response = await fetch(
+						"https://ojpp.si/api/stop_locations"
+					);
 					const data = await response.json();
 					const newBusStops = data.features.map((feature) => ({
 						name: feature.properties.name,
@@ -111,17 +136,32 @@ function App() {
 					const filteredBusStops = newBusStops.filter((stop) => {
 						const [lat, lon] = stop.gpsLocation;
 						return (
-							distance(userLocation[0], userLocation[1], lat, lon) <= +radius
+							distance(
+								userLocation[0],
+								userLocation[1],
+								lat,
+								lon
+							) <= +radius
 						);
 					});
 					setBusStops(filteredBusStops);
-					localStorage.setItem("busStops", JSON.stringify(filteredBusStops));
+					localStorage.setItem(
+						"busStops",
+						JSON.stringify(filteredBusStops)
+					);
 				} else {
-					const storedBusStops = JSON.parse(localStorage.getItem("busStops"));
+					const storedBusStops = JSON.parse(
+						localStorage.getItem("busStops")
+					);
 					const filteredBusStops = storedBusStops.filter((stop) => {
 						const [lat, lon] = stop.gpsLocation;
 						return (
-							distance(userLocation[0], userLocation[1], lat, lon) <= +radius
+							distance(
+								userLocation[0],
+								userLocation[1],
+								lat,
+								lon
+							) <= +radius
 						);
 					});
 					setBusStops(filteredBusStops);
@@ -261,6 +301,8 @@ function App() {
 										activeOperators={activeOperators}
 										radius={radius}
 										setRadius={setRadius}
+										busRadius={busRadius}
+										setBusRadius={setBusRadius}
 									/>
 								}
 							/>

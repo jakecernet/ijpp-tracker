@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const SettingsTab = ({ setActiveOperators, activeOperators, radius, setRadius }) => {
+const SettingsTab = ({ setActiveOperators, activeOperators, radius, setRadius, busRadius, setBusRadius }) => {
 	const saveSettings = () => {
 		const checkboxes = document.querySelectorAll("input[type=checkbox]");
 		const activeOperators = [];
@@ -15,6 +15,7 @@ const SettingsTab = ({ setActiveOperators, activeOperators, radius, setRadius })
 			JSON.stringify(activeOperators)
 		);
 		localStorage.setItem("radius", radius);
+		localStorage.setItem("busRadius", busRadius);
 		document.location.href = "/#/map";
 		document.location.reload();
 	};
@@ -53,13 +54,23 @@ const SettingsTab = ({ setActiveOperators, activeOperators, radius, setRadius })
 				</ul>
 			</div>
 			<div className="setting-item">
-				<h2>Prikaži samo postaje v radiju {radius} km od mene.</h2>
+				<h2>Prikaži samo postaje v radiju {radius} km.</h2>
 				<input
 					type="range"
 					min="10"
-					max="500"
+					max="400"
 					value={radius}
 					onChange={(e) => setRadius(e.target.value)}
+				/>
+			</div>
+			<div className="setting-item">
+				<h2>Prikaži samo avtobuse v radiju {busRadius} km.</h2>
+				<input
+					type="range"
+					min="10"
+					max="400"
+					value={busRadius}
+					onChange={(e) => setBusRadius(e.target.value)}
 				/>
 			</div>
 			<button className="save-button" onClick={saveSettings}>
