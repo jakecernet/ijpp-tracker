@@ -119,8 +119,8 @@ const Map = React.memo(
                         title={gpsPosition.route}>
                         <Popup>
                             <p>{gpsPosition.route}</p>
+                            <p>{gpsPosition.lineName}</p>
                             <p>{gpsPosition.operator}</p>
-                            <p>{gpsPosition.gpsLocation.join(", ")}</p>
                         </Popup>
                     </MemoizedMarker>
                 )),

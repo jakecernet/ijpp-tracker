@@ -93,7 +93,8 @@ function App() {
 					.filter((feature) => {
 						const [lon, lat] = feature.geometry.coordinates;
 						return (
-							calculateDistance(userLocation, [lat, lon]) <= busRadius
+							calculateDistance(userLocation, [lat, lon]) <=
+							busRadius
 						);
 					})
 					.map((feature) => ({
@@ -108,6 +109,60 @@ function App() {
 			}
 		};
 
+		const fetchLPPPositions = async () => {
+			try {
+				const response = await fetch(
+					"https://mestnipromet.cyou/api/v1/resources/buses/info"
+				);
+				const data = await response.json();
+				const lppPositions = data.data.map((bus) => ({
+					latitude: bus.latitude,
+					longitude: bus.longitude,
+					gpsLocation: [bus.latitude, bus.longitude],
+					lineId: bus.line_id,
+					speed: bus.speed,
+					lineNumber: bus.line_number,
+					lineName: bus.line_name,
+					lineDestination: bus.line_destination,
+					busName: bus.bus_name,
+					ignition: bus.ignition,
+					direction: bus.direction,
+					operator:
+						"Javno podjetje Ljubljanski potniški promet d.o.o.",
+					route:
+						bus.line_number +
+						" " +
+						(bus.line_destination
+							? bus.line_destination
+							: bus.line_name.split("-")[
+									bus.line_name.split("-").length - 1
+							  ]),
+				}));
+
+				setGpsPositions((prevPositions) => [
+					...prevPositions.filter(
+						(pos) =>
+							pos.operator !==
+							"Javno podjetje Ljubljanski potniški promet d.o.o."
+					),
+					...lppPositions,
+				]);
+			} catch (error) {
+				console.error("Error fetching LPP positions:", error);
+			}
+		};
+
+		fetchGpsPositions();
+		fetchLPPPositions();
+		const intervalId = setInterval(() => {
+			fetchGpsPositions();
+			fetchLPPPositions();
+		}, 30000); // Update every 30 seconds
+
+		return () => clearInterval(intervalId);
+	}, []);
+
+	useEffect(() => {
 		const fetchBusStops = async () => {
 			const distance = (lat1, lon1, lat2, lon2) => {
 				const R = 6371;
@@ -171,13 +226,8 @@ function App() {
 			}
 		};
 
-		fetchGpsPositions();
 		fetchBusStops();
-
-		const intervalId = setInterval(fetchGpsPositions, 30000); // Update every 30 seconds
-
-		return () => clearInterval(intervalId);
-	}, []);
+	}, [radius]);
 
 	useEffect(() => {
 		if (navigator.geolocation) {
