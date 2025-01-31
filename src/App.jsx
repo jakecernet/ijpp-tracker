@@ -90,6 +90,11 @@ function App() {
 							operatorName
 						);
 					})
+					.filter(
+						(feature) =>
+							feature.properties.operator_name !==
+							"Javno podjetje Ljubljanski potniški promet d.o.o."
+					)
 					.filter((feature) => {
 						const [lon, lat] = feature.geometry.coordinates;
 						return (
@@ -103,7 +108,14 @@ function App() {
 						route:
 							feature.properties.route_name || "Neznana linija",
 					}));
-				setGpsPositions(newPositions);
+				setGpsPositions((prevPositions) => {
+					const lppPositions = prevPositions.filter(
+						(pos) =>
+							pos.operator ===
+							"Javno podjetje Ljubljanski potniški promet d.o.o."
+					);
+					return [...newPositions, ...lppPositions];
+				});
 			} catch (error) {
 				console.error("Error fetching GPS positions:", error);
 			}
@@ -115,38 +127,41 @@ function App() {
 					"https://mestnipromet.cyou/api/v1/resources/buses/info"
 				);
 				const data = await response.json();
-				const lppPositions = data.data.map((bus) => ({
-					latitude: bus.latitude,
-					longitude: bus.longitude,
-					gpsLocation: [bus.latitude, bus.longitude],
-					lineId: bus.line_id,
-					speed: bus.speed,
-					lineNumber: bus.line_number,
-					lineName: bus.line_name,
-					lineDestination: bus.line_destination,
-					busName: bus.bus_name,
-					ignition: bus.ignition,
-					direction: bus.direction,
-					operator:
-						"Javno podjetje Ljubljanski potniški promet d.o.o.",
-					route:
-						bus.line_number +
-						" " +
-						(bus.line_destination
-							? bus.line_destination
-							: bus.line_name.split("-")[
-									bus.line_name.split("-").length - 1
-							  ]),
-				}));
+				const lppPositions = data.data
+					.filter(() => activeOperators.includes("lpp"))
+					.filter(
+						(bus) =>
+							calculateDistance(userLocation, [
+								bus.latitude,
+								bus.longitude,
+							]) <= busRadius
+					)
+					.map((bus) => ({
+						gpsLocation: [bus.latitude, bus.longitude],
+						operator:
+							"Javno podjetje Ljubljanski potniški promet d.o.o.",
+						route: `${bus.line_number} - ${
+							bus.line_destination ||
+							bus.line_name.split("-").pop()
+						}`,
+						lineId: bus.line_id,
+						speed: bus.speed,
+						lineNumber: bus.line_number,
+						lineName: bus.line_name,
+						lineDestination: bus.line_destination,
+						busName: bus.bus_name,
+						ignition: bus.ignition,
+						direction: bus.direction,
+					}));
 
-				setGpsPositions((prevPositions) => [
-					...prevPositions.filter(
-						(pos) =>
-							pos.operator !==
+				setGpsPositions((prevPositions) => {
+					const nonLppPositions = prevPositions.filter(
+						(position) =>
+							position.operator !==
 							"Javno podjetje Ljubljanski potniški promet d.o.o."
-					),
-					...lppPositions,
-				]);
+					);
+					return [...nonLppPositions, ...lppPositions];
+				});
 			} catch (error) {
 				console.error("Error fetching LPP positions:", error);
 			}
@@ -160,7 +175,7 @@ function App() {
 		}, 30000); // Update every 30 seconds
 
 		return () => clearInterval(intervalId);
-	}, []);
+	}, [userLocation, busRadius, activeOperators]);
 
 	useEffect(() => {
 		const fetchBusStops = async () => {
