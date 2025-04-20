@@ -48,12 +48,20 @@ const createOperatorIcon = (iconUrl) =>
         iconAnchor: [17.5, 35],
     });
 
+const stationLocationIcon = new L.Icon({
+    iconUrl: locationPNG,
+    iconSize: [35, 35],
+    iconAnchor: [17.5, 35],
+});
+
 const operatorIcons = {
-    "Javno podjetje Ljubljanski potniški promet d.o.o.": createOperatorIcon(lppPNG),
+    "Javno podjetje Ljubljanski potniški promet d.o.o.":
+        createOperatorIcon(lppPNG),
     "Nomago d.o.o.": createOperatorIcon(nomagoPNG),
     "Arriva d.o.o.": createOperatorIcon(arrivaPNG),
-    "Javno podjetje za mestni potniški promet Marprom, d.o.o.": createOperatorIcon(marpromPNG),
-	"Avtobusni promet Murska Sobota d.d.": createOperatorIcon(murskaPNG),
+    "Javno podjetje za mestni potniški promet Marprom, d.o.o.":
+        createOperatorIcon(marpromPNG),
+    "Avtobusni promet Murska Sobota d.d.": createOperatorIcon(murskaPNG),
 };
 
 function getBusIcon(operator) {
@@ -116,7 +124,8 @@ const Map = React.memo(
                         key={`gps-${index}`}
                         position={gpsPosition.gpsLocation}
                         icon={getBusIcon(gpsPosition.operator)}
-                        title={gpsPosition.route}>
+                        title={gpsPosition.route}
+                    >
                         <Popup>
                             <p>{gpsPosition.route}</p>
                             <p>{gpsPosition.lineName}</p>
@@ -134,7 +143,8 @@ const Map = React.memo(
                         key={`stop-${index}`}
                         position={busStop.gpsLocation}
                         icon={stopIcon}
-                        title={busStop.name}>
+                        title={busStop.name}
+                    >
                         <Popup>
                             <h3>{busStop.name}</h3>
                             <button onClick={() => handleStationClick(busStop)}>
@@ -148,7 +158,6 @@ const Map = React.memo(
 
         return (
             <div className="insideDiv">
-                <h2>Live Bus Map</h2>
                 <div className="map-container">
                     <MapContainer
                         center={mapCenter}
@@ -156,7 +165,8 @@ const Map = React.memo(
                         style={{ height: "100%", width: "100%" }}
                         attributionControl={false}
                         scrollWheelZoom={true}
-                        whenCreated={setMap}>
+                        whenCreated={setMap}
+                    >
                         <MapCenter center={mapCenter} />
                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                         <FeatureGroup>
@@ -164,7 +174,8 @@ const Map = React.memo(
                                 showCoverageOnHover={false}
                                 spiderfyOnMaxZoom={false}
                                 disableClusteringAtZoom={10}
-                                maxClusterRadius={30}>
+                                maxClusterRadius={30}
+                            >
                                 {memoizedGpsPositions}
                             </MarkerClusterGroup>
                         </FeatureGroup>
@@ -173,7 +184,8 @@ const Map = React.memo(
                                 showCoverageOnHover={false}
                                 spiderfyOnMaxZoom={false}
                                 disableClusteringAtZoom={16}
-                                maxClusterRadius={30}>
+                                maxClusterRadius={30}
+                            >
                                 {memoizedBusStops}
                             </MarkerClusterGroup>
                         </FeatureGroup>
@@ -181,11 +193,19 @@ const Map = React.memo(
                             <Marker
                                 position={userLocation}
                                 icon={userIcon}
-                                title="Tukaj sem">
+                                title="Tukaj sem"
+                            >
                                 <Popup>
                                     <h3>Vaša lokacija</h3>
                                 </Popup>
                             </Marker>
+                        )}
+                        {activeStation.coordinates && (
+                            <Marker
+                                position={activeStation.coordinates}
+                                icon={stationLocationIcon}
+                                title={"Aktivna postaja"}
+                            ></Marker>
                         )}
                     </MapContainer>
                 </div>

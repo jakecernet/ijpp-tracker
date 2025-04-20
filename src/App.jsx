@@ -300,15 +300,6 @@ function App() {
 	return (
 		<Router>
 			<div className="mobile-container">
-				<div className="header">
-					<div>
-						<FaBus />
-						<FaTrain />
-					</div>
-					<div>
-						<span>IJPP Tracker</span>
-					</div>
-				</div>
 				<div className="content">
 					<Suspense fallback={<div>Loading...</div>}>
 						<Routes>

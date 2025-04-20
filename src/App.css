@@ -8,6 +8,7 @@ body {
   background: linear-gradient(90deg, #06101b, #0e1a26);
   font-family: Arial, sans-serif;
   color: #fff;
+  min-height: 100vh;
 }
 
 .mobile-container {
@@ -19,28 +20,10 @@ body {
   font-family: Arial, sans-serif;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  background-color: #333;
-
-  div svg {
-    width: 24px;
-    height: 24px;
-    margin: 0 10px;
-  }
-
-  div span {
-    font-size: 1.5rem
-  }
-}
-
 .content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 10px;
 }
 
 .tab-content {
@@ -68,9 +51,8 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 8px;
   overflow: hidden;
-  aspect-ratio: 8/12;
+  height: 85vh;
 }
 
 .map-image {
@@ -106,13 +88,6 @@ h2 {
   }
 }
 
-.search-container {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-}
-
 .search-input,
 .setting-input {
   width: 100%;
@@ -130,6 +105,16 @@ h2 {
   padding: 15px;
   border-radius: 8px;
   color: #fff;
+}
+
+.station-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 60vh;
+  overflow-y: scroll;
+  border-radius: 8px;
+  margin-top: 10px;
 }
 
 .station-item {

@@ -121,7 +121,6 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
 					value={searchTerm}
 					onChange={(e) => setSearchTerm(e.target.value)}
 				/>
-				<Search className="search-icon" />
 			</div>
 			{error && <p className="error-message">{error}</p>}
 			{!error &&
