@@ -26,3 +26,5 @@ Structure and Component Separation
 Code Consistency and Clean-Up
 • Remove redundant state updates (like re-setting state from localStorage in multiple useEffects).
 • Ensure formatting consistency and avoid repeated utility functions by extracting them to a shared module.
+
+dodej vlak api + novi apiji
