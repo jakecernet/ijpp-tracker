@@ -173,8 +173,8 @@ const Map = React.memo(
                             <MarkerClusterGroup
                                 showCoverageOnHover={false}
                                 spiderfyOnMaxZoom={false}
-                                disableClusteringAtZoom={10}
-                                maxClusterRadius={30}
+                                disableClusteringAtZoom={25}
+                                maxClusterRadius={40}
                             >
                                 {memoizedGpsPositions}
                             </MarkerClusterGroup>
