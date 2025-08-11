@@ -35,6 +35,7 @@ function App() {
     );
     const [gpsPositions, setGpsPositions] = useState([]);
     const [busStops, setBusStops] = useState([]);
+    const [trainStops, setTrainStops] = useState([]);
     const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
     const [userLocation, setUserLocation] = useState(
         localStorage.getItem("userLocation")
@@ -249,6 +250,22 @@ function App() {
         }
     }, [activeStation]);
 
+    useEffect(() => {
+        const fetchTrainStops = async () => {
+            try {
+                const data = await fetchJson(
+                    "https://mapper-motis.ojpp-gateway.derp.si/api/v1/map/stops?min=49.415360776528956,7.898969151846785&max=36.38523043114108,26.9347879737411&zoom=20"
+                );
+                setTrainStops(data);
+                console.log("Train stops fetched:", data);
+            } catch (error) {
+                console.error("Error fetching train stops:", error);
+            }
+        };
+
+        fetchTrainStops();
+    }, []);
+
     return (
         <Router>
             <div className="mobile-container">
@@ -261,6 +278,7 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
+                                        trainStops={trainStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
@@ -274,6 +292,7 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
+                                        trainStops={trainStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}

@@ -18,6 +18,7 @@ import murskaPNG from "../img/murska.png";
 import userPNG from "../img/user.png";
 import busStopPNG from "../img/busStop.png";
 import locationPNG from "../img/location.png";
+import trainPNG from "../img/trainStop.png";
 
 const MapCenter = React.memo(({ center }) => {
     const map = useMap();
@@ -54,6 +55,12 @@ const stationLocationIcon = new L.Icon({
     iconAnchor: [17.5, 35],
 });
 
+const trainIcon = new L.Icon({
+    iconUrl: trainPNG,
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+});
+
 const operatorIcons = {
     "Javno podjetje Ljubljanski potniški promet d.o.o.":
         createOperatorIcon(lppPNG),
@@ -78,6 +85,7 @@ const Map = React.memo(
     ({
         gpsPositions,
         busStops,
+        trainStops,
         activeStation,
         setActiveStation,
         userLocation,
@@ -156,6 +164,25 @@ const Map = React.memo(
             [busStops, handleStationClick]
         );
 
+        const memoizedTrainStops = useMemo(
+            () =>
+                trainStops &&
+                trainStops.map((stop, index) => (
+                    <MemoizedMarker
+                        key={`train-${index}`}
+                        position={[stop.lat, stop.lon]}
+                        icon={trainIcon}
+                        title={stop.name}
+                    >
+                        <Popup>
+                            <h3>{stop.name}</h3>
+                            <p>ID: {stop.stopId}</p>
+                        </Popup>
+                    </MemoizedMarker>
+                )),
+            [trainStops]
+        );
+
         return (
             <div className="insideDiv">
                 <div className="map-container">
@@ -189,6 +216,16 @@ const Map = React.memo(
                                 {memoizedBusStops}
                             </MarkerClusterGroup>
                         </FeatureGroup>
+                        <FeatureGroup>
+                            <MarkerClusterGroup
+                                showCoverageOnHover={false}
+                                spiderfyOnMaxZoom={false}
+                                disableClusteringAtZoom={100}
+                                maxClusterRadius={25}
+                            >
+                                {memoizedTrainStops}
+                            </MarkerClusterGroup>
+                        </FeatureGroup>
                         {userLocation && (
                             <Marker
                                 position={userLocation}
@@ -196,7 +233,7 @@ const Map = React.memo(
                                 title="Tukaj sem"
                             >
                                 <Popup>
-                                    <h3>Vaša lokacija</h3>
+                                    <h4>Vaša lokacija</h4>
                                 </Popup>
                             </Marker>
                         )}
@@ -205,7 +242,11 @@ const Map = React.memo(
                                 position={activeStation.coordinates}
                                 icon={stationLocationIcon}
                                 title={"Aktivna postaja"}
-                            ></Marker>
+                            >
+                                <Popup>
+                                    <h4>Aktivna postaja</h4>
+                                </Popup>
+                            </Marker>
                         )}
                     </MapContainer>
                 </div>
