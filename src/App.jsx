@@ -250,7 +250,7 @@ function App() {
         }
     }, [activeStation]);
 
-    useEffect(() => {
+    /* useEffect(() => {
         const fetchTrainStops = async () => {
             try {
                 const data = await fetchJson(
@@ -264,7 +264,7 @@ function App() {
         };
 
         fetchTrainStops();
-    }, []);
+    }, []); */
 
     return (
         <Router>

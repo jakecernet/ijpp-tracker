@@ -1,237 +1,248 @@
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+@font-face {
+    font-family: "Proxima Nova";
+    src: url("./proximanova_regular.ttf") format("opentype");
+}
+
+@font-face {
+    font-family: "Proxima Nova Light";
+    src: url("./proximanova_light.oft") format("truetype");
+    font-display: swap;
 }
 
 body {
-  background: linear-gradient(90deg, #06101b, #0e1a26);
-  font-family: Arial, sans-serif;
-  color: #fff;
-  min-height: 100vh;
+    background: linear-gradient(90deg, #06101b, #0e1a26);
+    font-family: "Proxima Nova";
+    font-weight: 200;
+    color: #fff;
+    min-height: 100vh;
 }
 
 .mobile-container {
-  max-width: 680px;
-  margin: 0 auto;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  font-family: Arial, sans-serif;
+    max-width: 680px;
+    margin: 0 auto;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
 }
 
 .tab-content {
-  display: none;
-  flex-direction: column;
-  gap: 20px;
+    display: none;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .tab-content.active {
-  display: flex;
+    display: flex;
 }
 
 .insideDiv {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
 
 h2 {
-  font-size: 24px;
+    font-size: 24px;
 }
 
 .map-container {
-  background-color: #555;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  height: 85vh;
+    background-color: #555;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    height: 85vh;
 }
 
 .map-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .leaflet-popup-content-wrapper {
-  background-color: #555 !important;
-  color: #fff !important;
+    background-color: #555 !important;
+    color: #fff !important;
 
-  .leaflet-popup-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin: 10px 10px 10px 10px !important;
+    .leaflet-popup-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 10px 10px 10px 10px !important;
 
-    h3 {
-      font-size: 15px;
-      margin-bottom: 10px;
+        h3 {
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+        }
     }
-
-    button {
-      background-color: #007bff;
-      color: #fff;
-      border: none;
-      padding: 10px;
-      border-radius: 4px;
-      font-size: 10px;
-      cursor: pointer;
-    }
-  }
 }
 
 .search-input,
 .setting-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #555;
-  border-radius: 4px;
-  font-size: 16px;
-  background-color: #555;
-  color: #fff;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 16px;
+    background-color: #555;
+    color: #fff;
 }
 
 .arrival-item,
 .station-item {
-  background-color: #555;
-  padding: 15px;
-  border-radius: 8px;
-  color: #fff;
+    background-color: #555;
+    padding: 15px;
+    border-radius: 8px;
+    color: #fff;
 }
 
 .station-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  height: 60vh;
-  overflow-y: scroll;
-  border-radius: 8px;
-  margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 60vh;
+    overflow-y: scroll;
+    border-radius: 8px;
+    margin-top: 10px;
 }
 
 .station-item {
-  display: flex;
-  align-items: center;
-  gap: 15px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
 .settings {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-
-  .setting-item {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
     flex-direction: column;
+    gap: 20px;
 
-    ul {
-      list-style-type: none;
-      padding: 0;
-
-      div {
+    .setting-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 10px;
-        text-align: right;
+        flex-direction: column;
 
-        input[type="checkbox"] {
-          width: 20px;
-          height: 20px;
-        }
+        ul {
+            list-style-type: none;
+            padding: 0;
 
-        input[type="range"] {
-          width: 100%;
-        }
+            div {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                text-align: right;
 
-        label {
-          font-size: 16px;
+                input[type="checkbox"] {
+                    width: 20px;
+                    height: 20px;
+                }
+
+                input[type="range"] {
+                    width: 100%;
+                }
+
+                label {
+                    font-size: 16px;
+                }
+            }
         }
-      }
     }
-  }
 
-  .save-button {
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    padding: 10px;
-    border-radius: 4px;
-    font-size: 16px;
-    cursor: pointer;
-  }
+    .save-button {
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        padding: 10px;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+    }
 }
 
 .bottom-nav {
-  display: flex;
-  justify-content: space-around;
-  background-color: #333;
-  padding: 20px 0;
-  border-top: 1px solid #555;
+    display: flex;
+    justify-content: space-around;
+    background-color: #333;
+    padding: 20px 0;
+    border-top: 1px solid #555;
 }
 
 .bottom-nav button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 12px;
-  color: #ccc;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: #ccc;
 }
 
 .bottom-nav button.active {
-  color: #007bff;
+    color: #007bff;
 }
 
 .bottom-nav button span {
-  margin-top: 5px;
+    margin-top: 5px;
 }
 
 /* Dark Mode */
 .dark-mode {
-  background-color: #333;
-  color: #fff;
+    background-color: #333;
+    color: #fff;
 }
 
 .dark-mode .search-input,
 .dark-mode .setting-input {
-  background-color: #555;
-  color: #fff;
-  border-color: #555;
+    background-color: #555;
+    color: #fff;
+    border-color: #555;
 }
 
 .dark-mode .arrival-item,
 .dark-mode .station-item {
-  background-color: #555;
-  color: #fff;
+    background-color: #555;
+    color: #fff;
 }
 
 .dark-mode .save-button {
-  background-color: #007bff;
-  color: #fff;
+    background-color: #007bff;
+    color: #fff;
 }
 
 .dark-mode .bottom-nav {
-  background-color: #333;
-  border-top-color: #555;
+    background-color: #333;
+    border-top-color: #555;
 }
 
 .dark-mode .bottom-nav button {
-  color: #ccc;
+    color: #ccc;
 }
 
 .dark-mode .bottom-nav button.active {
-  color: #007bff;
+    color: #007bff;
 }
