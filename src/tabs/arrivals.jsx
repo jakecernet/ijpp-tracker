@@ -121,6 +121,7 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
                 />
             </div>
             {error && <p>{error}</p>}
+            <div className="arrival-list">
             {!error &&
                 filteredArrivals.map((arrival, index) => (
                     <div key={index} className="arrival-item">
@@ -140,6 +141,7 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
             {stationSelected && !error && filteredArrivals.length === 0 && (
                 <p>Ni prihajajočih prihodov za izbrano postajo.</p>
             )}
+            </div>
         </div>
     );
 };

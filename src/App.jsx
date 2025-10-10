@@ -1,6 +1,6 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin, Settings } from "lucide-react";
+import { Map, Clock, MapPin, Settings, X } from "lucide-react";
 import "./App.css";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -49,9 +49,17 @@ function App() {
             : ["lpp", "arriva", "nomago", "murska"]
     );
     const [radius, setRadius] = useState(localStorage.getItem("radius") || 20);
-    const [busRadius, setBusRadius] = useState(
-        localStorage.getItem("busRadius") || 20
-    );
+    const [busRadius, setBusRadius] = useState(localStorage.getItem("busRadius") || 20);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isSettingsOpen) return;
+        const onKey = (e) => {
+            if (e.key === "Escape") setIsSettingsOpen(false);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [isSettingsOpen]);
 
     function activeOperatorsNormal(activeOperators) {
         return activeOperators.map((operator) => {
@@ -250,11 +258,11 @@ function App() {
         }
     }, [activeStation]);
 
-    /* useEffect(() => {
+    useEffect(() => {
         const fetchTrainStops = async () => {
             try {
                 const data = await fetchJson(
-                    "https://mapper-motis.ojpp-gateway.derp.si/api/v1/map/stops?min=49.415360776528956,7.898969151846785&max=36.38523043114108,26.9347879737411&zoom=20"
+                    "https://api.modra.ninja/sz/postaje"
                 );
                 setTrainStops(data);
                 console.log("Train stops fetched:", data);
@@ -264,7 +272,7 @@ function App() {
         };
 
         fetchTrainStops();
-    }, []); */
+    }, []);
 
     return (
         <Router>
@@ -372,18 +380,33 @@ function App() {
                             <span>V bližini</span>
                         </button>
                     </NavLink>
-                    <NavLink to="/settings">
-                        <button
-                            onClick={() => setCurrentUrl("/settings")}
-                            className={
-                                currentUrl === "/settings" ? "active" : ""
-                            }
-                        >
-                            <Settings size={24} />
-                            <span>Nastavitve</span>
-                        </button>
-                    </NavLink>
                 </nav>
+                <button className="fab" aria-label="Nastavitve" onClick={() => setIsSettingsOpen(true)}>
+                    <Settings size={50} />
+                </button>
+                {isSettingsOpen && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.currentTarget === e.target) setIsSettingsOpen(false); }}>
+                        <div className="modal">
+                            <div className="modal-header">
+                                <h3>Nastavitve</h3>
+                                <button className="icon-button" onClick={() => setIsSettingsOpen(false)} aria-label="Zapri">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <Suspense fallback={<div>Loading…</div>}>
+                                <SettingsTab
+                                    setActiveOperators={setActiveOperators}
+                                    activeOperators={activeOperators}
+                                    radius={radius}
+                                    setRadius={setRadius}
+                                    busRadius={busRadius}
+                                    setBusRadius={setBusRadius}
+                                    onClose={() => setIsSettingsOpen(false)}
+                                />
+                            </Suspense>
+                        </div>
+                    </div>
+                )}
             </div>
         </Router>
     );
