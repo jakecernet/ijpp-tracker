@@ -26,6 +26,7 @@ function App() {
     const [gpsPositions, setGpsPositions] = useState([]);
     const [busStops, setBusStops] = useState([]);
     const [trainStops, setTrainStops] = useState([]);
+    const [trainPositions, setTrainPositions] = useState([]);
     const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
     const [userLocation, setUserLocation] = useState(
         localStorage.getItem("userLocation")
@@ -266,6 +267,20 @@ function App() {
         fetchTrainStops();
     }, []);
 
+    useEffect(() => {
+        const fetchTrainPositions = async () => {
+            try {
+                const data = await fetchJson("https://api.modra.ninja/sz/lokacije_raw");
+                setTrainPositions(data);
+                console.log("Train positions fetched:", data);
+            } catch (error) {
+                console.error("Error fetching train positions:", error);
+            }
+        };
+
+        fetchTrainPositions();
+    }, []);
+
     return (
         <Router>
             <div className="mobile-container">
@@ -283,6 +298,7 @@ function App() {
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
                                         setCurentUrl={setCurrentUrl}
+                                        trainPositions={trainPositions}
                                     />
                                 }
                             />
@@ -297,6 +313,7 @@ function App() {
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
                                         setCurentUrl={setCurrentUrl}
+                                        trainPositions={trainPositions}
                                     />
                                 }
                             />

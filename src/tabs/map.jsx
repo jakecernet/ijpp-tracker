@@ -9,9 +9,11 @@ import marpromPNG from "../img/marprom.png";
 import murskaPNG from "../img/murska.png";
 import userPNG from "../img/user.png";
 import busStopPNG from "../img/busStop.png";
+import trainStopPNG from "../img/trainStop.png";
+import szPNG from "../img/sz.png";
 import locationPNG from "../img/location.png";
-import trainPNG from "../img/trainStop.png";
 
+// Labeled OSM raster style (no API key). Override with localStorage.mapStyleUrl if desired.
 const OSM_RASTER_STYLE = {
     version: 8,
     sources: {
@@ -27,13 +29,7 @@ const OSM_RASTER_STYLE = {
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         },
     },
-    layers: [
-        {
-            id: "osm",
-            type: "raster",
-            source: "osm",
-        },
-    ],
+    layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
 
 const STYLE =
@@ -56,10 +52,7 @@ function toGeoJSONPoints(items, getCoord, getProps) {
                     return null;
                 return {
                     type: "Feature",
-                    geometry: {
-                        type: "Point",
-                        coordinates: [lng, lat],
-                    },
+                    geometry: { type: "Point", coordinates: [lng, lat] },
                     properties: getProps ? getProps(item) : {},
                 };
             })
@@ -83,6 +76,7 @@ const Map = React.memo(function Map({
     setActiveStation,
     userLocation,
     setCurentUrl,
+    trainPositions,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -128,6 +122,40 @@ const Map = React.memo(function Map({
         [trainStops]
     );
 
+    // New: train positions (API "Koordinate" is "lng,lat" -> flip to [lat, lng])
+    const trainPositionsGeoJSON = useMemo(
+        () =>
+            toGeoJSONPoints(
+                trainPositions || [],
+                (t) => {
+                    const coord = t?.Koordinate;
+                    if (!coord) return null;
+                    const [lng, lat] = String(coord)
+                        .split(",")
+                        .map((v) => Number(v.trim()));
+                    if (
+                        typeof lat !== "number" ||
+                        typeof lng !== "number" ||
+                        Number.isNaN(lat) ||
+                        Number.isNaN(lng)
+                    )
+                        return null;
+                    return [lat, lng];
+                },
+                (t) => ({
+                    id: t.St_vlaka,
+                    relation: t.Relacija,
+                    station: t.Postaja,
+                    departure: t.Odhod,
+                    delay: t.Zamuda_cas,
+                    rank: t.Rang,
+                    type: t.Vrsta_vlaka,
+                    icon: "train",
+                })
+            ),
+        [trainPositions]
+    );
+
     // Initialize map once
     useEffect(() => {
         if (mapInstanceRef.current) return;
@@ -140,13 +168,13 @@ const Map = React.memo(function Map({
         });
 
         mapInstanceRef.current = map;
-
         map.addControl(
             new maplibregl.NavigationControl({ showCompass: false }),
             "top-right"
         );
 
         map.on("load", () => {
+            // Register images
             const addImage = (name, src, options) =>
                 new Promise((resolve) => {
                     const img = new Image();
@@ -165,7 +193,7 @@ const Map = React.memo(function Map({
 
             const imageAdds = [
                 addImage("bus-stop", busStopPNG, { sdf: false }),
-                addImage("train", trainPNG, { sdf: false }),
+                addImage("train", szPNG, { sdf: false }),
                 addImage("user", userPNG, { sdf: false }),
                 addImage("station", locationPNG, { sdf: false }),
                 addImage("arriva", arrivaPNG, { sdf: false }),
@@ -174,6 +202,7 @@ const Map = React.memo(function Map({
                 addImage("marprom", marpromPNG, { sdf: false }),
                 addImage("murska", murskaPNG, { sdf: false }),
                 addImage("bus-generic", locationPNG, { sdf: false }),
+                addImage("train-generic", locationPNG, { sdf: false }),
             ];
 
             Promise.all(imageAdds).then(() => {
@@ -200,14 +229,23 @@ const Map = React.memo(function Map({
                         type: "geojson",
                         data: trainStopsGeoJSON,
                         cluster: true,
-                        clusterRadius: 40,
-                        clusterMaxZoom: 13,
+                        clusterRadius: 80,
+                        clusterMaxZoom: 15,
+                    });
+                }
+                // New: train positions source
+                if (!map.getSource("trainPositions")) {
+                    map.addSource("trainPositions", {
+                        type: "geojson",
+                        data: trainPositionsGeoJSON,
+                        cluster: true,
+                        clusterRadius: 80,
+                        clusterMaxZoom: 15,
                     });
                 }
 
-                // Layers: clusters
+                // Cluster layers (smaller circles, fewer)
                 const addClusterLayers = (prefix, color) => {
-                    // Bubbles
                     if (!map.getLayer(`${prefix}-clusters`)) {
                         map.addLayer({
                             id: `${prefix}-clusters`,
@@ -219,18 +257,16 @@ const Map = React.memo(function Map({
                                 "circle-radius": [
                                     "step",
                                     ["get", "point_count"],
-                                    12,
+                                    10,
                                     20,
-                                    16,
+                                    13,
                                     50,
-                                    22,
+                                    17,
                                 ],
                                 "circle-opacity": 0.8,
                             },
                         });
                     }
-
-                    // Labels
                     if (!map.getLayer(`${prefix}-cluster-count`)) {
                         map.addLayer({
                             id: `${prefix}-cluster-count`,
@@ -243,7 +279,7 @@ const Map = React.memo(function Map({
                                     "point_count_abbreviated",
                                 ],
                                 "text-font": ["Open Sans Semibold"],
-                                "text-size": 11,
+                                "text-size": 10,
                             },
                             paint: { "text-color": "#ffffff" },
                         });
@@ -253,8 +289,9 @@ const Map = React.memo(function Map({
                 addClusterLayers("buses", "#5b8cff");
                 addClusterLayers("busStops", "#7a5bff");
                 addClusterLayers("trainStops", "#5b8cff");
+                addClusterLayers("trainPositions", "#ff5b5b");
 
-                // Unclustered icons (smaller, scale by zoom)
+                // Unclustered icons with smaller, zoom-based sizes
                 const addUnclusteredIconLayer = (prefix, sizeExpr) => {
                     if (!map.getLayer(`${prefix}-points`)) {
                         map.addLayer({
@@ -272,53 +309,65 @@ const Map = React.memo(function Map({
                     }
                 };
 
-                // Smaller at low zoom, slightly larger when zoomed in
                 const busSize = [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     8,
-                    0.35,
+                    0.28,
                     12,
-                    0.45,
+                    0.36,
                     14,
-                    0.55,
+                    0.44,
                     16,
-                    0.7,
+                    0.52,
                 ];
                 const stopSize = [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     8,
-                    0.3,
+                    0.24,
                     12,
-                    0.4,
+                    0.32,
                     14,
-                    0.5,
+                    0.4,
                     16,
-                    0.65,
+                    0.48,
                 ];
                 const trainSize = [
                     "interpolate",
                     ["linear"],
                     ["zoom"],
                     8,
-                    0.32,
+                    0.26,
                     12,
-                    0.42,
+                    0.34,
                     14,
-                    0.52,
+                    0.42,
                     16,
-                    0.68,
+                    0.5,
+                ];
+                const trainPosSize = [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    8,
+                    0.26,
+                    12,
+                    0.34,
+                    14,
+                    0.42,
+                    16,
+                    0.5,
                 ];
 
                 addUnclusteredIconLayer("buses", busSize);
                 addUnclusteredIconLayer("busStops", stopSize);
                 addUnclusteredIconLayer("trainStops", trainSize);
+                addUnclusteredIconLayer("trainPositions", trainPosSize);
 
-                // Interactions
-                // Zoom into clusters on click
+                // Cluster interactions
                 const registerClusterClick = (prefix) => {
                     map.on("click", `${prefix}-clusters`, (e) => {
                         const features = map.queryRenderedFeatures(e.point, {
@@ -349,8 +398,9 @@ const Map = React.memo(function Map({
                 registerClusterClick("buses");
                 registerClusterClick("busStops");
                 registerClusterClick("trainStops");
+                registerClusterClick("trainPositions");
 
-                // Bus stop popup with 'Tukaj sem' button (Leaflet-like)
+                // Bus stop popup with action button
                 map.on("click", "busStops-points", (e) => {
                     const f = e.features?.[0];
                     if (!f) return;
@@ -411,17 +461,44 @@ const Map = React.memo(function Map({
                     });
                 };
 
+                attachPopup("trainPositions-points", (p) => {
+                    const number = p.id || p.St_vlaka || "";
+                    const relation = p.relation || p.Relacija || "";
+                    const station = p.station || p.Postaja || "";
+                    const departure = p.departure || p.Odhod || "";
+                    const delay =
+                        p.delay !== undefined
+                            ? p.delay
+                            : p.Zamuda_cas !== undefined
+                            ? p.Zamuda_cas
+                            : null;
+
+                    return (
+                        `<div style="min-width:180px">` +
+                        (number
+                            ? `<div style="font-weight:600">Vlak ${number}</div>`
+                            : "") +
+                        (relation ? `<div>Relacija: ${relation}</div>` : "") +
+                        (station ? `<div>Naslednja postaja: ${station}</div>` : "") +
+                        (departure ? `<div>Odhod: ${departure}</div>` : "") +
+                        (delay !== null
+                            ? `<div>Zamuda: ${delay} min</div>`
+                            : "") +
+                        `</div>`
+                    );
+                });
+
                 attachPopup("buses-points", (p) => {
                     const route = p.title || "";
                     const line = p.lineName || "";
                     const op = p.operator || "";
-                    // Match Leaflet's simple <p> layout
-                    return `\
-                        <div style="min-width:160px">\
-                            <p>${route}</p>\
-                            <p>${line}</p>\
-                            <p>${op}</p>\
-                        </div>`;
+                    return (
+                        `<div style="min-width:160px">` +
+                        `<p>${route}</p>` +
+                        `<p>${line}</p>` +
+                        `<p>${op}</p>` +
+                        `</div>`
+                    );
                 });
 
                 attachPopup("trainStops-points", (p) => {
@@ -465,6 +542,14 @@ const Map = React.memo(function Map({
         if (src && src.setData) src.setData(trainStopsGeoJSON);
     }, [trainStopsGeoJSON]);
 
+    // New: update train positions source
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const src = map.getSource("trainPositions");
+        if (src && src.setData) src.setData(trainPositionsGeoJSON);
+    }, [trainPositionsGeoJSON]);
+
     // Center map when active station or user location changes
     useEffect(() => {
         const map = mapInstanceRef.current;
@@ -476,9 +561,7 @@ const Map = React.memo(function Map({
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
-        // helper
         const ensureMarker = (key, coords, img, size = [22, 22], popupText) => {
-            // remove existing
             if (markersRef.current[key]) {
                 markersRef.current[key].remove();
                 markersRef.current[key] = null;
@@ -488,7 +571,7 @@ const Map = React.memo(function Map({
             el.src = img;
             el.style.width = `${size[0]}px`;
             el.style.height = `${size[1]}px`;
-            el.style.transform = "translate(-50%, -100%)"; // anchor bottom-center
+            el.style.transform = "translate(-50%, -100%)";
             const m = new maplibregl.Marker({ element: el, anchor: "bottom" })
                 .setLngLat([coords[1], coords[0]])
                 .addTo(map);
