@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useMemo } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings, X } from "lucide-react";
 import "./App.css";
@@ -8,17 +8,7 @@ const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
 
-// Custom hook for LocalStorage state
-function useLocalStorageState(key, initialValue) {
-    const [value, setValue] = useState(() => {
-        const stored = localStorage.getItem(key);
-        return stored ? JSON.parse(stored) : initialValue;
-    });
-    useEffect(() => {
-        localStorage.setItem(key, JSON.stringify(value));
-    }, [key, value]);
-    return [value, setValue];
-}
+// (removed unused useLocalStorageState helper)
 
 // Helper function to fetch JSON data with error handling and caching if needed.
 async function fetchJson(url) {
@@ -49,7 +39,9 @@ function App() {
             : ["lpp", "arriva", "nomago", "murska"]
     );
     const [radius, setRadius] = useState(localStorage.getItem("radius") || 20);
-    const [busRadius, setBusRadius] = useState(localStorage.getItem("busRadius") || 20);
+    const [busRadius, setBusRadius] = useState(
+        localStorage.getItem("busRadius") || 20
+    );
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     useEffect(() => {
@@ -381,15 +373,31 @@ function App() {
                         </button>
                     </NavLink>
                 </nav>
-                <button className="fab" aria-label="Nastavitve" onClick={() => setIsSettingsOpen(true)}>
+                <button
+                    className="fab"
+                    aria-label="Nastavitve"
+                    onClick={() => setIsSettingsOpen(true)}
+                >
                     <Settings size={50} />
                 </button>
                 {isSettingsOpen && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.currentTarget === e.target) setIsSettingsOpen(false); }}>
+                    <div
+                        className="modal-overlay"
+                        role="dialog"
+                        aria-modal="true"
+                        onClick={(e) => {
+                            if (e.currentTarget === e.target)
+                                setIsSettingsOpen(false);
+                        }}
+                    >
                         <div className="modal">
                             <div className="modal-header">
                                 <h3>Nastavitve</h3>
-                                <button className="icon-button" onClick={() => setIsSettingsOpen(false)} aria-label="Zapri">
+                                <button
+                                    className="icon-button"
+                                    onClick={() => setIsSettingsOpen(false)}
+                                    aria-label="Zapri"
+                                >
                                     <X size={18} />
                                 </button>
                             </div>

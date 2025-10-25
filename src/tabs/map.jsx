@@ -1,16 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import {
-    MapContainer,
-    TileLayer,
-    Marker,
-    Popup,
-    useMap,
-    useMapEvents,
-    FeatureGroup,
-} from "react-leaflet";
-import MarkerClusterGroup from "@changey/react-leaflet-markercluster";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import React, { useEffect, useMemo, useRef } from "react";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+
 import arrivaPNG from "../img/arriva.png";
 import lppPNG from "../img/lpp.png";
 import nomagoPNG from "../img/nomago.png";
@@ -21,433 +12,512 @@ import busStopPNG from "../img/busStop.png";
 import locationPNG from "../img/location.png";
 import trainPNG from "../img/trainStop.png";
 
-const MapCenter = React.memo(({ center }) => {
-    const map = useMap();
-
-    useEffect(() => {
-        map.setView(center);
-    }, [center, map]);
-
-    return null;
-});
-
-const stopIcon = new L.Icon({
-    iconUrl: busStopPNG,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-});
-
-const userIcon = new L.Icon({
-    iconUrl: userPNG,
-    iconSize: [35, 35],
-    iconAnchor: [17.5, 35],
-});
-
-const createOperatorIcon = (iconUrl) =>
-    new L.Icon({
-        iconUrl,
-        iconSize: [35, 35],
-        iconAnchor: [17.5, 35],
-    });
-
-const stationLocationIcon = new L.Icon({
-    iconUrl: locationPNG,
-    iconSize: [35, 35],
-    iconAnchor: [17.5, 35],
-});
-
-const trainIcon = new L.Icon({
-    iconUrl: trainPNG,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-});
-
-const operatorIcons = {
-    "Javno podjetje Ljubljanski potniški promet d.o.o.":
-        createOperatorIcon(lppPNG),
-    "Nomago d.o.o.": createOperatorIcon(nomagoPNG),
-    "Arriva d.o.o.": createOperatorIcon(arrivaPNG),
-    "Javno podjetje za mestni potniški promet Marprom, d.o.o.":
-        createOperatorIcon(marpromPNG),
-    "Avtobusni promet Murska Sobota d.d.": createOperatorIcon(murskaPNG),
+const OSM_RASTER_STYLE = {
+    version: 8,
+    sources: {
+        osm: {
+            type: "raster",
+            tiles: [
+                "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            ],
+            tileSize: 256,
+            attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        },
+    },
+    layers: [
+        {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+        },
+    ],
 };
 
-function getBusIcon(operator) {
-    return operatorIcons[operator] || createOperatorIcon(locationPNG);
+const STYLE =
+    typeof window !== "undefined"
+        ? localStorage.getItem("mapStyleUrl") || OSM_RASTER_STYLE
+        : OSM_RASTER_STYLE;
+
+function toGeoJSONPoints(items, getCoord, getProps) {
+    return {
+        type: "FeatureCollection",
+        features: (items || [])
+            .map((item) => {
+                const [lat, lng] = getCoord(item) || [];
+                if (
+                    typeof lat !== "number" ||
+                    typeof lng !== "number" ||
+                    Number.isNaN(lat) ||
+                    Number.isNaN(lng)
+                )
+                    return null;
+                return {
+                    type: "Feature",
+                    geometry: {
+                        type: "Point",
+                        coordinates: [lng, lat],
+                    },
+                    properties: getProps ? getProps(item) : {},
+                };
+            })
+            .filter(Boolean),
+    };
 }
 
-const MemoizedMarker = React.memo(({ position, icon, title, children }) => (
-    <Marker position={position} icon={icon} title={title}>
-        {children}
-    </Marker>
-));
+const operatorToIcon = {
+    "Javno podjetje Ljubljanski potniški promet d.o.o.": "lpp",
+    "Nomago d.o.o.": "nomago",
+    "Arriva d.o.o.": "arriva",
+    "Javno podjetje za mestni potniški promet Marprom, d.o.o.": "marprom",
+    "Avtobusni promet Murska Sobota d.d.": "murska",
+};
 
-const Map = React.memo(
-    ({
-        gpsPositions,
-        busStops,
-        trainStops,
-        activeStation,
-        setActiveStation,
-        userLocation,
-        setCurentUrl,
-    }) => {
-        const [map, setMap] = useState(null);
-        const position = useMemo(
-            () => activeStation.coordinates || userLocation,
-            [activeStation, userLocation]
-        );
+const Map = React.memo(function Map({
+    gpsPositions,
+    busStops,
+    trainStops,
+    activeStation,
+    setActiveStation,
+    userLocation,
+    setCurentUrl,
+}) {
+    const mapRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const markersRef = useRef({ user: null, active: null });
 
-        const [mapCenter, setMapCenter] = useState(position);
+    const center = useMemo(
+        () => activeStation?.coordinates || userLocation || [46.0569, 14.5058],
+        [activeStation, userLocation]
+    );
 
-        // Track viewport (bounds + zoom) to filter & limit markers rendered
-        const [viewport, setViewport] = useState({ bounds: null, zoom: 13 });
+    const busesGeoJSON = useMemo(
+        () =>
+            toGeoJSONPoints(
+                gpsPositions || [],
+                (g) => g.gpsLocation,
+                (g) => ({
+                    title: g.route || "",
+                    lineName: g.lineName || "",
+                    operator: g.operator || "",
+                    icon: operatorToIcon[g.operator] || "bus-generic",
+                })
+            ),
+        [gpsPositions]
+    );
 
-        const handleViewportChange = useCallback((bounds, zoom) => {
-            setViewport({ bounds, zoom });
-        }, []);
+    const busStopsGeoJSON = useMemo(
+        () =>
+            toGeoJSONPoints(
+                busStops || [],
+                (s) => s.gpsLocation,
+                (s) => ({ id: s.id, name: s.name, icon: "bus-stop" })
+            ),
+        [busStops]
+    );
 
-        const ViewportWatcher = useCallback(() => {
-            useMapEvents({
-                moveend: (e) => {
-                    const m = e.target;
-                    handleViewportChange(m.getBounds(), m.getZoom());
-                },
-                zoomend: (e) => {
-                    const m = e.target;
-                    handleViewportChange(m.getBounds(), m.getZoom());
-                },
-            });
-            const m = useMap();
-            useEffect(() => {
-                handleViewportChange(m.getBounds(), m.getZoom());
-            }, [m]);
-            return null;
-        }, [handleViewportChange]);
+    const trainStopsGeoJSON = useMemo(
+        () =>
+            toGeoJSONPoints(
+                trainStops || [],
+                (t) => [t.lat, t.lng],
+                (t) => ({ id: t.id, name: t.name || t.naziv, icon: "train" })
+            ),
+        [trainStops]
+    );
 
-        useEffect(() => {
-            setMapCenter(position);
-        }, [position]);
-
-        const handleStationClick = useCallback(
-            (busStop) => {
-                setActiveStation({
-                    name: busStop.name,
-                    coordinates: busStop.gpsLocation,
-                    id: busStop.id,
-                });
-                setMapCenter(busStop.gpsLocation);
-                localStorage.setItem(
-                    "activeStation",
-                    JSON.stringify({
-                        name: busStop.name,
-                        coordinates: busStop.gpsLocation,
-                        id: busStop.id,
-                    })
-                );
-                setCurentUrl("/arrivals");
-                document.location.href = "/#/arrivals";
-            },
-            [setActiveStation, setCurentUrl]
-        );
-
-        const memoizedGpsPositions = useMemo(
-            () =>
-                gpsPositions.map((gpsPosition, index) => (
-                    <MemoizedMarker
-                        key={`gps-${index}`}
-                        position={gpsPosition.gpsLocation}
-                        icon={getBusIcon(gpsPosition.operator)}
-                        title={gpsPosition.route}
-                    >
-                        <Popup>
-                            <p>{gpsPosition.route}</p>
-                            <p>{gpsPosition.lineName}</p>
-                            <p>{gpsPosition.operator}</p>
-                        </Popup>
-                    </MemoizedMarker>
-                )),
-            [gpsPositions, getBusIcon]
-        );
-
-        // ----- Bus stops (large dataset) performance pipeline -----
-        const rawBusStops = useMemo(() => busStops || [], [busStops]);
-
-        const MIN_ZOOM_FOR_BUS_STOPS = 10; // choose a sensible default to reduce clutter when zoomed out
-        const filteredBusStops = useMemo(() => {
-            if (!viewport.bounds) return [];
-            if (viewport.zoom < MIN_ZOOM_FOR_BUS_STOPS) return [];
-            const { _southWest, _northEast } = viewport.bounds;
-            return rawBusStops.filter((busStop) => {
-                const [lat, lng] = busStop.gpsLocation;
-                return (
-                    lat >= _southWest.lat &&
-                    lat <= _northEast.lat &&
-                    lng >= _southWest.lng &&
-                    lng <= _northEast.lng
-                );
-            });
-        }, [rawBusStops, viewport]);
-
-        // Progressive rendering for bus stops (10.5k total) to avoid blocking
-        const [renderedBusStopCount, setRenderedBusStopCount] = useState(0);
-        useEffect(() => {
-            let cancelled = false;
-            if (filteredBusStops.length === 0) {
-                setRenderedBusStopCount(0);
-                return;
-            }
-            setRenderedBusStopCount(0);
-            const total = filteredBusStops.length;
-            // chunk size tuned for large dataset; can adjust further
-            const chunkSize = total > 5000 ? 600 : total > 2500 ? 450 : 300;
-            let current = 0;
-            function step() {
-                if (cancelled) return;
-                current += chunkSize;
-                setRenderedBusStopCount(Math.min(current, total));
-                if (current < total) requestAnimationFrame(step);
-            }
-            requestAnimationFrame(step);
-            return () => {
-                cancelled = true;
-            };
-        }, [filteredBusStops]);
-
-        const progressiveBusStops = useMemo(
-            () => filteredBusStops.slice(0, renderedBusStopCount),
-            [filteredBusStops, renderedBusStopCount]
-        );
-
-        const memoizedBusStops = useMemo(
-            () =>
-                progressiveBusStops.map((busStop, index) => (
-                    <MemoizedMarker
-                        key={`stop-${busStop.id || index}`}
-                        position={busStop.gpsLocation}
-                        icon={stopIcon}
-                        title={busStop.name}
-                    >
-                        <Popup>
-                            <h3>{busStop.name}</h3>
-                            <button onClick={() => handleStationClick(busStop)}>
-                                Tukaj sem
-                            </button>
-                        </Popup>
-                    </MemoizedMarker>
-                )),
-            [progressiveBusStops, handleStationClick]
-        );
-
-        // ----- Train stops performance pipeline -----
-        // 1. Raw list
-        const rawTrainStops = useMemo(() => trainStops || [], [trainStops]);
-
-        // 2. Filter by viewport (only show within current map bounds & after min zoom)
-        const MIN_ZOOM_FOR_TRAIN_STOPS = 8; // adjust as needed
-        const filteredTrainStops = useMemo(() => {
-            if (!viewport.bounds) return [];
-            if (viewport.zoom < MIN_ZOOM_FOR_TRAIN_STOPS) return [];
-            const { _southWest, _northEast } = viewport.bounds;
-            return rawTrainStops.filter((stop) => {
-                const lat = stop.lat;
-                const lng = stop.lng;
-                return (
-                    lat >= _southWest.lat &&
-                    lat <= _northEast.lat &&
-                    lng >= _southWest.lng &&
-                    lng <= _northEast.lng
-                );
-            });
-        }, [rawTrainStops, viewport]);
-
-        // 3. Progressive (chunked) rendering to avoid blocking the main thread
-        const [renderedTrainStopCount, setRenderedTrainStopCount] = useState(0);
-        useEffect(() => {
-            let cancelled = false;
-            if (filteredTrainStops.length === 0) {
-                setRenderedTrainStopCount(0);
-                return;
-            }
-            // Reset count then increment in animation frames
-            setRenderedTrainStopCount(0);
-            const total = filteredTrainStops.length;
-            const chunkSize = total > 2000 ? 400 : total > 1000 ? 300 : 200; // adaptive
-            let current = 0;
-            function step() {
-                if (cancelled) return;
-                current += chunkSize;
-                setRenderedTrainStopCount(Math.min(current, total));
-                if (current < total) requestAnimationFrame(step);
-            }
-            requestAnimationFrame(step);
-            return () => {
-                cancelled = true;
-            };
-        }, [filteredTrainStops]);
-
-        // 4. Slice to the number progressively rendered
-        const progressiveTrainStops = useMemo(
-            () => filteredTrainStops.slice(0, renderedTrainStopCount),
-            [filteredTrainStops, renderedTrainStopCount]
-        );
-
-        // 5. Convert to markers (memoized)
-        const memoizedTrainStops = useMemo(
-            () =>
-                progressiveTrainStops.map((stop, index) => (
-                    <MemoizedMarker
-                        key={`train-${stop.stopId || index}`}
-                        position={[stop.lat, stop.lng]}
-                        icon={trainIcon}
-                        title={stop.name}
-                    >
-                        <Popup>
-                            <h3>{stop.naziv}</h3>
-                            <p>ID: {stop.id}</p>
-                        </Popup>
-                    </MemoizedMarker>
-                )),
-            [progressiveTrainStops]
-        );
-
-        return (
-            <div className="insideDiv">
-                <div className="map-container">
-                    <MapContainer
-                        center={mapCenter}
-                        zoom={13}
-                        style={{ height: "100%", width: "100%" }}
-                        attributionControl={false}
-                        scrollWheelZoom={true}
-                        whenCreated={setMap}
-                    >
-                        <ViewportWatcher />
-                        <MapCenter center={mapCenter} />
-                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                        <FeatureGroup>
-                            <MarkerClusterGroup
-                                showCoverageOnHover={false}
-                                spiderfyOnMaxZoom={false}
-                                disableClusteringAtZoom={25}
-                                maxClusterRadius={40}
-                                chunkedLoading
-                                removeOutsideVisibleBounds
-                            >
-                                {memoizedGpsPositions}
-                            </MarkerClusterGroup>
-                        </FeatureGroup>
-                        <FeatureGroup>
-                            <MarkerClusterGroup
-                                showCoverageOnHover={false}
-                                spiderfyOnMaxZoom={false}
-                                disableClusteringAtZoom={16}
-                                maxClusterRadius={30}
-                                chunkedLoading
-                                removeOutsideVisibleBounds
-                            >
-                                {memoizedBusStops}
-                            </MarkerClusterGroup>
-                        </FeatureGroup>
-                        {memoizedTrainStops.length > 0 && (
-                            <FeatureGroup>
-                                <MarkerClusterGroup
-                                    showCoverageOnHover={false}
-                                    spiderfyOnMaxZoom={false}
-                                    disableClusteringAtZoom={18}
-                                    maxClusterRadius={35}
-                                    chunkedLoading
-                                    removeOutsideVisibleBounds
-                                >
-                                    {memoizedTrainStops}
-                                </MarkerClusterGroup>
-                            </FeatureGroup>
-                        )}
-                        {userLocation && (
-                            <Marker
-                                position={userLocation}
-                                icon={userIcon}
-                                title="Tukaj sem"
-                            >
-                                <Popup>
-                                    <h4>Vaša lokacija</h4>
-                                </Popup>
-                            </Marker>
-                        )}
-                        {activeStation.coordinates && (
-                            <Marker
-                                position={activeStation.coordinates}
-                                icon={stationLocationIcon}
-                                title={"Aktivna postaja"}
-                            >
-                                <Popup>
-                                    <h4>Aktivna postaja</h4>
-                                </Popup>
-                            </Marker>
-                        )}
-                    </MapContainer>
-                    {/* Debug stats toggle (press D to toggle) */}
-                    <DebugStats
-                        rawTrain={rawTrainStops.length}
-                        filteredTrain={filteredTrainStops.length}
-                        renderedTrain={renderedTrainStopCount}
-                        rawBus={rawBusStops.length}
-                        filteredBus={filteredBusStops.length}
-                        renderedBus={renderedBusStopCount}
-                        zoom={viewport.zoom}
-                    />
-                </div>
-            </div>
-        );
-    }
-);
-
-// Lightweight debug component (hidden by default; press 'd' to toggle)
-const DebugStats = ({
-    rawTrain,
-    filteredTrain,
-    renderedTrain,
-    rawBus,
-    filteredBus,
-    renderedBus,
-    zoom,
-}) => {
-    const [visible, setVisible] = useState(false);
+    // Initialize map once
     useEffect(() => {
-        const handler = (e) => {
-            if (e.key.toLowerCase() === "d") setVisible((v) => !v);
+        if (mapInstanceRef.current) return;
+        const map = new maplibregl.Map({
+            container: mapRef.current,
+            style: STYLE,
+            center: [center[1], center[0]],
+            zoom: 13,
+            attributionControl: false,
+        });
+
+        mapInstanceRef.current = map;
+
+        map.addControl(
+            new maplibregl.NavigationControl({ showCompass: false }),
+            "top-right"
+        );
+
+        map.on("load", () => {
+            const addImage = (name, src, options) =>
+                new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => {
+                        try {
+                            map.addImage(name, img, options || {});
+                            resolve();
+                        } catch {
+                            resolve();
+                        }
+                    };
+                    img.onerror = () => resolve();
+                    img.src = src;
+                });
+
+            const imageAdds = [
+                addImage("bus-stop", busStopPNG, { sdf: false }),
+                addImage("train", trainPNG, { sdf: false }),
+                addImage("user", userPNG, { sdf: false }),
+                addImage("station", locationPNG, { sdf: false }),
+                addImage("arriva", arrivaPNG, { sdf: false }),
+                addImage("lpp", lppPNG, { sdf: false }),
+                addImage("nomago", nomagoPNG, { sdf: false }),
+                addImage("marprom", marpromPNG, { sdf: false }),
+                addImage("murska", murskaPNG, { sdf: false }),
+                addImage("bus-generic", locationPNG, { sdf: false }),
+            ];
+
+            Promise.all(imageAdds).then(() => {
+                if (!map.getSource("buses")) {
+                    map.addSource("buses", {
+                        type: "geojson",
+                        data: busesGeoJSON,
+                        cluster: true,
+                        clusterRadius: 40,
+                        clusterMaxZoom: 14,
+                    });
+                }
+                if (!map.getSource("busStops")) {
+                    map.addSource("busStops", {
+                        type: "geojson",
+                        data: busStopsGeoJSON,
+                        cluster: true,
+                        clusterRadius: 35,
+                        clusterMaxZoom: 14,
+                    });
+                }
+                if (!map.getSource("trainStops")) {
+                    map.addSource("trainStops", {
+                        type: "geojson",
+                        data: trainStopsGeoJSON,
+                        cluster: true,
+                        clusterRadius: 40,
+                        clusterMaxZoom: 13,
+                    });
+                }
+
+                // Layers: clusters
+                const addClusterLayers = (prefix, color) => {
+                    // Bubbles
+                    if (!map.getLayer(`${prefix}-clusters`)) {
+                        map.addLayer({
+                            id: `${prefix}-clusters`,
+                            type: "circle",
+                            source: prefix,
+                            filter: ["has", "point_count"],
+                            paint: {
+                                "circle-color": color,
+                                "circle-radius": [
+                                    "step",
+                                    ["get", "point_count"],
+                                    12,
+                                    20,
+                                    16,
+                                    50,
+                                    22,
+                                ],
+                                "circle-opacity": 0.8,
+                            },
+                        });
+                    }
+
+                    // Labels
+                    if (!map.getLayer(`${prefix}-cluster-count`)) {
+                        map.addLayer({
+                            id: `${prefix}-cluster-count`,
+                            type: "symbol",
+                            source: prefix,
+                            filter: ["has", "point_count"],
+                            layout: {
+                                "text-field": [
+                                    "get",
+                                    "point_count_abbreviated",
+                                ],
+                                "text-font": ["Open Sans Semibold"],
+                                "text-size": 11,
+                            },
+                            paint: { "text-color": "#ffffff" },
+                        });
+                    }
+                };
+
+                addClusterLayers("buses", "#5b8cff");
+                addClusterLayers("busStops", "#7a5bff");
+                addClusterLayers("trainStops", "#5b8cff");
+
+                // Unclustered icons (smaller, scale by zoom)
+                const addUnclusteredIconLayer = (prefix, sizeExpr) => {
+                    if (!map.getLayer(`${prefix}-points`)) {
+                        map.addLayer({
+                            id: `${prefix}-points`,
+                            type: "symbol",
+                            source: prefix,
+                            filter: ["!", ["has", "point_count"]],
+                            layout: {
+                                "icon-image": ["get", "icon"],
+                                "icon-allow-overlap": true,
+                                "icon-size": sizeExpr,
+                                "icon-anchor": "bottom",
+                            },
+                        });
+                    }
+                };
+
+                // Smaller at low zoom, slightly larger when zoomed in
+                const busSize = [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    8,
+                    0.35,
+                    12,
+                    0.45,
+                    14,
+                    0.55,
+                    16,
+                    0.7,
+                ];
+                const stopSize = [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    8,
+                    0.3,
+                    12,
+                    0.4,
+                    14,
+                    0.5,
+                    16,
+                    0.65,
+                ];
+                const trainSize = [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    8,
+                    0.32,
+                    12,
+                    0.42,
+                    14,
+                    0.52,
+                    16,
+                    0.68,
+                ];
+
+                addUnclusteredIconLayer("buses", busSize);
+                addUnclusteredIconLayer("busStops", stopSize);
+                addUnclusteredIconLayer("trainStops", trainSize);
+
+                // Interactions
+                // Zoom into clusters on click
+                const registerClusterClick = (prefix) => {
+                    map.on("click", `${prefix}-clusters`, (e) => {
+                        const features = map.queryRenderedFeatures(e.point, {
+                            layers: [`${prefix}-clusters`],
+                        });
+                        const clusterId = features[0]?.properties?.cluster_id;
+                        if (!clusterId) return;
+                        const source = map.getSource(prefix);
+                        source.getClusterExpansionZoom(
+                            clusterId,
+                            (err, zoom) => {
+                                if (err) return;
+                                map.easeTo({
+                                    center: features[0].geometry.coordinates,
+                                    zoom,
+                                });
+                            }
+                        );
+                    });
+                    map.on("mouseenter", `${prefix}-clusters`, () => {
+                        map.getCanvas().style.cursor = "pointer";
+                    });
+                    map.on("mouseleave", `${prefix}-clusters`, () => {
+                        map.getCanvas().style.cursor = "";
+                    });
+                };
+
+                registerClusterClick("buses");
+                registerClusterClick("busStops");
+                registerClusterClick("trainStops");
+
+                // Bus stop popup with 'Tukaj sem' button (Leaflet-like)
+                map.on("click", "busStops-points", (e) => {
+                    const f = e.features?.[0];
+                    if (!f) return;
+                    const { id, name } = f.properties || {};
+                    const [lng, lat] = f.geometry.coordinates;
+
+                    const wrapper = document.createElement("div");
+                    const title = document.createElement("h3");
+                    title.textContent = name || "";
+                    const btn = document.createElement("button");
+                    btn.textContent = "Tukaj sem";
+                    btn.className = "popup-button";
+                    wrapper.appendChild(title);
+                    wrapper.appendChild(btn);
+
+                    const popup = new maplibregl.Popup({ closeButton: true })
+                        .setLngLat([lng, lat])
+                        .setDOMContent(wrapper)
+                        .addTo(map);
+
+                    btn.addEventListener("click", () => {
+                        const busStop = { id, name, gpsLocation: [lat, lng] };
+                        setActiveStation({
+                            name: busStop.name,
+                            coordinates: busStop.gpsLocation,
+                            id: busStop.id,
+                        });
+                        localStorage.setItem(
+                            "activeStation",
+                            JSON.stringify({
+                                name: busStop.name,
+                                coordinates: busStop.gpsLocation,
+                                id: busStop.id,
+                            })
+                        );
+                        setCurentUrl("/arrivals");
+                        document.location.href = "/#/arrivals";
+                        popup.remove();
+                    });
+                });
+
+                // Simple popups for buses and train stops
+                const attachPopup = (layerId, formatter) => {
+                    map.on("click", layerId, (e) => {
+                        const f = e.features?.[0];
+                        if (!f) return;
+                        const html = formatter(f.properties);
+                        new maplibregl.Popup({ closeButton: true })
+                            .setLngLat(e.lngLat)
+                            .setHTML(html)
+                            .addTo(map);
+                    });
+                    map.on("mouseenter", layerId, () => {
+                        map.getCanvas().style.cursor = "pointer";
+                    });
+                    map.on("mouseleave", layerId, () => {
+                        map.getCanvas().style.cursor = "";
+                    });
+                };
+
+                attachPopup("buses-points", (p) => {
+                    const route = p.title || "";
+                    const line = p.lineName || "";
+                    const op = p.operator || "";
+                    // Match Leaflet's simple <p> layout
+                    return `\
+                        <div style="min-width:160px">\
+                            <p>${route}</p>\
+                            <p>${line}</p>\
+                            <p>${op}</p>\
+                        </div>`;
+                });
+
+                attachPopup("trainStops-points", (p) => {
+                    const name = p.name || "";
+                    const id = p.id || "";
+                    return (
+                        `<div style="min-width:160px">` +
+                        `<div style="font-weight:600">${name}</div>` +
+                        `<div>ID: ${id}</div>` +
+                        `</div>`
+                    );
+                });
+            });
+        });
+
+        return () => {
+            map.remove();
+            mapInstanceRef.current = null;
         };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
     }, []);
-    if (!visible) return null;
+
+    // Update sources when data changes
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const src = map.getSource("buses");
+        if (src && src.setData) src.setData(busesGeoJSON);
+    }, [busesGeoJSON]);
+
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const src = map.getSource("busStops");
+        if (src && src.setData) src.setData(busStopsGeoJSON);
+    }, [busStopsGeoJSON]);
+
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const src = map.getSource("trainStops");
+        if (src && src.setData) src.setData(trainStopsGeoJSON);
+    }, [trainStopsGeoJSON]);
+
+    // Center map when active station or user location changes
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map || !center) return;
+        map.easeTo({ center: [center[1], center[0]], duration: 500 });
+    }, [center]);
+
+    // User and active station markers (DOM markers with popups like Leaflet)
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        // helper
+        const ensureMarker = (key, coords, img, size = [22, 22], popupText) => {
+            // remove existing
+            if (markersRef.current[key]) {
+                markersRef.current[key].remove();
+                markersRef.current[key] = null;
+            }
+            if (!coords) return;
+            const el = document.createElement("img");
+            el.src = img;
+            el.style.width = `${size[0]}px`;
+            el.style.height = `${size[1]}px`;
+            el.style.transform = "translate(-50%, -100%)"; // anchor bottom-center
+            const m = new maplibregl.Marker({ element: el, anchor: "bottom" })
+                .setLngLat([coords[1], coords[0]])
+                .addTo(map);
+            if (popupText) {
+                m.setPopup(
+                    new maplibregl.Popup().setHTML(`<h4>${popupText}</h4>`)
+                );
+                el.style.cursor = "pointer";
+            }
+            markersRef.current[key] = m;
+        };
+
+        ensureMarker("user", userLocation, userPNG, [22, 22], "Vaša lokacija");
+        ensureMarker(
+            "active",
+            activeStation?.coordinates,
+            locationPNG,
+            [22, 22],
+            "Aktivna postaja"
+        );
+    }, [userLocation, activeStation]);
+
     return (
-        <div
-            style={{
-                position: "absolute",
-                bottom: 8,
-                left: 8,
-                background: "rgba(0,0,0,0.6)",
-                color: "#fff",
-                padding: "6px 10px",
-                fontSize: 12,
-                lineHeight: 1.4,
-                borderRadius: 4,
-                zIndex: 9999,
-                pointerEvents: "none",
-                fontFamily: "monospace",
-            }}
-        >
-            <div>Zoom: {zoom}</div>
-            <div>
-                Train: {renderedTrain}/{filteredTrain}/{rawTrain}
+        <div className="insideDiv">
+            <div className="map-container">
+                <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
             </div>
-            <div>
-                Bus: {renderedBus}/{filteredBus}/{rawBus}
-            </div>
-            <div>Press 'd' to hide</div>
         </div>
     );
-};
+});
 
 export default Map;

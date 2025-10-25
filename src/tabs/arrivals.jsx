@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format, formatDistanceToNow, set } from "date-fns";
 import { sl } from "date-fns/locale";
 
@@ -122,25 +122,26 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
             </div>
             {error && <p>{error}</p>}
             <div className="arrival-list">
-            {!error &&
-                filteredArrivals.map((arrival, index) => (
-                    <div key={index} className="arrival-item">
-                        <h3>{arrival.routeName}</h3>
-                        <>
-                            Prihod: {formatArrivalTime(arrival.timeArrival)} (
-                            {formatRelativeTime(arrival.timeArrival)})
-                        </>
-                        <p>
-                            Prevoznik: {shortenOperatorName(arrival.operator)}
-                        </p>
-                    </div>
-                ))}
-            {!stationSelected && (
-                <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
-            )}
-            {stationSelected && !error && filteredArrivals.length === 0 && (
-                <p>Ni prihajajočih prihodov za izbrano postajo.</p>
-            )}
+                {!error &&
+                    filteredArrivals.map((arrival, index) => (
+                        <div key={index} className="arrival-item">
+                            <h3>{arrival.routeName}</h3>
+                            <>
+                                Prihod: {formatArrivalTime(arrival.timeArrival)}{" "}
+                                ({formatRelativeTime(arrival.timeArrival)})
+                            </>
+                            <p>
+                                Prevoznik:{" "}
+                                {shortenOperatorName(arrival.operator)}
+                            </p>
+                        </div>
+                    ))}
+                {!stationSelected && (
+                    <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
+                )}
+                {stationSelected && !error && filteredArrivals.length === 0 && (
+                    <p>Ni prihajajočih prihodov za izbrano postajo.</p>
+                )}
             </div>
         </div>
     );
