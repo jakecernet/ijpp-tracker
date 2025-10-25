@@ -97,6 +97,8 @@ const Map = React.memo(function Map({
                     lineName: g.lineName || "",
                     operator: g.operator || "",
                     icon: operatorToIcon[g.operator] || "bus-generic",
+                    // circle color driver
+                    brand: operatorToIcon[g.operator] || "generic",
                 })
             ),
         [gpsPositions]
@@ -151,6 +153,8 @@ const Map = React.memo(function Map({
                     rank: t.Rang,
                     type: t.Vrsta_vlaka,
                     icon: "train",
+                    // circle color driver (SŽ)
+                    brand: "sz",
                 })
             ),
         [trainPositions]
@@ -220,8 +224,8 @@ const Map = React.memo(function Map({
                         type: "geojson",
                         data: busStopsGeoJSON,
                         cluster: true,
-                        clusterRadius: 35,
-                        clusterMaxZoom: 14,
+                        clusterRadius: 60,
+                        clusterMaxZoom: 20,
                     });
                 }
                 if (!map.getSource("trainStops")) {
@@ -292,7 +296,11 @@ const Map = React.memo(function Map({
                 addClusterLayers("trainPositions", "#ff5b5b");
 
                 // Unclustered icons with smaller, zoom-based sizes
-                const addUnclusteredIconLayer = (prefix, sizeExpr) => {
+                const addUnclusteredIconLayer = (
+                    prefix,
+                    sizeExpr,
+                    anchor = "bottom"
+                ) => {
                     if (!map.getLayer(`${prefix}-points`)) {
                         map.addLayer({
                             id: `${prefix}-points`,
@@ -303,7 +311,7 @@ const Map = React.memo(function Map({
                                 "icon-image": ["get", "icon"],
                                 "icon-allow-overlap": true,
                                 "icon-size": sizeExpr,
-                                "icon-anchor": "bottom",
+                                "icon-anchor": anchor,
                             },
                         });
                     }
@@ -362,10 +370,85 @@ const Map = React.memo(function Map({
                     0.5,
                 ];
 
-                addUnclusteredIconLayer("buses", busSize);
-                addUnclusteredIconLayer("busStops", stopSize);
-                addUnclusteredIconLayer("trainStops", trainSize);
-                addUnclusteredIconLayer("trainPositions", trainPosSize);
+                // Center vehicle icons so they sit inside their halo circles
+                addUnclusteredIconLayer("buses", busSize, "center");
+                addUnclusteredIconLayer("busStops", stopSize, "bottom");
+                addUnclusteredIconLayer("trainStops", trainSize, "bottom");
+                addUnclusteredIconLayer(
+                    "trainPositions",
+                    trainPosSize,
+                    "center"
+                );
+
+                // New: colored circle halos under bus/train position icons
+                const brandColorExpr = [
+                    "match",
+                    ["coalesce", ["get", "brand"], ["get", "icon"]],
+                    "arriva",
+                    "#5bc0ff", // light blue
+                    "sz",
+                    "#5bc9ff", // SŽ light blue
+                    "nomago",
+                    "#ffeb3b", // yellow
+                    "lpp",
+                    "#4caf50", // green
+                    "marprom",
+                    "#f44336", // red
+                    /* default */ "#607d8b", // grey-blue
+                ];
+                const brandColorExprDarkened = [
+                    "match",
+                    ["coalesce", ["get", "brand"], ["get", "icon"]],
+                    "arriva",
+                    "#0091ea", // dark blue
+                    "sz",
+                    "#0091ea", // SŽ dark blue
+                    "nomago",
+                    "#fbc02d", // dark yellow
+                    "lpp",
+                    "#388e3c", // dark green
+                    "marprom",
+                    "#d32f2f", // dark red
+                    /* default */ "#455a64", // dark grey-blue
+                ];
+                const circleRadius = [
+                    "interpolate",
+                    ["linear"],
+                    ["zoom"],
+                    22,
+                    22,
+                    30,
+                    26,
+                    34,
+                    30,
+                    38,
+                    34,
+                ];
+                const addUnclusteredCircleLayer = (prefix) => {
+                    const id = `${prefix}-halo`;
+                    if (!map.getLayer(id)) {
+                        map.addLayer(
+                            {
+                                id,
+                                type: "circle",
+                                source: prefix,
+                                filter: ["!", ["has", "point_count"]],
+                                paint: {
+                                    "circle-color": brandColorExpr,
+                                    "circle-radius": circleRadius,
+                                    "circle-stroke-color": brandColorExprDarkened,
+                                    "circle-stroke-width": 2.8,
+                                    "circle-opacity": 0.6,
+                                },
+                            },
+                            // place below the icon layer
+                            `${prefix}-points`
+                        );
+                    }
+                };
+
+                addUnclusteredCircleLayer("buses");
+                addUnclusteredCircleLayer("trainPositions");
 
                 // Cluster interactions
                 const registerClusterClick = (prefix) => {
@@ -479,7 +562,9 @@ const Map = React.memo(function Map({
                             ? `<div style="font-weight:600">Vlak ${number}</div>`
                             : "") +
                         (relation ? `<div>Relacija: ${relation}</div>` : "") +
-                        (station ? `<div>Naslednja postaja: ${station}</div>` : "") +
+                        (station
+                            ? `<div>Naslednja postaja: ${station}</div>`
+                            : "") +
                         (departure ? `<div>Odhod: ${departure}</div>` : "") +
                         (delay !== null
                             ? `<div>Zamuda: ${delay} min</div>`
