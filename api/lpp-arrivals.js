@@ -25,7 +25,7 @@ function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
 
-async function fetchUpstream(url, { attempts = 3, timeoutMs = 6000 } = {}) {
+async function fetchUpstream(url, { attempts = 4, timeoutMs = 8000 } = {}) {
     let lastErr;
     for (let i = 1; i <= attempts; i++) {
         const ctrl = new AbortController();
@@ -39,9 +39,35 @@ async function fetchUpstream(url, { attempts = 3, timeoutMs = 6000 } = {}) {
                 },
             });
             clearTimeout(t);
-            if (res.ok) return await res.json();
 
-            lastErr = new Error(`Upstream ${res.status}`);
+            if (res.ok) {
+                // try parse json, but surface parse errors
+                try {
+                    return await res.json();
+                } catch (parseErr) {
+                    lastErr = new Error(
+                        `Upstream ${res.status} (invalid JSON)`
+                    );
+                    lastErr.body = await res.text().catch(() => "");
+                    throw lastErr;
+                }
+            }
+
+            // read body for debugging (truncate to avoid huge logs)
+            let body = "";
+            try {
+                body = await res.text();
+                if (body.length > 2000)
+                    body = body.slice(0, 2000) + "...(truncated)";
+            } catch {}
+
+            lastErr = new Error(
+                `Upstream ${res.status}: ${body ? body.slice(0, 200) : ""}`
+            );
+            lastErr.status = res.status;
+            lastErr.body = body;
+
+            // Retry on 429 and 5xx
             if (
                 res.status === 429 ||
                 (res.status >= 500 && res.status <= 599)
@@ -49,15 +75,18 @@ async function fetchUpstream(url, { attempts = 3, timeoutMs = 6000 } = {}) {
                 await sleep(200 * i + Math.random() * 200);
                 continue;
             }
+
             throw lastErr;
         } catch (e) {
             clearTimeout(t);
             lastErr = e;
+            // Retry on network/abort errors
             if (
-                e.name === "AbortError" ||
-                /ECONN|ETIMEDOUT|RESET|TIMEOUT/i.test(String(e?.message))
+                e &&
+                (e.name === "AbortError" ||
+                    /ECONN|ETIMEDOUT|RESET|TIMEOUT/i.test(String(e?.message)))
             ) {
-                await sleep(200 * i + Math.random() * 200);
+                await sleep(250 * i + Math.random() * 250);
                 continue;
             }
             throw e;
