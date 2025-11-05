@@ -1,6 +1,6 @@
 import { Agent, fetch as undiciFetch } from "undici";
 
-export const config = { runtime: "nodejs", regions: ["fra1", "arn1"] };
+export const config = { runtime: "nodejs", regions: ["fra1"] };
 
 const CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
