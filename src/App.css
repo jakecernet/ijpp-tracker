@@ -149,6 +149,49 @@ h2 {
     padding-right: 6px;
 }
 
+.lpp-arrivals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    border-radius: 12px;
+    margin-top: 6px;
+    padding-right: 6px;
+
+    .arrival-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+
+        .left {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 12px;
+
+            .circle {
+                padding: 20px;
+                border-radius: 50%;
+                height: 4rem;
+                width: 4rem;
+                background-color: rgba(128, 128, 128, 0.377);
+                font-size: 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+        }
+
+        .right {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 2rem;
+        }
+    }
+}
+
 .search-input,
 .setting-input {
     width: 100%;

@@ -345,20 +345,30 @@ function App() {
                     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=" + lppCode
                 );
 
-                const arrivals = raw.data.arrivals
-                    .filter((arrival) =>
-                        activeOperatorsNormal(activeOperators).includes(
-                            arrival?.operator?.name
-                        )
-                    )
+                if (!activeOperators.includes("lpp")) {
+                    setLppArrivals([]);
+                    return;
+                }
+
+                const list = Array.isArray(raw?.data?.arrivals) ? raw.data.arrivals : [];
+
+                const arrivals = list
                     .map((arrival) => ({
                         etaMinutes: arrival.eta_min,
                         routeName: arrival.route_name,
                         tripName: arrival.trip_name,
-                    }));
+                        routeId: arrival.route_id,
+                        tripId: arrival.trip_id,
+                        vehicleId: arrival.vehicle_id,
+                        type: arrival.type,
+                        depot: arrival.depot,
+                        from: arrival.stations?.departure,
+                        to: arrival.stations?.arrival,
+                    }))
+                    .sort((a, b) => a.etaMinutes - b.etaMinutes);
 
                 setLppArrivals(arrivals);
-                console.log("LPP arrivals fetched:", arrivals);
+                console.log("LPP arrivals fetched:", raw);
             } catch (error) {
                 console.error("Error fetching LPP arrivals:", error);
             }

@@ -147,11 +147,16 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
                 {!error &&
                     lppArrivals.map((arrival, index) => (
                         <div key={index} className="arrival-item">
-                            <h3>{arrival.routeName}</h3>
-                            <>Prihod: {formatArrivalTime(arrival.timeArrival)} ({formatRelativeTime(arrival.timeArrival)})</>
-                            <p>
-                                Prevoznik: LPP
-                            </p>
+                            <div className="left">
+                                <div className="circle">
+                                    {arrival.routeName}
+                                </div>
+                                <h2>{arrival.tripName}</h2>
+                            </div>
+                            <div className="right">
+                                <h2>{arrival.etaMinutes} min</h2>
+                                <p>Prevoznik: LPP</p>
+                            </div>
                         </div>
                     ))}
                 {!stationSelected && (
