@@ -67,65 +67,87 @@ async function fetchUpstream(url, { attempts = 3, timeoutMs = 6000 } = {}) {
 }
 
 export default async function handler(req, res) {
-    if (req.method === "OPTIONS") {
-        res.writeHead(204, CORS_HEADERS);
-        res.end();
-        return;
-    }
-    if (req.method !== "GET") {
-        sendJson(res, { error: "Method not allowed" }, 405);
-        return;
-    }
-
-    const stationCode =
-        req.query["station-code"] ||
-        req.query["station_code"] ||
-        req.query["code"];
-
-    if (!stationCode) {
-        sendJson(
-            res,
-            { error: "Missing required query param: station-code" },
-            400
-        );
-        return;
-    }
-
-    const key = `arr:${stationCode}`;
-    const now = Date.now();
-    const ttlMs = 15_000;
-
-    const cached = cache.get(key);
-    if (cached && now - cached.ts < ttlMs) {
-        sendJson(res, cached.data, 200, {
-            "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
-        });
-        return;
-    }
-
-    const upstream = new URL("https://data.lpp.si/api/station/arrival");
-    upstream.searchParams.set("station-code", stationCode);
-
     try {
-        const data = await fetchUpstream(upstream.toString(), {
-            attempts: 3,
-            timeoutMs: 6000,
-        });
-        cache.set(key, { data, ts: now });
-        sendJson(res, data, 200, {
-            "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
-        });
-    } catch (err) {
-        if (cached) {
-            sendJson(res, { ...cached.data, stale: true }, 200, {
-                "Cache-Control": "public, max-age=0, must-revalidate",
+        if (req.method === "OPTIONS") {
+            res.writeHead(204, CORS_HEADERS);
+            res.end();
+            return;
+        }
+        if (req.method !== "GET") {
+            sendJson(res, { error: "Method not allowed" }, 405);
+            return;
+        }
+
+        // parse query params from req.url (safe for plain Node/Vercel functions)
+        const base = `http://${req.headers.host || "localhost"}`;
+        const url = new URL(req.url || "/", base);
+        const q = url.searchParams;
+
+        const stationCode =
+            q.get("station-code") || q.get("station_code") || q.get("code");
+
+        if (!stationCode) {
+            sendJson(
+                res,
+                { error: "Missing required query param: station-code" },
+                400
+            );
+            return;
+        }
+
+        const key = `arr:${stationCode}`;
+        const now = Date.now();
+        const ttlMs = 15_000;
+
+        const cached = cache.get(key);
+        if (cached && now - cached.ts < ttlMs) {
+            sendJson(res, cached.data, 200, {
+                "Cache-Control":
+                    "public, s-maxage=15, stale-while-revalidate=60",
             });
             return;
         }
+
+        const upstream = new URL("https://data.lpp.si/api/station/arrival");
+        upstream.searchParams.set("station-code", stationCode);
+
+        try {
+            const data = await fetchUpstream(upstream.toString(), {
+                attempts: 3,
+                timeoutMs: 6000,
+            });
+            cache.set(key, { data, ts: now });
+            sendJson(res, data, 200, {
+                "Cache-Control":
+                    "public, s-maxage=15, stale-while-revalidate=60",
+            });
+        } catch (err) {
+            if (cached) {
+                sendJson(res, { ...cached.data, stale: true }, 200, {
+                    "Cache-Control": "public, max-age=0, must-revalidate",
+                });
+                return;
+            }
+            console.error("upstream error:", err);
+            sendJson(
+                res,
+                {
+                    error: "Upstream error",
+                    detail: String(err?.message || err),
+                },
+                502
+            );
+        }
+    } catch (err) {
+        // unexpected error — log and return 500
+        console.error("handler error:", err);
         sendJson(
             res,
-            { error: "Upstream error", detail: String(err?.message || err) },
-            502
+            {
+                error: "Internal server error",
+                detail: String(err?.message || err),
+            },
+            500
         );
     }
 }
