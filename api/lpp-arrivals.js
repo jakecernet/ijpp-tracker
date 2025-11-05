@@ -11,13 +11,14 @@ const CORS_HEADERS = {
 const cache = new Map(); // key -> { data, ts }
 
 function sendJson(res, body, status = 200, extraHeaders = {}) {
-    res.status(status)
-        .set({
-            "content-type": "application/json; charset=utf-8",
-            ...CORS_HEADERS,
-            ...extraHeaders,
-        })
-        .send(JSON.stringify(body));
+    const headers = {
+        "content-type": "application/json; charset=utf-8",
+        ...CORS_HEADERS,
+        ...extraHeaders,
+    };
+    // Use Node's response methods compatible with Vercel runtime
+    res.writeHead(status, headers);
+    res.end(JSON.stringify(body));
 }
 
 function sleep(ms) {
@@ -67,7 +68,8 @@ async function fetchUpstream(url, { attempts = 3, timeoutMs = 6000 } = {}) {
 
 export default async function handler(req, res) {
     if (req.method === "OPTIONS") {
-        res.status(204).set(CORS_HEADERS).end();
+        res.writeHead(204, CORS_HEADERS);
+        res.end();
         return;
     }
     if (req.method !== "GET") {
