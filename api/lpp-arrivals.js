@@ -7,6 +7,8 @@ const CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*", // Adjust for production if desired
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "600",
+    "Access-Control-Expose-Headers": "cache-control, content-type",
 };
 
 function jsonResponse(body, init = {}) {
@@ -43,12 +45,13 @@ export default async function handler(req) {
             );
         }
 
-        const upstream = new URL("https://data.lpp.si/api/station/arrival?");
+        // Build the upstream URL exactly as required
+        const upstream = new URL("https://data.lpp.si/api/station/arrival");
         upstream.searchParams.set("station-code", stationCode);
 
         const resp = await fetch(upstream.toString(), {
+            method: "GET",
             headers: {
-                "User-Agent": "ijpp-tracker/edge-proxy",
                 Accept: "application/json",
             },
             cache: "no-store",
@@ -61,12 +64,15 @@ export default async function handler(req) {
             );
         }
 
-        const data = await resp.json();
-        return new Response(JSON.stringify(data), {
+        // Stream upstream response directly to avoid parsing/serialization issues
+        const contentType =
+            resp.headers.get("content-type") ||
+            "application/json; charset=utf-8";
+
+        return new Response(resp.body, {
             status: 200,
             headers: {
-                "content-type": "application/json; charset=utf-8",
-                // Arrivals are dynamic; keep CDN cache very short
+                "content-type": contentType,
                 "cache-control":
                     "public, s-maxage=15, stale-while-revalidate=15",
                 ...CORS_HEADERS,
