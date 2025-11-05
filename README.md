@@ -22,11 +22,12 @@ They add permissive CORS headers and CDN caching. You can tighten `Access-Contro
 
 ### Run locally with Vercel CLI
 
-Install Vercel CLI and run the dev server to test `api/` endpoints locally alongside Vite. Use a different port than Vite (this repo uses 3000 for Vite):
+Install deps and Vercel CLI, then run the dev server to test `api/` endpoints locally alongside Vite. Use a different port than Vite (this repo uses 3000 for Vite):
 
 ```cmd
+npm install
 npm i -g vercel
-vercel dev -p 4000
+vercel dev --listen 4000
 ```
 
 This starts a local server exposing `/api/*` on port 4000. If you also want the Vite frontend, run in a separate terminal:
@@ -59,4 +60,5 @@ Notes:
 ### Troubleshooting 404 locally
 
 -   If you see `404: NOT_FOUND ... ID: dev1::...`, you’re likely opening the Vercel dev server directly without a frontend. Use the steps above: run `vercel dev -p 4000`, then open `http://localhost:3000` for the Vite UI. The UI calls `/api/*`, which Vite proxies to `http://localhost:4000`.
+-   If you see `404: NOT_FOUND ... ID: dev1::...`, you’re likely opening the Vercel dev server directly without a frontend. Use the steps above: run `vercel dev --listen 4000`, then open `http://localhost:3000` for the Vite UI. The UI calls `/api/*`, which Vite proxies to `http://localhost:4000`.
 -   Ensure `vite.config.js` contains a `server.proxy` entry for `/api` pointing to `http://localhost:4000`.

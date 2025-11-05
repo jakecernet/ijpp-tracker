@@ -177,7 +177,7 @@ function App() {
         const fetchLppBusStops = async () => {
             try {
                 const response = await fetch(
-                    "/api/lpp-stops?latitude=46.043904&longitude=14.503119&radius=300000"
+                    "https://tracker.cernetic.cc/api/lpp-stops?latitude=46.043904&longitude=14.503119&radius=300000"
                 );
                 const data = await response.json();
                 setLppBusStops(data);
@@ -192,7 +192,7 @@ function App() {
     useEffect(() => {
         const fetchTrainStops = async () => {
             try {
-                const data = await fetchJson("/api/sz-stops");
+                const data = await fetchJson("https://tracker.cernetic.cc/api/sz-stops");
                 setTrainStops(data);
                 console.log("Train stops fetched:", data);
             } catch (error) {
