@@ -1,5 +1,3 @@
-import { Agent, fetch as undiciFetch } from "undici";
-
 export const config = { runtime: "nodejs", regions: ["fra1"] };
 
 const CORS_HEADERS = {
@@ -9,12 +7,6 @@ const CORS_HEADERS = {
     "Access-Control-Max-Age": "600",
     "Access-Control-Expose-Headers": "cache-control, content-type",
 };
-
-const agent = new Agent({
-    keepAliveTimeout: 10_000,
-    keepAliveMaxTimeout: 15_000,
-    connections: 64,
-});
 
 const cache = new Map(); // key -> { data, ts }
 
@@ -38,8 +30,7 @@ async function fetchUpstream(url, { attempts = 3, timeoutMs = 6000 } = {}) {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), timeoutMs);
         try {
-            const res = await undiciFetch(url, {
-                dispatcher: agent,
+            const res = await fetch(url, {
                 signal: ctrl.signal,
                 headers: {
                     Accept: "application/json",
