@@ -43,7 +43,7 @@ export default async function handler(req) {
             );
         }
 
-        const upstream = new URL("https://data.lpp.si/api/station/arrival");
+        const upstream = new URL("https://data.lpp.si/api/station/arrival?");
         upstream.searchParams.set("station-code", stationCode);
 
         const resp = await fetch(upstream.toString(), {

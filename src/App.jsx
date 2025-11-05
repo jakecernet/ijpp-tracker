@@ -345,7 +345,7 @@ function App() {
                     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=" + lppCode
                 );
 
-                const arrivals = raw.arrivals
+                const arrivals = raw.data.arrivals
                     .filter((arrival) =>
                         activeOperatorsNormal(activeOperators).includes(
                             arrival?.operator?.name
