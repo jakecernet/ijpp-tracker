@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings, X } from "lucide-react";
 import "./App.css";
+import { set } from "lodash";
 
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
@@ -32,6 +33,7 @@ function App() {
             : [46.056, 14.5058]
     );
     const [busStopArrivals, setBusStopArrivals] = useState([]);
+    const [lppArrivals, setLppArrivals] = useState([]);
     const [activeOperators, setActiveOperators] = useState(
         localStorage.getItem("activeOperators")
             ? JSON.parse(localStorage.getItem("activeOperators"))
@@ -192,7 +194,9 @@ function App() {
     useEffect(() => {
         const fetchTrainStops = async () => {
             try {
-                const data = await fetchJson("https://tracker.cernetic.cc/api/sz-stops");
+                const data = await fetchJson(
+                    "https://tracker.cernetic.cc/api/sz-stops"
+                );
                 setTrainStops(data);
                 console.log("Train stops fetched:", data);
             } catch (error) {
@@ -203,10 +207,9 @@ function App() {
         fetchTrainStops();
     }, []);
 
-    useEffect(() => {
+   /*  useEffect(() => {
         const fetchBusStops = async () => {
             try {
-                // Helpers for matching
                 const normalizeName = (n) =>
                     (n || "").toString().trim().toLowerCase();
                 const getLppName = (s) =>
@@ -315,7 +318,7 @@ function App() {
         };
 
         fetchBusStops();
-    }, [radius, userLocation, lppBusStops]);
+    }, [radius, userLocation, lppBusStops]); */
 
     useEffect(() => {
         if (navigator.geolocation) {
@@ -334,19 +337,57 @@ function App() {
     }, []);
 
     useEffect(() => {
+        const fetchLppArrivals = async () => {
+            const lppCode = activeStation?.ref_id;
+
+            try {
+                const raw = await fetchJson(
+                    "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=" + lppCode
+                );
+
+                const arrivals = raw.arrivals
+                    .filter((arrival) =>
+                        activeOperatorsNormal(activeOperators).includes(
+                            arrival?.operator?.name
+                        )
+                    )
+                    .map((arrival) => ({
+                        etaMinutes: arrival.eta_min,
+                        routeName: arrival.route_name,
+                        tripName: arrival.trip_name,
+                    }));
+
+                setLppArrivals(arrivals);
+                console.log("LPP arrivals fetched:", arrivals);
+            } catch (error) {
+                console.error("Error fetching LPP arrivals:", error);
+            }
+        };
+        fetchLppArrivals();
+    }, [activeStation]);
+
+    useEffect(() => {
         const fetchBusStopArrivals = async () => {
             try {
                 const data = await fetchJson(
                     `https://ojpp.si/api/stop_locations/${activeStation.id}/arrivals`
                 );
-                const arrivals = data.map((arrival) => ({
-                    tripId: arrival.trip_id,
-                    routeId: arrival.route_id,
-                    routeName: arrival.route_name,
-                    timeArrival: arrival.time_arrival,
-                    timeDeparture: arrival.time_departure,
-                    operator: arrival.operator.name,
-                }));
+
+                const arrivals = data
+                    .filter(
+                        (arrival) =>
+                            arrival?.operator?.name !==
+                            "Javno podjetje Ljubljanski potniški promet d.o.o."
+                    )
+                    .map((arrival) => ({
+                        tripId: arrival.trip_id,
+                        routeId: arrival.route_id,
+                        routeName: arrival.route_name,
+                        timeArrival: arrival.time_arrival,
+                        timeDeparture: arrival.time_departure,
+                        operator: arrival.operator.name,
+                    }));
+
                 setBusStopArrivals(arrivals);
             } catch (error) {
                 console.error("Error fetching bus stop arrivals:", error);
@@ -387,6 +428,7 @@ function App() {
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
                                         trainStops={trainStops}
+                                        lppBusStops={lppBusStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
@@ -401,6 +443,7 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
+                                        lppBusStops={lppBusStops}
                                         trainStops={trainStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
@@ -416,6 +459,7 @@ function App() {
                                     <ArrivalsTab
                                         activeStation={activeStation}
                                         stopArrivals={busStopArrivals}
+                                        lppArrivals={lppArrivals}
                                     />
                                 }
                             />

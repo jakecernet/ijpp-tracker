@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { format, formatDistanceToNow, set } from "date-fns";
 import { sl } from "date-fns/locale";
 
-const ArrivalsTab = ({ activeStation, stopArrivals }) => {
+const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
     const [arrivals, setArrivals] = useState([]);
     const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -140,6 +140,21 @@ const ArrivalsTab = ({ activeStation, stopArrivals }) => {
                     <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
                 )}
                 {stationSelected && !error && filteredArrivals.length === 0 && (
+                    <p>Ni prihajajočih prihodov za izbrano postajo.</p>
+                )}
+            </div>
+            <div className="lpp-arrivals-list">
+                {!error &&
+                    lppArrivals.map((arrival, index) => (
+                        <div key={index} className="arrival-item">
+                            <h3>{arrival.routeName}</h3>
+                            <>Prihod: {formatArrivalTime(arrival.timeArrival)} ({formatRelativeTime(arrival.timeArrival)})</>
+                            <p>
+                                Prevoznik: LPP
+                            </p>
+                        </div>
+                    ))}
+                {!stationSelected && (
                     <p>Ni prihajajočih prihodov za izbrano postajo.</p>
                 )}
             </div>

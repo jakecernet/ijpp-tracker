@@ -143,7 +143,6 @@ h2 {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    height: calc(100vh - 240px);
     overflow-y: auto;
     border-radius: 12px;
     margin-top: 6px;

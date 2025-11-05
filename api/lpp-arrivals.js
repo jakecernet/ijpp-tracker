@@ -1,0 +1,81 @@
+// Vercel Edge Function: Proxy LPP arrivals with CORS and lightweight caching
+export const config = {
+    runtime: "edge",
+};
+
+const CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*", // Adjust for production if desired
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+function jsonResponse(body, init = {}) {
+    return new Response(JSON.stringify(body), {
+        headers: {
+            "content-type": "application/json; charset=utf-8",
+            ...CORS_HEADERS,
+            ...(init.headers || {}),
+        },
+        status: init.status || 200,
+    });
+}
+
+export default async function handler(req) {
+    if (req.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    if (req.method !== "GET") {
+        return jsonResponse({ error: "Method not allowed" }, { status: 405 });
+    }
+
+    try {
+        const url = new URL(req.url);
+        const stationCode =
+            url.searchParams.get("station-code") ||
+            url.searchParams.get("station_code") ||
+            url.searchParams.get("code");
+
+        if (!stationCode) {
+            return jsonResponse(
+                { error: "Missing required query param: station-code" },
+                { status: 400 }
+            );
+        }
+
+        const upstream = new URL("https://data.lpp.si/api/station/arrival");
+        upstream.searchParams.set("station-code", stationCode);
+
+        const resp = await fetch(upstream.toString(), {
+            headers: {
+                "User-Agent": "ijpp-tracker/edge-proxy",
+                Accept: "application/json",
+            },
+            cache: "no-store",
+        });
+
+        if (!resp.ok) {
+            return jsonResponse(
+                { error: "Upstream error", status: resp.status },
+                { status: 502 }
+            );
+        }
+
+        const data = await resp.json();
+        return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: {
+                "content-type": "application/json; charset=utf-8",
+                // Arrivals are dynamic; keep CDN cache very short
+                "cache-control":
+                    "public, s-maxage=15, stale-while-revalidate=15",
+                ...CORS_HEADERS,
+            },
+        });
+    } catch (err) {
+        return jsonResponse(
+            { error: "Proxy error", message: String(err) },
+            { status: 500 }
+        );
+    }
+}

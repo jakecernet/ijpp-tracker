@@ -13,7 +13,6 @@ import trainStopPNG from "../img/trainStop.png";
 import szPNG from "../img/sz.png";
 import locationPNG from "../img/location.png";
 
-// Labeled OSM raster style (no API key). Override with localStorage.mapStyleUrl if desired.
 const OSM_RASTER_STYLE = {
     version: 8,
     sources: {
@@ -71,6 +70,7 @@ const operatorToIcon = {
 const Map = React.memo(function Map({
     gpsPositions,
     busStops,
+    lppBusStops,
     trainStops,
     activeStation,
     setActiveStation,
@@ -113,6 +113,65 @@ const Map = React.memo(function Map({
             ),
         [busStops]
     );
+
+    // Try to normalize LPP stop shapes into points
+    const lppStopsGeoJSON = useMemo(() => {
+        // Accept array or wrapped object
+        const list = Array.isArray(lppBusStops)
+            ? lppBusStops
+            : lppBusStops?.stations || lppBusStops?.data || [];
+
+        const getLppName = (s) =>
+            s?.name ??
+            s?.title ??
+            s?.stationName ??
+            s?.display_name ??
+            s?.stop_name ??
+            "";
+        const getLppCoords = (s) => {
+            if (Array.isArray(s?.gpsLocation) && s.gpsLocation.length === 2)
+                return s.gpsLocation;
+            if (s?.latitude != null && s?.longitude != null)
+                return [s.latitude, s.longitude];
+            if (s?.lat != null && s?.lon != null) return [s.lat, s.lon];
+            if (
+                s?.location &&
+                s.location.latitude != null &&
+                s.location.longitude != null
+            )
+                return [s.location.latitude, s.location.longitude];
+            if (
+                s?.coordinates &&
+                Array.isArray(s.coordinates) &&
+                s.coordinates.length === 2
+            ) {
+                // Many APIs use [lng, lat]; try to detect if looks like that
+                const [a, b] = s.coordinates;
+                // If values look like lon, lat, flip to [lat, lon]
+                if (Math.abs(a) > 20 && Math.abs(b) > 20) return [b, a];
+                return [a, b];
+            }
+            return null;
+        };
+        const getRefId = (s) =>
+            s?.ref_id ??
+            s?.station_code ??
+            s?.code ??
+            s?.id ??
+            s?.stationId ??
+            null;
+
+        return toGeoJSONPoints(
+            list || [],
+            (s) => getLppCoords(s),
+            (s) => ({
+                id: s?.id ?? getRefId(s) ?? getLppName(s),
+                name: getLppName(s),
+                icon: "bus-stop",
+                ref_id: getRefId(s),
+            })
+        );
+    }, [lppBusStops]);
 
     const trainStopsGeoJSON = useMemo(
         () =>
@@ -228,6 +287,15 @@ const Map = React.memo(function Map({
                         clusterMaxZoom: 20,
                     });
                 }
+                if (!map.getSource("lppBusStops")) {
+                    map.addSource("lppBusStops", {
+                        type: "geojson",
+                        data: lppStopsGeoJSON,
+                        cluster: true,
+                        clusterRadius: 60,
+                        clusterMaxZoom: 20,
+                    });
+                }
                 if (!map.getSource("trainStops")) {
                     map.addSource("trainStops", {
                         type: "geojson",
@@ -292,6 +360,7 @@ const Map = React.memo(function Map({
 
                 addClusterLayers("buses", "#5b8cff");
                 addClusterLayers("busStops", "#7a5bff");
+                addClusterLayers("lppBusStops", "#2e7d32");
                 addClusterLayers("trainStops", "#5b8cff");
                 addClusterLayers("trainPositions", "#ff5b5b");
 
@@ -373,6 +442,7 @@ const Map = React.memo(function Map({
                 // Center vehicle icons so they sit inside their halo circles
                 addUnclusteredIconLayer("buses", busSize, "center");
                 addUnclusteredIconLayer("busStops", stopSize, "bottom");
+                addUnclusteredIconLayer("lppBusStops", stopSize, "bottom");
                 addUnclusteredIconLayer("trainStops", trainSize, "bottom");
                 addUnclusteredIconLayer(
                     "trainPositions",
@@ -436,7 +506,8 @@ const Map = React.memo(function Map({
                                 paint: {
                                     "circle-color": brandColorExpr,
                                     "circle-radius": circleRadius,
-                                    "circle-stroke-color": brandColorExprDarkened,
+                                    "circle-stroke-color":
+                                        brandColorExprDarkened,
                                     "circle-stroke-width": 2.8,
                                     "circle-opacity": 0.6,
                                 },
@@ -480,6 +551,7 @@ const Map = React.memo(function Map({
 
                 registerClusterClick("buses");
                 registerClusterClick("busStops");
+                registerClusterClick("lppBusStops");
                 registerClusterClick("trainStops");
                 registerClusterClick("trainPositions");
 
@@ -518,6 +590,51 @@ const Map = React.memo(function Map({
                                 coordinates: busStop.gpsLocation,
                                 id: busStop.id,
                             })
+                        );
+                        setCurentUrl("/arrivals");
+                        document.location.href = "/#/arrivals";
+                        popup.remove();
+                    });
+                });
+
+                // LPP stop popup with action button (preserves ref_id for LPP arrivals)
+                map.on("click", "lppBusStops-points", (e) => {
+                    const f = e.features?.[0];
+                    if (!f) return;
+                    const { id, name, ref_id } = f.properties || {};
+                    const [lng, lat] = f.geometry.coordinates;
+
+                    const wrapper = document.createElement("div");
+                    const title = document.createElement("h3");
+                    title.textContent = name || "";
+                    const btn = document.createElement("button");
+                    btn.textContent = "Tukaj sem";
+                    btn.className = "popup-button";
+                    wrapper.appendChild(title);
+                    wrapper.appendChild(btn);
+
+                    const popup = new maplibregl.Popup({ closeButton: true })
+                        .setLngLat([lng, lat])
+                        .setDOMContent(wrapper)
+                        .addTo(map);
+
+                    btn.addEventListener("click", () => {
+                        const station = {
+                            id: id ?? ref_id ?? name,
+                            name: name,
+                            gpsLocation: [lat, lng],
+                            ref_id: ref_id ?? id ?? null,
+                        };
+                        const payload = {
+                            name: station.name,
+                            coordinates: station.gpsLocation,
+                            id: station.id,
+                            ref_id: station.ref_id,
+                        };
+                        setActiveStation(payload);
+                        localStorage.setItem(
+                            "activeStation",
+                            JSON.stringify(payload)
                         );
                         setCurentUrl("/arrivals");
                         document.location.href = "/#/arrivals";
@@ -619,6 +736,14 @@ const Map = React.memo(function Map({
         const src = map.getSource("busStops");
         if (src && src.setData) src.setData(busStopsGeoJSON);
     }, [busStopsGeoJSON]);
+
+    // Update LPP stops source when data changes
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+        const src = map.getSource("lppBusStops");
+        if (src && src.setData) src.setData(lppStopsGeoJSON);
+    }, [lppStopsGeoJSON]);
 
     useEffect(() => {
         const map = mapInstanceRef.current;
