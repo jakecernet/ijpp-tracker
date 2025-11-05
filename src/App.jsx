@@ -8,9 +8,6 @@ const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
 
-// (removed unused useLocalStorageState helper)
-
-// Helper function to fetch JSON data with error handling and caching if needed.
 async function fetchJson(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -25,6 +22,7 @@ function App() {
     );
     const [gpsPositions, setGpsPositions] = useState([]);
     const [busStops, setBusStops] = useState([]);
+    const [lppBusStops, setLppBusStops] = useState([]);
     const [trainStops, setTrainStops] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
     const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
@@ -163,22 +161,82 @@ function App() {
         return () => clearInterval(intervalId);
     }, [userLocation, busRadius, activeOperators]);
 
+    const computeDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLon = ((lon2 - lon1) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((lat1 * Math.PI) / 180) *
+                Math.cos((lat2 * Math.PI) / 180) *
+                Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
     useEffect(() => {
-        const computeDistance = (lat1, lon1, lat2, lon2) => {
-            const R = 6371;
-            const dLat = ((lat2 - lat1) * Math.PI) / 180;
-            const dLon = ((lon2 - lon1) * Math.PI) / 180;
-            const a =
-                Math.sin(dLat / 2) ** 2 +
-                Math.cos((lat1 * Math.PI) / 180) *
-                    Math.cos((lat2 * Math.PI) / 180) *
-                    Math.sin(dLon / 2) ** 2;
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const fetchLppBusStops = async () => {
+            try {
+                const response = await fetch(
+                    "/api/lpp-stops?latitude=46.043904&longitude=14.503119&radius=300000"
+                );
+                const data = await response.json();
+                setLppBusStops(data);
+                console.log("LPP bus stops fetched:", data);
+            } catch (error) {
+                console.error("Error fetching LPP bus stops:", error);
+            }
+        };
+        fetchLppBusStops();
+    }, []);
+
+    useEffect(() => {
+        const fetchTrainStops = async () => {
+            try {
+                const data = await fetchJson("/api/sz-stops");
+                setTrainStops(data);
+                console.log("Train stops fetched:", data);
+            } catch (error) {
+                console.error("Error fetching train stops:", error);
+            }
         };
 
+        fetchTrainStops();
+    }, []);
+
+    useEffect(() => {
         const fetchBusStops = async () => {
             try {
-                let stops = JSON.parse(localStorage.getItem("busStops"));
+                // Helpers for matching
+                const normalizeName = (n) =>
+                    (n || "").toString().trim().toLowerCase();
+                const getLppName = (s) =>
+                    s?.name ??
+                    s?.title ??
+                    s?.stationName ??
+                    s?.display_name ??
+                    s?.stop_name ??
+                    "";
+                const getLppCoords = (s) => {
+                    if (
+                        Array.isArray(s?.gpsLocation) &&
+                        s.gpsLocation.length === 2
+                    )
+                        return s.gpsLocation;
+                    if (s?.latitude != null && s?.longitude != null)
+                        return [s.latitude, s.longitude];
+                    if (s?.lat != null && s?.lon != null) return [s.lat, s.lon];
+                    if (
+                        s?.location &&
+                        s.location.latitude != null &&
+                        s.location.longitude != null
+                    )
+                        return [s.location.latitude, s.location.longitude];
+                    return null;
+                };
+                const COORD_THRESHOLD_KM = 0.3; // ~300m
+
+                // Load raw OJPP stops (cached separately from deduped busStops)
+                let stops = JSON.parse(localStorage.getItem("ojppStops"));
                 if (!stops) {
                     const data = await fetchJson(
                         "https://ojpp.si/api/stop_locations"
@@ -188,9 +246,58 @@ function App() {
                         gpsLocation: feature.geometry.coordinates.reverse(),
                         id: feature.properties.id,
                     }));
-                    localStorage.setItem("busStops", JSON.stringify(stops));
+                    localStorage.setItem("ojppStops", JSON.stringify(stops));
                 }
-                const filteredStops = stops.filter((stop) => {
+
+                // Prepare LPP array copy for safe mutation
+                const lppsArray = Array.isArray(lppBusStops)
+                    ? lppBusStops.map((s) => ({ ...s }))
+                    : [];
+
+                // Build deduped OJPP list and enrich LPP with ojpp-id
+                const ojppOnly = [];
+                let lppModified = false;
+
+                for (const stop of stops) {
+                    const [ojppLat, ojppLon] = stop.gpsLocation;
+                    const ojppNameNorm = normalizeName(stop.name);
+
+                    // Find LPP match by same name and nearby coordinates
+                    const idx = lppsArray.findIndex((s) => {
+                        const lppNameNorm = normalizeName(getLppName(s));
+                        if (!lppNameNorm || lppNameNorm !== ojppNameNorm)
+                            return false;
+                        const coords = getLppCoords(s);
+                        if (!coords) return false;
+                        const [lppLat, lppLon] = coords;
+                        const d = computeDistance(
+                            ojppLat,
+                            ojppLon,
+                            lppLat,
+                            lppLon
+                        );
+                        return d <= COORD_THRESHOLD_KM;
+                    });
+
+                    if (idx >= 0) {
+                        // Attach OJPP id to the matched LPP station if not present
+                        if (!("ojpp-id" in lppsArray[idx])) {
+                            lppsArray[idx]["ojpp-id"] = stop.id;
+                            lppModified = true;
+                        }
+                        // Do not include this OJPP stop in busStops
+                    } else {
+                        ojppOnly.push(stop);
+                    }
+                }
+
+                // Update LPP stations only if we enriched any item
+                if (lppModified) {
+                    setLppBusStops(lppsArray);
+                }
+
+                // Radius filter for display
+                const filteredStops = ojppOnly.filter((stop) => {
                     const [lat, lon] = stop.gpsLocation;
                     return (
                         computeDistance(
@@ -208,7 +315,7 @@ function App() {
         };
 
         fetchBusStops();
-    }, [radius, userLocation]);
+    }, [radius, userLocation, lppBusStops]);
 
     useEffect(() => {
         if (navigator.geolocation) {
@@ -252,25 +359,11 @@ function App() {
     }, [activeStation]);
 
     useEffect(() => {
-        const fetchTrainStops = async () => {
-            try {
-                const data = await fetchJson(
-                    "https://api.modra.ninja/sz/postaje"
-                );
-                setTrainStops(data);
-                console.log("Train stops fetched:", data);
-            } catch (error) {
-                console.error("Error fetching train stops:", error);
-            }
-        };
-
-        fetchTrainStops();
-    }, []);
-
-    useEffect(() => {
         const fetchTrainPositions = async () => {
             try {
-                const data = await fetchJson("https://api.modra.ninja/sz/lokacije_raw");
+                const data = await fetchJson(
+                    "https://api.modra.ninja/sz/lokacije_raw"
+                );
                 setTrainPositions(data);
                 console.log("Train positions fetched:", data);
             } catch (error) {
