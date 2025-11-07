@@ -44,12 +44,12 @@ async function fetchUpstream(url, { attempts = 4, timeoutMs = 8000 } = {}) {
                 // try parse json, but surface parse errors
                 try {
                     return await res.json();
-                } catch (parseErr) {
-                    lastErr = new Error(
+                } catch {
+                    const parseError = new Error(
                         `Upstream ${res.status} (invalid JSON)`
                     );
-                    lastErr.body = await res.text().catch(() => "");
-                    throw lastErr;
+                    parseError.body = await res.text().catch(() => "");
+                    throw parseError;
                 }
             }
 

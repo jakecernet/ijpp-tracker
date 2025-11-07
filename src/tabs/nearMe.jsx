@@ -20,7 +20,7 @@ const calculateDistance = (userLocation, busStops) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = earthRadius * c;
 
-    busStop.distance = distance.toFixed(1);
+    busStop.distance = distance;
   });
 };
 
@@ -33,7 +33,7 @@ const StationItem = React.memo(({ busStop, onSelect }) => (
     <MapPin size={24} />
     <div>
       <h3>{busStop.name}</h3>
-      <p>{busStop.distance} km</p>
+  <p>{busStop.distance?.toFixed(1)} km</p>
     </div>
   </div>
 ));

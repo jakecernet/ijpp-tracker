@@ -70,7 +70,6 @@ const operatorToIcon = {
 const Map = React.memo(function Map({
     gpsPositions,
     busStops,
-    lppBusStops,
     trainStops,
     activeStation,
     setActiveStation,
@@ -97,7 +96,6 @@ const Map = React.memo(function Map({
                     lineName: g.lineName || "",
                     operator: g.operator || "",
                     icon: operatorToIcon[g.operator] || "bus-generic",
-                    // circle color driver
                     brand: operatorToIcon[g.operator] || "generic",
                 })
             ),
@@ -109,81 +107,26 @@ const Map = React.memo(function Map({
             toGeoJSONPoints(
                 busStops || [],
                 (s) => s.gpsLocation,
-                (s) => ({ id: s.id, name: s.name, icon: "bus-stop" })
+                (s) => ({
+                    id: s.id,
+                    name: s.name,
+                    icon: "bus-stop",
+                    ref_id: s.ref_id ?? null,
+                })
             ),
         [busStops]
     );
-
-    // Try to normalize LPP stop shapes into points
-    const lppStopsGeoJSON = useMemo(() => {
-        // Accept array or wrapped object
-        const list = Array.isArray(lppBusStops)
-            ? lppBusStops
-            : lppBusStops?.stations || lppBusStops?.data || [];
-
-        const getLppName = (s) =>
-            s?.name ??
-            s?.title ??
-            s?.stationName ??
-            s?.display_name ??
-            s?.stop_name ??
-            "";
-        const getLppCoords = (s) => {
-            if (Array.isArray(s?.gpsLocation) && s.gpsLocation.length === 2)
-                return s.gpsLocation;
-            if (s?.latitude != null && s?.longitude != null)
-                return [s.latitude, s.longitude];
-            if (s?.lat != null && s?.lon != null) return [s.lat, s.lon];
-            if (
-                s?.location &&
-                s.location.latitude != null &&
-                s.location.longitude != null
-            )
-                return [s.location.latitude, s.location.longitude];
-            if (
-                s?.coordinates &&
-                Array.isArray(s.coordinates) &&
-                s.coordinates.length === 2
-            ) {
-                // Many APIs use [lng, lat]; try to detect if looks like that
-                const [a, b] = s.coordinates;
-                // If values look like lon, lat, flip to [lat, lon]
-                if (Math.abs(a) > 20 && Math.abs(b) > 20) return [b, a];
-                return [a, b];
-            }
-            return null;
-        };
-        const getRefId = (s) =>
-            s?.ref_id ??
-            s?.station_code ??
-            s?.code ??
-            s?.id ??
-            s?.stationId ??
-            null;
-
-        return toGeoJSONPoints(
-            list || [],
-            (s) => getLppCoords(s),
-            (s) => ({
-                id: s?.id ?? getRefId(s) ?? getLppName(s),
-                name: getLppName(s),
-                icon: "bus-stop",
-                ref_id: getRefId(s),
-            })
-        );
-    }, [lppBusStops]);
 
     const trainStopsGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
                 trainStops || [],
                 (t) => [t.lat, t.lng],
-                (t) => ({ id: t.id, name: t.name || t.naziv, icon: "train" })
+                (t) => ({ id: t.id, name: t.name || t.naziv, icon: "train-stop" })
             ),
         [trainStops]
     );
 
-    // New: train positions (API "Koordinate" is "lng,lat" -> flip to [lat, lng])
     const trainPositionsGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
@@ -212,14 +155,12 @@ const Map = React.memo(function Map({
                     rank: t.Rang,
                     type: t.Vrsta_vlaka,
                     icon: "train",
-                    // circle color driver (SŽ)
                     brand: "sz",
                 })
             ),
         [trainPositions]
     );
 
-    // Initialize map once
     useEffect(() => {
         if (mapInstanceRef.current) return;
         const map = new maplibregl.Map({
@@ -237,7 +178,6 @@ const Map = React.memo(function Map({
         );
 
         map.on("load", () => {
-            // Register images
             const addImage = (name, src, options) =>
                 new Promise((resolve) => {
                     const img = new Image();
@@ -256,6 +196,7 @@ const Map = React.memo(function Map({
 
             const imageAdds = [
                 addImage("bus-stop", busStopPNG, { sdf: false }),
+                addImage("train-stop", trainStopPNG, { sdf: false }),
                 addImage("train", szPNG, { sdf: false }),
                 addImage("user", userPNG, { sdf: false }),
                 addImage("station", locationPNG, { sdf: false }),
@@ -287,15 +228,7 @@ const Map = React.memo(function Map({
                         clusterMaxZoom: 20,
                     });
                 }
-                if (!map.getSource("lppBusStops")) {
-                    map.addSource("lppBusStops", {
-                        type: "geojson",
-                        data: lppStopsGeoJSON,
-                        cluster: true,
-                        clusterRadius: 60,
-                        clusterMaxZoom: 20,
-                    });
-                }
+                // lppBusStops merged into busStops
                 if (!map.getSource("trainStops")) {
                     map.addSource("trainStops", {
                         type: "geojson",
@@ -360,7 +293,7 @@ const Map = React.memo(function Map({
 
                 addClusterLayers("buses", "#5b8cff");
                 addClusterLayers("busStops", "#7a5bff");
-                addClusterLayers("lppBusStops", "#2e7d32");
+                // lppBusStops merged into busStops
                 addClusterLayers("trainStops", "#5b8cff");
                 addClusterLayers("trainPositions", "#ff5b5b");
 
@@ -442,7 +375,7 @@ const Map = React.memo(function Map({
                 // Center vehicle icons so they sit inside their halo circles
                 addUnclusteredIconLayer("buses", busSize, "center");
                 addUnclusteredIconLayer("busStops", stopSize, "bottom");
-                addUnclusteredIconLayer("lppBusStops", stopSize, "bottom");
+                // lppBusStops merged into busStops
                 addUnclusteredIconLayer("trainStops", trainSize, "bottom");
                 addUnclusteredIconLayer(
                     "trainPositions",
@@ -551,54 +484,12 @@ const Map = React.memo(function Map({
 
                 registerClusterClick("buses");
                 registerClusterClick("busStops");
-                registerClusterClick("lppBusStops");
+                // lppBusStops merged into busStops
                 registerClusterClick("trainStops");
                 registerClusterClick("trainPositions");
 
                 // Bus stop popup with action button
                 map.on("click", "busStops-points", (e) => {
-                    const f = e.features?.[0];
-                    if (!f) return;
-                    const { id, name } = f.properties || {};
-                    const [lng, lat] = f.geometry.coordinates;
-
-                    const wrapper = document.createElement("div");
-                    const title = document.createElement("h3");
-                    title.textContent = name || "";
-                    const btn = document.createElement("button");
-                    btn.textContent = "Tukaj sem";
-                    btn.className = "popup-button";
-                    wrapper.appendChild(title);
-                    wrapper.appendChild(btn);
-
-                    const popup = new maplibregl.Popup({ closeButton: true })
-                        .setLngLat([lng, lat])
-                        .setDOMContent(wrapper)
-                        .addTo(map);
-
-                    btn.addEventListener("click", () => {
-                        const busStop = { id, name, gpsLocation: [lat, lng] };
-                        setActiveStation({
-                            name: busStop.name,
-                            coordinates: busStop.gpsLocation,
-                            id: busStop.id,
-                        });
-                        localStorage.setItem(
-                            "activeStation",
-                            JSON.stringify({
-                                name: busStop.name,
-                                coordinates: busStop.gpsLocation,
-                                id: busStop.id,
-                            })
-                        );
-                        setCurentUrl("/arrivals");
-                        document.location.href = "/#/arrivals";
-                        popup.remove();
-                    });
-                });
-
-                // LPP stop popup with action button (preserves ref_id for LPP arrivals)
-                map.on("click", "lppBusStops-points", (e) => {
                     const f = e.features?.[0];
                     if (!f) return;
                     const { id, name, ref_id } = f.properties || {};
@@ -619,17 +510,17 @@ const Map = React.memo(function Map({
                         .addTo(map);
 
                     btn.addEventListener("click", () => {
-                        const station = {
-                            id: id ?? ref_id ?? name,
-                            name: name,
+                        const busStop = {
+                            id: id ?? name,
+                            name,
                             gpsLocation: [lat, lng],
-                            ref_id: ref_id ?? id ?? null,
+                            ref_id: ref_id ?? null,
                         };
                         const payload = {
-                            name: station.name,
-                            coordinates: station.gpsLocation,
-                            id: station.id,
-                            ref_id: station.ref_id,
+                            name: busStop.name,
+                            coordinates: busStop.gpsLocation,
+                            id: busStop.id,
+                            ref_id: busStop.ref_id,
                         };
                         setActiveStation(payload);
                         localStorage.setItem(
@@ -722,7 +613,6 @@ const Map = React.memo(function Map({
         };
     }, []);
 
-    // Update sources when data changes
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
@@ -737,14 +627,6 @@ const Map = React.memo(function Map({
         if (src && src.setData) src.setData(busStopsGeoJSON);
     }, [busStopsGeoJSON]);
 
-    // Update LPP stops source when data changes
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-        const src = map.getSource("lppBusStops");
-        if (src && src.setData) src.setData(lppStopsGeoJSON);
-    }, [lppStopsGeoJSON]);
-
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
@@ -752,7 +634,6 @@ const Map = React.memo(function Map({
         if (src && src.setData) src.setData(trainStopsGeoJSON);
     }, [trainStopsGeoJSON]);
 
-    // New: update train positions source
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
@@ -760,14 +641,12 @@ const Map = React.memo(function Map({
         if (src && src.setData) src.setData(trainPositionsGeoJSON);
     }, [trainPositionsGeoJSON]);
 
-    // Center map when active station or user location changes
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map || !center) return;
         map.easeTo({ center: [center[1], center[0]], duration: 500 });
     }, [center]);
 
-    // User and active station markers (DOM markers with popups like Leaflet)
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;

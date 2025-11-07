@@ -2,7 +2,9 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings, X } from "lucide-react";
 import "./App.css";
-import { set } from "lodash";
+
+import stopLocations from "./stop_locations.json";
+import lppStopsData from "./lpp_stops.json";
 
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
@@ -19,11 +21,20 @@ function App() {
     const [activeStation, setActiveStation] = useState(
         localStorage.getItem("activeStation")
             ? JSON.parse(localStorage.getItem("activeStation"))
-            : ["Vrhnika", [46.057, 14.295], 123456789]
+            : { name: "Vrhnika", coordinates: [46.057, 14.295], id: 123456789 }
     );
     const [gpsPositions, setGpsPositions] = useState([]);
     const [busStops, setBusStops] = useState([]);
-    const [lppBusStops, setLppBusStops] = useState([]);
+    const [lppBusStops] = useState(
+        Array.isArray(lppStopsData)
+            ? lppStopsData.map((s) => ({
+                  id: s.id,
+                  ref_id: s.code, // use provided LPP station code directly
+                  name: s.name,
+                  gpsLocation: [s.latitude, s.longitude], // assume numeric lat/lon
+              }))
+            : []
+    );
     const [trainStops, setTrainStops] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
     const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
@@ -175,21 +186,7 @@ function App() {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    useEffect(() => {
-        const fetchLppBusStops = async () => {
-            try {
-                const response = await fetch(
-                    "https://tracker.cernetic.cc/api/lpp-stops?latitude=46.043904&longitude=14.503119&radius=300000"
-                );
-                const data = await response.json();
-                setLppBusStops(data);
-                console.log("LPP bus stops fetched:", data);
-            } catch (error) {
-                console.error("Error fetching LPP bus stops:", error);
-            }
-        };
-        fetchLppBusStops();
-    }, []);
+    // Removed network fetch for LPP stops – using local lpp_stops.json
 
     useEffect(() => {
         const fetchTrainStops = async () => {
@@ -207,72 +204,34 @@ function App() {
         fetchTrainStops();
     }, []);
 
-   /*  useEffect(() => {
-        const fetchBusStops = async () => {
+    useEffect(() => {
+        const fetchAndJoinBusStops = async () => {
             try {
                 const normalizeName = (n) =>
                     (n || "").toString().trim().toLowerCase();
-                const getLppName = (s) =>
-                    s?.name ??
-                    s?.title ??
-                    s?.stationName ??
-                    s?.display_name ??
-                    s?.stop_name ??
-                    "";
-                const getLppCoords = (s) => {
-                    if (
-                        Array.isArray(s?.gpsLocation) &&
-                        s.gpsLocation.length === 2
-                    )
-                        return s.gpsLocation;
-                    if (s?.latitude != null && s?.longitude != null)
-                        return [s.latitude, s.longitude];
-                    if (s?.lat != null && s?.lon != null) return [s.lat, s.lon];
-                    if (
-                        s?.location &&
-                        s.location.latitude != null &&
-                        s.location.longitude != null
-                    )
-                        return [s.location.latitude, s.location.longitude];
-                    return null;
-                };
-                const COORD_THRESHOLD_KM = 0.3; // ~300m
 
-                // Load raw OJPP stops (cached separately from deduped busStops)
-                let stops = JSON.parse(localStorage.getItem("ojppStops"));
-                if (!stops) {
-                    const data = await fetchJson(
-                        "https://ojpp.si/api/stop_locations"
-                    );
-                    stops = data.features.map((feature) => ({
-                        name: feature.properties.name,
-                        gpsLocation: feature.geometry.coordinates.reverse(),
-                        id: feature.properties.id,
-                    }));
-                    localStorage.setItem("ojppStops", JSON.stringify(stops));
-                }
+                const COORD_THRESHOLD_KM = 0.3;
 
-                // Prepare LPP array copy for safe mutation
-                const lppsArray = Array.isArray(lppBusStops)
-                    ? lppBusStops.map((s) => ({ ...s }))
-                    : [];
+                const ojpp = stopLocations.features.map((feature) => ({
+                    name: feature.properties.name,
+                    gpsLocation: feature.geometry.coordinates.slice().reverse(),
+                    id: feature.properties.id,
+                }));
 
-                // Build deduped OJPP list and enrich LPP with ojpp-id
-                const ojppOnly = [];
-                let lppModified = false;
+                const lppNormalized = lppBusStops;
 
-                for (const stop of stops) {
+                const ojppRemaining = [];
+                const lppEnriched = lppNormalized.map((s) => ({ ...s }));
+
+                for (const stop of ojpp) {
                     const [ojppLat, ojppLon] = stop.gpsLocation;
                     const ojppNameNorm = normalizeName(stop.name);
 
-                    // Find LPP match by same name and nearby coordinates
-                    const idx = lppsArray.findIndex((s) => {
-                        const lppNameNorm = normalizeName(getLppName(s));
+                    const idx = lppEnriched.findIndex((s) => {
+                        const lppNameNorm = normalizeName(s.name);
                         if (!lppNameNorm || lppNameNorm !== ojppNameNorm)
                             return false;
-                        const coords = getLppCoords(s);
-                        if (!coords) return false;
-                        const [lppLat, lppLon] = coords;
+                        const [lppLat, lppLon] = s.gpsLocation;
                         const d = computeDistance(
                             ojppLat,
                             ojppLon,
@@ -283,24 +242,26 @@ function App() {
                     });
 
                     if (idx >= 0) {
-                        // Attach OJPP id to the matched LPP station if not present
-                        if (!("ojpp-id" in lppsArray[idx])) {
-                            lppsArray[idx]["ojpp-id"] = stop.id;
-                            lppModified = true;
+                        if (
+                            !lppEnriched[idx].id ||
+                            String(lppEnriched[idx].id) ===
+                                String(lppEnriched[idx].ref_id)
+                        ) {
+                            lppEnriched[idx].id = stop.id;
+                        } else {
+                            lppEnriched[idx]["ojppId"] = stop.id;
                         }
-                        // Do not include this OJPP stop in busStops
                     } else {
-                        ojppOnly.push(stop);
+                        ojppRemaining.push(stop);
                     }
                 }
 
-                // Update LPP stations only if we enriched any item
-                if (lppModified) {
-                    setLppBusStops(lppsArray);
-                }
+                const combined = [
+                    ...lppEnriched,
+                    ...ojppRemaining.map((s) => ({ ...s, ref_id: null })),
+                ];
 
-                // Radius filter for display
-                const filteredStops = ojppOnly.filter((stop) => {
+                const filtered = combined.filter((stop) => {
                     const [lat, lon] = stop.gpsLocation;
                     return (
                         computeDistance(
@@ -311,14 +272,15 @@ function App() {
                         ) <= +radius
                     );
                 });
-                setBusStops(filteredStops);
+
+                setBusStops(filtered);
             } catch (err) {
-                console.error("Error fetching bus stops:", err);
+                console.error("Error fetching/joining bus stops:", err);
             }
         };
 
-        fetchBusStops();
-    }, [radius, userLocation, lppBusStops]); */
+        fetchAndJoinBusStops();
+    }, [radius, userLocation, lppBusStops]);
 
     useEffect(() => {
         if (navigator.geolocation) {
@@ -341,16 +303,19 @@ function App() {
             const lppCode = activeStation?.ref_id;
 
             try {
-                const raw = await fetchJson(
-                    "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=" + lppCode
-                );
-
                 if (!activeOperators.includes("lpp")) {
                     setLppArrivals([]);
                     return;
                 }
 
-                const list = Array.isArray(raw?.data?.arrivals) ? raw.data.arrivals : [];
+                const raw = await fetchJson(
+                    "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=" +
+                        lppCode
+                );
+
+                const list = Array.isArray(raw?.data?.arrivals)
+                    ? raw.data.arrivals
+                    : [];
 
                 const arrivals = list
                     .map((arrival) => ({
@@ -374,7 +339,7 @@ function App() {
             }
         };
         fetchLppArrivals();
-    }, [activeStation]);
+    }, [activeStation, activeOperators]);
 
     useEffect(() => {
         const fetchBusStopArrivals = async () => {

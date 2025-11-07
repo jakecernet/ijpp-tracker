@@ -29,12 +29,12 @@ const SettingsTab = ({
 
     useEffect(() => {
         const stored =
-            activeOperators || localStorage.getItem("activeOperators");
+            activeOperators || JSON.parse(localStorage.getItem("activeOperators") || "[]");
         stored.forEach((id) => {
             const checkbox = document.getElementById(id);
             if (checkbox) checkbox.checked = true;
         });
-    }, []);
+    }, [activeOperators]);
 
     return (
         <div className="settings">
