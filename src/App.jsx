@@ -28,10 +28,11 @@ function App() {
     const [lppBusStops] = useState(
         Array.isArray(lppStopsData)
             ? lppStopsData.map((s) => ({
-                  id: s.id,
-                  ref_id: s.code, // use provided LPP station code directly
+                  id: s.int_id,
+                  ref_id: s.ref_id,
                   name: s.name,
-                  gpsLocation: [s.latitude, s.longitude], // assume numeric lat/lon
+                  gpsLocation: [s.latitude, s.longitude],
+                  busLines: s.route_groups_on_station,
               }))
             : []
     );
@@ -186,8 +187,6 @@ function App() {
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     };
 
-    // Removed network fetch for LPP stops – using local lpp_stops.json
-
     useEffect(() => {
         const fetchTrainStops = async () => {
             try {
@@ -242,15 +241,7 @@ function App() {
                     });
 
                     if (idx >= 0) {
-                        if (
-                            !lppEnriched[idx].id ||
-                            String(lppEnriched[idx].id) ===
-                                String(lppEnriched[idx].ref_id)
-                        ) {
-                            lppEnriched[idx].id = stop.id;
-                        } else {
-                            lppEnriched[idx]["ojppId"] = stop.id;
-                        }
+                        lppEnriched[idx].ojppId = stop.id;
                     } else {
                         ojppRemaining.push(stop);
                     }
