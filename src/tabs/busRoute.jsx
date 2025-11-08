@@ -5,7 +5,7 @@ const BusRouteTab = ({ selectedVehicle, lppRoute }) => {
         <div className="route">
             <div className="data">
                 <h3>
-                    {selectedVehicle?.lineNumber} &#32;|&#32;
+                    {isLPP ? selectedVehicle?.lineNumber + " | " : ""}
                     {selectedVehicle?.lineName}
                 </h3>
                 <p>
@@ -17,22 +17,37 @@ const BusRouteTab = ({ selectedVehicle, lppRoute }) => {
             <div className="stops">
                 <h2>Postaje na poti:</h2>
                 <ul>
-                    {selectedVehicle?.stops?.map((stop, index) => (
-                        <li key={index}>
+                    {selectedVehicle?.stops?.map((stop) => (
+                        <li>
                             <h3>
-                                {stop.lineNumber} -{stop.stop_name}
+                                {stop.stop_name}
                             </h3>
                             <p>{stop.arrival_time}</p>
                         </li>
                     ))}
                     {isLPP && (
                         <ul>
-                            {lppRoute?.map((stop, index) => (
-                                <li key={index}>
-                                    <h3>
-                                        {stop.lineNumber} - {stop.stop_name}
-                                    </h3>
-                                    <p>{stop.arrival_time}</p>
+                            {lppRoute?.map((stop) => (
+                                <li>
+                                    <h3>{stop.name}</h3>
+                                    <span
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "row",
+                                            gap: "20px",
+                                        }}
+                                    >
+                                        {stop.arrivals[0] && (
+                                            <p>
+                                                {stop.arrivals[0].eta_min} min
+                                            </p>
+                                        )}
+                                        {stop.arrivals[1] && (
+                                            <p>
+                                                {stop.arrivals[1].eta_min} min
+                                            </p>
+                                        )}
+                                    </span>
                                 </li>
                             ))}
                         </ul>
