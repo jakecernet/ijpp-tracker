@@ -18,7 +18,7 @@ const lppArrivalsLink =
 
 const lppLocationsLink =
     "https://mestnipromet.cyou/api/v1/resources/buses/info";
-const ijppLocationsLink = "https://ijpp.nikigre.si/getData";
+const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
 
 async function fetchJson(url) {
     const response = await fetch(url);
