@@ -927,8 +927,12 @@ const Map = React.memo(function Map({
                                         event.preventDefault();
                                         event.stopPropagation();
                                         const payload = {
-                                            lineId: properties.lineId || null,
-                                            tripId: properties.tripId || null,
+                                            lineId: properties.lineId ?? null,
+                                            tripId: properties.tripId ?? null,
+                                            lineNumber:
+                                                properties.lineNumber ?? null,
+                                            lineName:
+                                                properties.lineName ?? null,
                                         };
                                         try {
                                             localStorage.setItem(

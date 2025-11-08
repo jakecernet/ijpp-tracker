@@ -20,7 +20,7 @@ const lppLocationsLink =
     "https://mestnipromet.cyou/api/v1/resources/buses/info";
 const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
 
-const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?route-id=";
+const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
 
 async function fetchJson(url) {
     const response = await fetch(url);
@@ -371,8 +371,7 @@ function App() {
                                 element={
                                     <BusRouteTab
                                         selectedVehicle={selectedVehicle}
-                                        positionsUrl={ijppLocationsLink}
-                                        setCurentUrl={setCurrentUrl}
+                                        lppRoute={lppRoute}
                                     />
                                 }
                             />
