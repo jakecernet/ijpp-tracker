@@ -11,7 +11,7 @@ const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
 const BusRouteTab = lazy(() => import("./tabs/busRoute"));
 
-const ijppArrivalsLink = "https://ijpp.nikigre.si/getTripsByStop?stopID=";
+const ijppArrivalsLink = "https://tracker.cernetic.cc/api/ijpp-arrivals?stop-id=";
 const lppArrivalsLink =
     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 
@@ -231,6 +231,7 @@ function App() {
         }
     }, []);
 
+    // LPP arrivals
     useEffect(() => {
         const fetchLppArrivals = async () => {
             const lppCode = activeStation?.ref_id;
@@ -272,6 +273,35 @@ function App() {
             }
         };
         fetchLppArrivals();
+    }, [activeStation, activeOperators]);
+
+    // IJPP arrivals
+    useEffect(() => {
+        const fetchIjppArrivals = async () => {
+            const ijppId = activeStation?.ijpp_id;
+            if (!ijppId) {
+                setIjppArrivals([]);
+                return;
+            }
+            try {
+                const raw = await fetchJson(ijppArrivalsLink + ijppId);
+                const list = Array.isArray(raw?.routes)
+                    ? raw.routes
+                    : [];
+                const arrivals = list
+                    .map((arrival) => ({
+                        name: arrival.trips.first_stop + " - " + arrival.trips.last_stop,
+                        arrivalTime: arrival.trips.stop_times.arrival_time,
+                        
+                    }))
+                    .sort((a, b) => a.etaMinutes - b.etaMinutes);
+                setIjppArrivals(arrivals);
+                console.log("IJPP arrivals fetched:", raw);
+            } catch (error) {
+                console.error("Error fetching IJPP arrivals:", error);
+            }
+        };
+        fetchIjppArrivals();
     }, [activeStation, activeOperators]);
 
     return (
