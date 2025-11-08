@@ -3,7 +3,7 @@ import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings, X } from "lucide-react";
 import "./App.css";
 
-import stopLocations from "./stop_locations.json";
+import stopLocations from "./lpp_stops.json";
 import lppStopsData from "./lpp_stops.json";
 
 const MapTab = lazy(() => import("./tabs/map"));
