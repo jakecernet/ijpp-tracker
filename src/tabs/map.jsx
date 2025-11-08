@@ -720,6 +720,7 @@ const Map = React.memo(function Map({
                         "speed",
                         "ignition",
                         "lineId",
+                        "tripId",
                     ]);
                     return (
                         (lineCombined
@@ -727,7 +728,8 @@ const Map = React.memo(function Map({
                             : "") +
                         rows +
                         extra +
-                        `</div>`
+                        `<button type="button" class="popup-button" style="margin-top:12px; width:100%" data-role="view-lpp-route">Prikaži linijo</button>
+                        </div>`
                     );
                 };
 
@@ -845,56 +847,109 @@ const Map = React.memo(function Map({
                     (popup, properties) => {
                         if (
                             !properties ||
-                            properties.sourceType !== "ijpp" ||
                             typeof setSelectedVehicle !== "function"
                         )
                             return;
                         const container = popup.getElement();
                         if (!container) return;
-                        const button = container.querySelector(
-                            '[data-role="view-route"]'
-                        );
-                        if (!button) return;
-                        const handler = (event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const payload = {
-                                lineName: properties.lineName || null,
-                                operator: properties.operator || null,
-                                tripId: properties.tripId || null,
-                                routeId: properties.routeId || null,
-                                journeyPatternId:
-                                    properties.journeyPatternId || null,
-                                stops: properties.stops
-                                    ? JSON.parse(properties.stops)
-                                    : null,
-                                vehicleRef:
-                                    properties.vehicleRef ||
-                                    properties.vehicleId ||
-                                    null,
-                                destination:
-                                    properties.lineDestination ||
-                                    properties.destination ||
-                                    null,
-                                origin: properties.origin || null,
-                                lastKnown: Date.now(),
-                            };
-                            try {
-                                localStorage.setItem(
-                                    "selectedBusRoute",
-                                    JSON.stringify(payload)
-                                );
-                            } catch (err) {
-                                console.warn("Shranjevanje ni uspelo:", err);
+                        if (properties.sourceType === "ijpp") {
+                            const button = container.querySelector(
+                                '[data-role="view-route"]'
+                            );
+                            if (button) {
+                                const handler = (event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    let stops = [];
+                                    const rawStops = properties.stops;
+                                    if (Array.isArray(rawStops)) {
+                                        stops = rawStops;
+                                    } else if (typeof rawStops === "string") {
+                                        try {
+                                            stops = JSON.parse(rawStops);
+                                        } catch (parseErr) {
+                                            console.warn(
+                                                "Neveljaven format postaj:",
+                                                parseErr
+                                            );
+                                            stops = [];
+                                        }
+                                    }
+                                    const payload = {
+                                        lineName: properties.lineName || null,
+                                        operator: properties.operator || null,
+                                        tripId: properties.tripId || null,
+                                        routeId: properties.routeId || null,
+                                        journeyPatternId:
+                                            properties.journeyPatternId || null,
+                                        stops,
+                                        vehicleRef:
+                                            properties.vehicleRef ||
+                                            properties.vehicleId ||
+                                            null,
+                                        destination:
+                                            properties.lineDestination ||
+                                            properties.destination ||
+                                            null,
+                                        origin: properties.origin || null,
+                                        lastKnown: Date.now(),
+                                    };
+                                    try {
+                                        localStorage.setItem(
+                                            "selectedBusRoute",
+                                            JSON.stringify(payload)
+                                        );
+                                    } catch (err) {
+                                        console.warn(
+                                            "Shranjevanje ni uspelo:",
+                                            err
+                                        );
+                                    }
+                                    setSelectedVehicle(payload);
+                                    setCurrentUrl("/route");
+                                    window.location.hash = "/route";
+                                    popup.remove();
+                                };
+                                button.addEventListener("click", handler, {
+                                    once: true,
+                                });
                             }
-                            setSelectedVehicle(payload);
-                            setCurrentUrl("/route");
-                            window.location.hash = "/route";
-                            popup.remove();
-                        };
-                        button.addEventListener("click", handler, {
-                            once: true,
-                        });
+                        }
+
+                        if (properties.sourceType === "lpp") {
+                            const lppButton = container.querySelector(
+                                '[data-role="view-lpp-route"]'
+                            );
+                            if (lppButton) {
+                                lppButton.addEventListener(
+                                    "click",
+                                    (event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        const payload = {
+                                            lineId: properties.lineId || null,
+                                            tripId: properties.tripId || null,
+                                        };
+                                        try {
+                                            localStorage.setItem(
+                                                "selectedBusRoute",
+                                                JSON.stringify(payload)
+                                            );
+                                        } catch (err) {
+                                            console.warn(
+                                                "Shranjevanje ni uspelo:",
+                                                err
+                                            );
+                                        }
+                                        setSelectedVehicle(payload);
+                                        setCurrentUrl("/route");
+                                        window.location.hash = "/route";
+                                        popup.remove();
+                                    },
+                                    { once: true }
+                                );
+                            }
+                        }
                     }
                 );
             });

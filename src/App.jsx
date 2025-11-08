@@ -11,13 +11,16 @@ const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
 const BusRouteTab = lazy(() => import("./tabs/busRoute"));
 
-const ijppArrivalsLink = "https://tracker.cernetic.cc/api/ijpp-arrivals?stop-id=";
+const ijppArrivalsLink =
+    "https://tracker.cernetic.cc/api/ijpp-arrivals?stop-id=";
 const lppArrivalsLink =
     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 
 const lppLocationsLink =
     "https://mestnipromet.cyou/api/v1/resources/buses/info";
 const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
+
+const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?route-id=";
 
 async function fetchJson(url) {
     const response = await fetch(url);
@@ -78,6 +81,8 @@ function App() {
     const [ijppArrivals, setIjppArrivals] = useState([]);
     const [lppArrivals, setLppArrivals] = useState([]);
 
+    const [lppRoute, setLppRoute] = useState([]);
+
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     useEffect(() => {
@@ -115,6 +120,7 @@ function App() {
                         speed: bus.speed,
                         busName: bus.bus_name,
                         ignition: bus.ignition,
+                        tripId: bus.trip_id,
                     }));
 
                 setGpsPositions(lppPositions);
@@ -285,14 +291,14 @@ function App() {
             }
             try {
                 const raw = await fetchJson(ijppArrivalsLink + ijppId);
-                const list = Array.isArray(raw?.routes)
-                    ? raw.routes
-                    : [];
+                const list = Array.isArray(raw?.routes) ? raw.routes : [];
                 const arrivals = list
                     .map((arrival) => ({
-                        name: arrival.trips.first_stop + " - " + arrival.trips.last_stop,
+                        name:
+                            arrival.trips.first_stop +
+                            " - " +
+                            arrival.trips.last_stop,
                         arrivalTime: arrival.trips.stop_times.arrival_time,
-                        
                     }))
                     .sort((a, b) => a.etaMinutes - b.etaMinutes);
                 setIjppArrivals(arrivals);
@@ -303,6 +309,26 @@ function App() {
         };
         fetchIjppArrivals();
     }, [activeStation, activeOperators]);
+
+    // LPP route
+    useEffect(() => {
+        const fetchLppRoute = async () => {
+            if (!selectedVehicle) {
+                return;
+            }
+            try {
+                const raw = await fetchJson(
+                    lppRouteLink + selectedVehicle.tripId
+                );
+                const route = raw?.data;
+                setLppRoute(route);
+                console.log("LPP route fetched:", raw);
+            } catch (error) {
+                console.error("Error fetching LPP route:", error);
+            }
+        };
+        fetchLppRoute();
+    }, [selectedVehicle, activeOperators]);
 
     return (
         <Router>
