@@ -73,9 +73,9 @@ const Map = React.memo(function Map({
     activeStation,
     setActiveStation,
     userLocation,
-    setCurentUrl,
+    setCurrentUrl,
     trainPositions,
-    onSelectVehicle,
+    setSelectedVehicle,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -443,7 +443,6 @@ const Map = React.memo(function Map({
                                     "circle-opacity": 0.6,
                                 },
                             },
-                            // place below the icon layer
                             `${prefix}-points`
                         );
                     }
@@ -482,7 +481,6 @@ const Map = React.memo(function Map({
 
                 registerClusterClick("buses");
                 registerClusterClick("busStops");
-                // lppBusStops merged into busStops
                 registerClusterClick("trainPositions");
 
                 // Bus stop popup with action button
@@ -501,7 +499,7 @@ const Map = React.memo(function Map({
                     wrapper.appendChild(title);
                     wrapper.appendChild(btn);
 
-                    const popup = new maplibregl.Popup({ closeButton: true })
+                    const popup = new maplibregl.Popup({ closeButton: false })
                         .setLngLat([lng, lat])
                         .setDOMContent(wrapper)
                         .addTo(map);
@@ -703,14 +701,14 @@ const Map = React.memo(function Map({
                     ]
                         .filter(Boolean)
                         .map((value) => escapeHTML(String(value)))
-                        .join(" &ndash; ");
+                        .join(" | ");
                     const rows =
                         createRow("Prevoznik", properties.operator) +
                         createRow("Smer", properties.lineDestination) +
                         createRow("Vozilo", properties.busName) +
                         createRow("Hitrost", formatSpeed(properties.speed)) +
                         createRow(
-                            "Vzig",
+                            "Vžig",
                             formatIgnitionStatus(properties.ignition)
                         );
                     const extra = renderExtraFields(properties, [
@@ -721,11 +719,11 @@ const Map = React.memo(function Map({
                         "busName",
                         "speed",
                         "ignition",
+                        "lineId",
                     ]);
                     return (
-                        `<div style="min-width:220px">` +
                         (lineCombined
-                            ? `<div style="font-weight:700; font-size:16px; margin-bottom:8px">${lineCombined}</div>`
+                            ? `<div style="font-weight:500; font-size:16px; margin-bottom:8px">${lineCombined}</div>`
                             : "") +
                         rows +
                         extra +
@@ -742,10 +740,7 @@ const Map = React.memo(function Map({
                     const relation = summarizeStops(properties.stops);
                     const rows =
                         createRow("Prevoznik", properties.operator) +
-                        createRow("Relacija", relation) +
-                        createRow("Pot", properties.journeyPatternId) +
-                        createRow("Voznja", properties.tripId) +
-                        createRow("Ruta", properties.routeId);
+                        createRow("Relacija", relation);
                     const stopsSection = renderStopsList(properties.stops);
                     const extra = renderExtraFields(properties, [
                         "lineName",
@@ -784,7 +779,7 @@ const Map = React.memo(function Map({
                         if (!f) return;
                         const content = formatter(f.properties);
                         const popup = new maplibregl.Popup({
-                            closeButton: true,
+                            closeButton: false,
                         }).setLngLat(e.lngLat);
                         if (
                             content &&
@@ -851,7 +846,7 @@ const Map = React.memo(function Map({
                         if (
                             !properties ||
                             properties.sourceType !== "ijpp" ||
-                            typeof onSelectVehicle !== "function"
+                            typeof setSelectedVehicle !== "function"
                         )
                             return;
                         const container = popup.getElement();
@@ -870,9 +865,9 @@ const Map = React.memo(function Map({
                                 routeId: properties.routeId || null,
                                 journeyPatternId:
                                     properties.journeyPatternId || null,
-                                stops: Array.isArray(properties.stops)
-                                    ? properties.stops
-                                    : [],
+                                stops: properties.stops
+                                    ? JSON.parse(properties.stops)
+                                    : null,
                                 vehicleRef:
                                     properties.vehicleRef ||
                                     properties.vehicleId ||
@@ -892,8 +887,8 @@ const Map = React.memo(function Map({
                             } catch (err) {
                                 console.warn("Shranjevanje ni uspelo:", err);
                             }
-                            onSelectVehicle(payload);
-                            setCurentUrl("/route");
+                            setSelectedVehicle(payload);
+                            setCurrentUrl("/route");
                             window.location.hash = "/route";
                             popup.remove();
                         };

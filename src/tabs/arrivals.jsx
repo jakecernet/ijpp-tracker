@@ -142,11 +142,12 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
                 {stationSelected && !error && filteredArrivals.length === 0 && (
                     <p>Ni prihajajočih prihodov za izbrano postajo.</p>
                 )}
-            </div>
-            <div className="lpp-arrivals-list">
                 {!error &&
                     lppArrivals.map((arrival, index) => (
-                        <div key={index} className="arrival-item">
+                        <div
+                            key={index}
+                            className="lpp-arrival-item arrival-item"
+                        >
                             <div className="left">
                                 <div className="circle">
                                     {arrival.routeName}

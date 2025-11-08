@@ -96,22 +96,6 @@ function App() {
         }
     }, [activeStation]);
 
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        try {
-            if (selectedVehicle) {
-                window.localStorage.setItem(
-                    "selectedBusRoute",
-                    JSON.stringify(selectedVehicle)
-                );
-            } else {
-                window.localStorage.removeItem("selectedBusRoute");
-            }
-        } catch (error) {
-            console.warn("Shranjevanje vozila ni uspelo:", error);
-        }
-    }, [selectedVehicle]);
-
     // Fetch GPS positions for LPP buses
     useEffect(() => {
         const fetchLPPPositions = async () => {
@@ -305,9 +289,9 @@ function App() {
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        setCurentUrl={setCurrentUrl}
+                                        setCurrentUrl={setCurrentUrl}
                                         trainPositions={trainPositions}
-                                        onSelectVehicle={setSelectedVehicle}
+                                        setSelectedVehicle={setSelectedVehicle}
                                     />
                                 }
                             />
@@ -320,9 +304,9 @@ function App() {
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        setCurentUrl={setCurrentUrl}
+                                        setCurrentUrl={setCurrentUrl}
                                         trainPositions={trainPositions}
-                                        onSelectVehicle={setSelectedVehicle}
+                                        setSelectedVehicle={setSelectedVehicle}
                                     />
                                 }
                             />
@@ -331,7 +315,6 @@ function App() {
                                 element={
                                     <BusRouteTab
                                         selectedVehicle={selectedVehicle}
-                                        setSelectedVehicle={setSelectedVehicle}
                                         positionsUrl={ijppLocationsLink}
                                         setCurentUrl={setCurrentUrl}
                                     />
