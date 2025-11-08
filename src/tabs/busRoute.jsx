@@ -22,7 +22,7 @@ const BusRouteTab = ({ selectedVehicle, lppRoute }) => {
                             <h3>
                                 {stop.stop_name}
                             </h3>
-                            <p>{stop.arrival_time}</p>
+                            <p>{stop.arrival_time.slice(0, -3)}</p>
                         </li>
                     ))}
                     {isLPP && (
