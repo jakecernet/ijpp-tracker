@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const SELECTED_BUS_ROUTE_KEY = "selectedBusRoute";
 const STOP_NAME_KEYS = [
     "name",
     "stop_name",
@@ -61,7 +60,7 @@ const pickFirstText = (container, keys) => {
 const loadStoredVehicle = () => {
     if (typeof window === "undefined") return null;
     try {
-        const raw = window.localStorage.getItem(SELECTED_BUS_ROUTE_KEY);
+        const raw = window.localStorage.getItem("selectedBusRoute");
         return raw ? JSON.parse(raw) : null;
     } catch (error) {
         console.warn("Neuspelo branje podatkov o liniji:", error);
@@ -288,11 +287,11 @@ function BusRouteTab({
         try {
             if (vehicle) {
                 window.localStorage.setItem(
-                    SELECTED_BUS_ROUTE_KEY,
+                    "selectedBusRoute",
                     JSON.stringify(vehicle)
                 );
             } else {
-                window.localStorage.removeItem(SELECTED_BUS_ROUTE_KEY);
+                window.localStorage.removeItem("selectedBusRoute");
             }
         } catch (storageError) {
             console.warn("Shranjevanje podatkov ni uspelo:", storageError);

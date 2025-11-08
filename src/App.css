@@ -207,29 +207,14 @@ h2 {
 .route-view {
     background: rgba(20, 20, 34, 0.82);
     border: 1px solid var(--stroke);
-    border-radius: 20px;
     padding: 24px;
     box-shadow: var(--shadow);
     display: flex;
     flex-direction: column;
     gap: 20px;
-    min-height: calc(100vh - 140px);
     overflow-y: auto;
     color: var(--text);
     backdrop-filter: var(--blur);
-}
-
-.route-view::-webkit-scrollbar {
-    width: 10px;
-}
-
-.route-view::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.route-view::-webkit-scrollbar-thumb {
-    background: rgba(123, 120, 189, 0.4);
-    border-radius: 999px;
 }
 
 .route-view--empty {
