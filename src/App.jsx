@@ -1,16 +1,15 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin, Settings, X } from "lucide-react";
+import { Map, Clock, MapPin, Settings, X, ArrowRightLeft } from "lucide-react";
 import "./App.css";
 
-import ijppStopsSource from "./ijpp_stops.json";
-import lppStopsSource from "./lpp_stops.json";
-import { use } from "react";
+import busStopsSource from "./unified_stops.json";
 
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
+const BusRouteTab = lazy(() => import("./tabs/busRoute"));
 
 const ijppArrivalsLink = "https://ijpp.nikigre.si/getTripsByStop?stopID=";
 const lppArrivalsLink =
@@ -50,28 +49,30 @@ function App() {
 
     const [gpsPositions, setGpsPositions] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
+    const [selectedVehicle, setSelectedVehicle] = useState(() => {
+        if (typeof window === "undefined") return null;
+        try {
+            const raw = window.localStorage.getItem("selectedBusRoute");
+            return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+            console.warn("Neveljavni podatki o izbranem vozilu:", error);
+            return null;
+        }
+    });
 
-    const [ijppStops] = useState(
-        Array.isArray(ijppStopsSource)
-            ? ijppStopsSource.map((s) => ({
-                  id: s.int_id,
-                  ref_id: s.ref_id,
+    const [busStops] = useState(
+        Array.isArray(busStopsSource)
+            ? busStopsSource.map((s) => ({
                   name: s.name,
+                  refID: s.ref_id ? s.ref_id : null,
+                  ijppID: s.ijpp_id ? s.ijpp_id : null,
                   gpsLocation: [s.latitude, s.longitude],
-                  busLines: s.route_groups_on_station,
+                  busLines: s.route_groups_on_station
+                      ? s.route_groups_on_station
+                      : [],
               }))
             : []
     );
-    const [lppBusStops] = useState(
-        Array.isArray(lppStopsSource)
-            ? lppStopsSource.map((s) => ({
-                  id: s.stop_id,
-                  name: s.name,
-                  gpsLocation: [s.latitude, s.longitude],
-              }))
-            : []
-    );
-    const [busStops, setBusStops] = useState([]);
     const [szStops, setSzStops] = useState([]);
 
     const [ijppArrivals, setIjppArrivals] = useState([]);
@@ -96,9 +97,26 @@ function App() {
     }, [activeStation]);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            if (selectedVehicle) {
+                window.localStorage.setItem(
+                    "selectedBusRoute",
+                    JSON.stringify(selectedVehicle)
+                );
+            } else {
+                window.localStorage.removeItem("selectedBusRoute");
+            }
+        } catch (error) {
+            console.warn("Shranjevanje vozila ni uspelo:", error);
+        }
+    }, [selectedVehicle]);
+
+    // Fetch GPS positions for LPP buses
+    useEffect(() => {
         const fetchLPPPositions = async () => {
             try {
-                const data = await fetchJson(lppLocationsLink)
+                const data = await fetchJson(lppLocationsLink);
 
                 const lppPositions = data.data
                     .filter(() => activeOperators.includes("lpp"))
@@ -126,34 +144,46 @@ function App() {
         return () => clearInterval(intervalId);
     }, [activeOperators]);
 
+    // Fetch GPS positions for other buses (Arriva, Nomago...)
     useEffect(() => {
         const fetchIJPPPositions = async () => {
             try {
                 const data = await fetchJson(ijppLocationsLink);
-                const ijppPositions = data
-                    .filter((vehicle) =>
-                        activeOperators.includes(
-                            vehicle.OperatorData.agency_name.toLowerCase()
-                        )
-                    )
-                    .map((vehicle) => ({
-                        gpsLocation: [
-                            vehicle.VehicleLocations.Latitude,
-                            vehicle.VehicleLocation.Longitude,
-                        ],
-                        operator: vehicle.OperatorData.agency_name,
-                        lineName: vehicle.PublishedLineName,
-                        journeyPatternId: vehicle.JourneyPatternRef,
-                        tripId: vehicle.LineData.tripId,
-                        routeId: vehicle.LineData.trip.route_id,
-                        stops: vehicle.LineData.stops
-                        }));
-
+                const ijppPositions = Array.isArray(data)
+                    ? data.map((vehicle) => ({
+                          gpsLocation: [
+                              parseFloat(vehicle?.VehicleLocation?.Latitude) ||
+                                  0,
+                              parseFloat(vehicle?.VehicleLocation?.Longitude) ||
+                                  0,
+                          ],
+                          operator:
+                              vehicle?.OperatorData?.agency_name ||
+                              vehicle?.OperatorRef ||
+                              "",
+                          lineName:
+                              vehicle?.PublishedLineName ||
+                              vehicle?.LineRef ||
+                              "",
+                          journeyPatternId:
+                              vehicle?.JourneyPatternRef ||
+                              vehicle?.JourneyPatternName ||
+                              null,
+                          tripId:
+                              vehicle?.LineData?.tripId ||
+                              vehicle?.LineData?.trip?.trip_id ||
+                              null,
+                          routeId:
+                              vehicle?.LineData?.trip?.route_id ||
+                              vehicle?.LineData?.trip?.routeId ||
+                              null,
+                          stops: vehicle?.LineData?.stops || [],
+                      }))
+                    : [];
                 setGpsPositions((prevPositions) => [
                     ...prevPositions,
                     ...ijppPositions,
                 ]);
-                console.log("IJPP positions fetched:", ijppPositions);
             } catch (error) {
                 console.error("Error fetching ijpp positions:", error);
             }
@@ -163,19 +193,24 @@ function App() {
         return () => clearInterval(intervalId);
     }, [activeOperators]);
 
-    const computeDistance = (lat1, lon1, lat2, lon2) => {
-        const R = 6371;
-        const dLat = ((lat2 - lat1) * Math.PI) / 180;
-        const dLon = ((lon2 - lon1) * Math.PI) / 180;
-        const a =
-            Math.sin(dLat / 2) ** 2 +
-            Math.cos((lat1 * Math.PI) / 180) *
-                Math.cos((lat2 * Math.PI) / 180) *
-                Math.sin(dLon / 2) ** 2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-
+    // Fetch positions of Slovenske železnice trains
     useEffect(() => {
+        const fetchTrainPositions = async () => {
+            try {
+                const data = await fetchJson(
+                    "https://api.modra.ninja/sz/lokacije_raw"
+                );
+                setTrainPositions(data);
+            } catch (error) {
+                console.error("Error fetching train positions:", error);
+            }
+        };
+
+        fetchTrainPositions();
+    }, []);
+
+    // Fetch positions of Slovenske železnice train stops (ne dela api)
+    /* useEffect(() => {
         const fetchszStops = async () => {
             try {
                 const data = await fetchJson(
@@ -189,84 +224,19 @@ function App() {
         };
 
         fetchszStops();
-    }, []);
+    }, []); */
 
-    useEffect(() => {
-        const fetchAndJoinBusStops = async () => {
-            try {
-                const normalizeName = (n) =>
-                    (n || "").toString().trim().toLowerCase();
-
-                const COORD_THRESHOLD_KM = 0.3;
-
-                const ojpp = stopLocations.features.map((feature) => ({
-                    name: feature.properties.name,
-                    gpsLocation: feature.geometry.coordinates.slice().reverse(),
-                    id: feature.properties.id,
-                }));
-
-                const lppNormalized = lppBusStops;
-
-                const ojppRemaining = [];
-                const lppEnriched = lppNormalized.map((s) => ({ ...s }));
-
-                for (const stop of ojpp) {
-                    const [ojppLat, ojppLon] = stop.gpsLocation;
-                    const ojppNameNorm = normalizeName(stop.name);
-
-                    const idx = lppEnriched.findIndex((s) => {
-                        const lppNameNorm = normalizeName(s.name);
-                        if (!lppNameNorm || lppNameNorm !== ojppNameNorm)
-                            return false;
-                        const [lppLat, lppLon] = s.gpsLocation;
-                        const d = computeDistance(
-                            ojppLat,
-                            ojppLon,
-                            lppLat,
-                            lppLon
-                        );
-                        return d <= COORD_THRESHOLD_KM;
-                    });
-
-                    if (idx >= 0) {
-                        lppEnriched[idx].ojppId = stop.id;
-                    } else {
-                        ojppRemaining.push(stop);
-                    }
-                }
-
-                const combined = [
-                    ...lppEnriched,
-                    ...ojppRemaining.map((s) => ({ ...s, ref_id: null })),
-                ];
-
-                const filtered = combined.filter((stop) => {
-                    const [lat, lon] = stop.gpsLocation;
-                    return (
-                        computeDistance(
-                            userLocation[0],
-                            userLocation[1],
-                            lat,
-                            lon
-                        ) <= +radius
-                    );
-                });
-
-                setBusStops(filtered);
-            } catch (err) {
-                console.error("Error fetching/joining bus stops:", err);
-            }
-        };
-
-        fetchAndJoinBusStops();
-    }, [radius, userLocation, lppBusStops]);
-
+    // Get user's location
     useEffect(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
                     setUserLocation([latitude, longitude]);
+                    localStorage.setItem(
+                        "userLocation",
+                        JSON.stringify([latitude, longitude])
+                    );
                 },
                 (error) => {
                     console.error("Error getting user's location:", error);
@@ -280,17 +250,17 @@ function App() {
     useEffect(() => {
         const fetchLppArrivals = async () => {
             const lppCode = activeStation?.ref_id;
-
+            if (!lppCode) {
+                setLppArrivals([]);
+                return;
+            }
             try {
                 if (!activeOperators.includes("lpp")) {
                     setLppArrivals([]);
                     return;
                 }
 
-                const raw = await fetchJson(
-                    "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=" +
-                        lppCode
-                );
+                const raw = await fetchJson(lppArrivalsLink + lppCode);
 
                 const list = Array.isArray(raw?.data?.arrivals)
                     ? raw.data.arrivals
@@ -320,55 +290,6 @@ function App() {
         fetchLppArrivals();
     }, [activeStation, activeOperators]);
 
-    useEffect(() => {
-        const fetchijppArrivals = async () => {
-            try {
-                const data = await fetchJson(
-                    `https://ojpp.si/api/stop_locations/${activeStation.id}/arrivals`
-                );
-
-                const arrivals = data
-                    .filter(
-                        (arrival) =>
-                            arrival?.operator?.name !==
-                            "Javno podjetje Ljubljanski potniški promet d.o.o."
-                    )
-                    .map((arrival) => ({
-                        tripId: arrival.trip_id,
-                        routeId: arrival.route_id,
-                        routeName: arrival.route_name,
-                        timeArrival: arrival.time_arrival,
-                        timeDeparture: arrival.time_departure,
-                        operator: arrival.operator.name,
-                    }));
-
-                setIjppArrivals(arrivals);
-            } catch (error) {
-                console.error("Error fetching bus stop arrivals:", error);
-            }
-        };
-
-        if (activeStation && activeStation.id) {
-            fetchijppArrivals();
-        }
-    }, [activeStation]);
-
-    useEffect(() => {
-        const fetchTrainPositions = async () => {
-            try {
-                const data = await fetchJson(
-                    "https://api.modra.ninja/sz/lokacije_raw"
-                );
-                setTrainPositions(data);
-                console.log("Train positions fetched:", data);
-            } catch (error) {
-                console.error("Error fetching train positions:", error);
-            }
-        };
-
-        fetchTrainPositions();
-    }, []);
-
     return (
         <Router>
             <div className="mobile-container">
@@ -381,13 +302,12 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
-                                        szStops={szStops}
-                                        lppBusStops={lppBusStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
                                         setCurentUrl={setCurrentUrl}
                                         trainPositions={trainPositions}
+                                        onSelectVehicle={setSelectedVehicle}
                                     />
                                 }
                             />
@@ -397,13 +317,23 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
-                                        lppBusStops={lppBusStops}
-                                        szStops={szStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
                                         setCurentUrl={setCurrentUrl}
                                         trainPositions={trainPositions}
+                                        onSelectVehicle={setSelectedVehicle}
+                                    />
+                                }
+                            />
+                            <Route
+                                path="/route"
+                                element={
+                                    <BusRouteTab
+                                        selectedVehicle={selectedVehicle}
+                                        setSelectedVehicle={setSelectedVehicle}
+                                        positionsUrl={ijppLocationsLink}
+                                        setCurentUrl={setCurrentUrl}
                                     />
                                 }
                             />
@@ -478,6 +408,15 @@ function App() {
                         >
                             <MapPin size={24} />
                             <span>V bližini</span>
+                        </button>
+                    </NavLink>
+                    <NavLink to="/route">
+                        <button
+                            onClick={() => setCurrentUrl("/route")}
+                            className={currentUrl === "/route" ? "active" : ""}
+                        >
+                            <ArrowRightLeft size={24} />
+                            <span>Pot</span>
                         </button>
                     </NavLink>
                 </nav>

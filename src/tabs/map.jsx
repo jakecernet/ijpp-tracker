@@ -70,12 +70,12 @@ const operatorToIcon = {
 const Map = React.memo(function Map({
     gpsPositions,
     busStops,
-    trainStops,
     activeStation,
     setActiveStation,
     userLocation,
     setCurentUrl,
     trainPositions,
+    onSelectVehicle,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -91,13 +91,28 @@ const Map = React.memo(function Map({
             toGeoJSONPoints(
                 gpsPositions || [],
                 (g) => g.gpsLocation,
-                (g) => ({
-                    title: g.route || "",
-                    lineName: g.lineName || "",
-                    operator: g.operator || "",
-                    icon: operatorToIcon[g.operator] || "bus-generic",
-                    brand: operatorToIcon[g.operator] || "generic",
-                })
+                (g) => {
+                    const props = { ...g };
+                    delete props.gpsLocation;
+                    if (props.title === undefined && g.route) {
+                        props.title = g.route;
+                    }
+                    if (!props.lineName && g.lineName) {
+                        props.lineName = g.lineName;
+                    }
+                    const isLpp =
+                        (typeof g.operator === "string" &&
+                            g.operator
+                                .toLowerCase()
+                                .includes("ljubljanski potniški promet")) ||
+                        g.lineNumber !== undefined ||
+                        g.lineId !== undefined;
+                    props.sourceType = isLpp ? "lpp" : "ijpp";
+                    props.icon = operatorToIcon[g.operator] || "bus-generic";
+                    props.brand = operatorToIcon[g.operator] || "generic";
+                    props.operator = g.operator || props.operator || "";
+                    return props;
+                }
             ),
         [gpsPositions]
     );
@@ -107,24 +122,19 @@ const Map = React.memo(function Map({
             toGeoJSONPoints(
                 busStops || [],
                 (s) => s.gpsLocation,
-                (s) => ({
-                    id: s.id,
-                    name: s.name,
-                    icon: "bus-stop",
-                    ref_id: s.ref_id ?? null,
-                })
+                (s) => {
+                    const id =
+                        s.ijppID ?? s.refID ?? s.ref_id ?? s.id ?? s.name;
+                    const refId = s.ref_id ?? s.refID ?? null;
+                    return {
+                        id,
+                        name: s.name,
+                        icon: "bus-stop",
+                        ref_id: refId,
+                    };
+                }
             ),
         [busStops]
-    );
-
-    const trainStopsGeoJSON = useMemo(
-        () =>
-            toGeoJSONPoints(
-                trainStops || [],
-                (t) => [t.lat, t.lng],
-                (t) => ({ id: t.id, name: t.name || t.naziv, icon: "train-stop" })
-            ),
-        [trainStops]
     );
 
     const trainPositionsGeoJSON = useMemo(
@@ -228,17 +238,7 @@ const Map = React.memo(function Map({
                         clusterMaxZoom: 20,
                     });
                 }
-                // lppBusStops merged into busStops
-                if (!map.getSource("trainStops")) {
-                    map.addSource("trainStops", {
-                        type: "geojson",
-                        data: trainStopsGeoJSON,
-                        cluster: true,
-                        clusterRadius: 80,
-                        clusterMaxZoom: 15,
-                    });
-                }
-                // New: train positions source
+
                 if (!map.getSource("trainPositions")) {
                     map.addSource("trainPositions", {
                         type: "geojson",
@@ -294,7 +294,6 @@ const Map = React.memo(function Map({
                 addClusterLayers("buses", "#5b8cff");
                 addClusterLayers("busStops", "#7a5bff");
                 // lppBusStops merged into busStops
-                addClusterLayers("trainStops", "#5b8cff");
                 addClusterLayers("trainPositions", "#ff5b5b");
 
                 // Unclustered icons with smaller, zoom-based sizes
@@ -376,7 +375,6 @@ const Map = React.memo(function Map({
                 addUnclusteredIconLayer("buses", busSize, "center");
                 addUnclusteredIconLayer("busStops", stopSize, "bottom");
                 // lppBusStops merged into busStops
-                addUnclusteredIconLayer("trainStops", trainSize, "bottom");
                 addUnclusteredIconLayer(
                     "trainPositions",
                     trainPosSize,
@@ -485,7 +483,6 @@ const Map = React.memo(function Map({
                 registerClusterClick("buses");
                 registerClusterClick("busStops");
                 // lppBusStops merged into busStops
-                registerClusterClick("trainStops");
                 registerClusterClick("trainPositions");
 
                 // Bus stop popup with action button
@@ -534,15 +531,275 @@ const Map = React.memo(function Map({
                 });
 
                 // Simple popups for buses and train stops
-                const attachPopup = (layerId, formatter) => {
+                const escapeHTML = (value) =>
+                    String(value).replace(/[&<>"']/g, (char) => {
+                        switch (char) {
+                            case "&":
+                                return "&amp;";
+                            case "<":
+                                return "&lt;";
+                            case ">":
+                                return "&gt;";
+                            case '"':
+                                return "&quot;";
+                            case "'":
+                                return "&#39;";
+                            default:
+                                return char;
+                        }
+                    });
+
+                const formatValue = (value) => {
+                    if (value === null || value === undefined || value === "") {
+                        return '<span style="opacity:0.6">&mdash;</span>';
+                    }
+                    if (typeof value === "object") {
+                        try {
+                            const text = JSON.stringify(value, null, 2);
+                            return `<pre style="margin:4px 0; white-space:pre-wrap">${escapeHTML(
+                                text
+                            )}</pre>`;
+                        } catch (err) {
+                            return `<pre style="margin:4px 0; white-space:pre-wrap">${escapeHTML(
+                                String(value)
+                            )}</pre>`;
+                        }
+                    }
+                    return `<span>${escapeHTML(String(value))}</span>`;
+                };
+
+                const prettifyKey = (key) => {
+                    const spaced = key
+                        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                        .replace(/_/g, " ")
+                        .replace(/\s+/g, " ")
+                        .trim();
+                    if (!spaced) return key;
+                    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+                };
+
+                const createRow = (label, value) => {
+                    if (value === null || value === undefined || value === "")
+                        return "";
+                    return (
+                        `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
+                        `<span style="opacity:0.7">${escapeHTML(
+                            label
+                        )}</span>` +
+                        `<span style="font-weight:600; text-align:right">${escapeHTML(
+                            String(value)
+                        )}</span>` +
+                        `</div>`
+                    );
+                };
+
+                const formatSpeed = (speed) => {
+                    if (typeof speed !== "number" || Number.isNaN(speed))
+                        return null;
+                    const rounded = Math.round(speed);
+                    return `${rounded} km/h`;
+                };
+
+                const formatIgnitionStatus = (value) => {
+                    if (value === null || value === undefined) return null;
+                    if (typeof value === "boolean")
+                        return value ? "Vklopljen" : "Izklopljen";
+                    if (typeof value === "number")
+                        return value > 0 ? "Vklopljen" : "Izklopljen";
+                    const normalized = String(value).trim().toLowerCase();
+                    if (["1", "on", "true", "yes"].includes(normalized))
+                        return "Vklopljen";
+                    if (["0", "off", "false", "no"].includes(normalized))
+                        return "Izklopljen";
+                    if (!normalized) return null;
+                    return normalized;
+                };
+
+                const summarizeStops = (stops) => {
+                    if (!Array.isArray(stops) || stops.length === 0)
+                        return null;
+                    const getName = (stop) =>
+                        stop?.name ??
+                        stop?.stop_name ??
+                        stop?.common_name ??
+                        stop?.Name ??
+                        stop?.naziv ??
+                        stop?.stop ??
+                        null;
+                    const first = getName(stops[0]);
+                    const last = getName(stops[stops.length - 1]);
+                    if (first && last && first !== last)
+                        return `${first} -> ${last}`;
+                    return first || last || null;
+                };
+
+                const renderStopsList = (stops) => {
+                    if (!Array.isArray(stops) || stops.length === 0) return "";
+                    const names = stops
+                        .map(
+                            (stop) =>
+                                stop?.name ??
+                                stop?.stop_name ??
+                                stop?.common_name ??
+                                stop?.Name ??
+                                stop?.naziv ??
+                                stop?.stop ??
+                                null
+                        )
+                        .filter(Boolean);
+                    if (names.length === 0) return "";
+                    const preview = names.slice(0, 4);
+                    const items = preview
+                        .map(
+                            (name, index) =>
+                                `<li style="margin:0; padding:0; list-style-position:inside">${escapeHTML(
+                                    name
+                                )}</li>`
+                        )
+                        .join("");
+                    const moreCount = names.length - preview.length;
+                    const moreLabel =
+                        moreCount > 0
+                            ? `<li style="margin:0; padding:0; list-style-position:inside; opacity:0.7">+${moreCount} postaj</li>`
+                            : "";
+                    return (
+                        `<div style="margin-top:10px">` +
+                        `<div style="font-weight:600; margin-bottom:4px">Postaje</div>` +
+                        `<ul style="margin:0; padding-left:16px">${items}${moreLabel}</ul>` +
+                        `</div>`
+                    );
+                };
+
+                const renderExtraFields = (properties, usedKeys = []) => {
+                    const ignore = new Set([
+                        ...usedKeys,
+                        "icon",
+                        "brand",
+                        "sourceType",
+                    ]);
+                    const entries = Object.entries(properties || {}).filter(
+                        ([key]) => !ignore.has(key)
+                    );
+                    if (!entries.length) return "";
+                    const rows = entries
+                        .map(([key, value]) => {
+                            const label = escapeHTML(prettifyKey(key));
+                            return `<div style="margin-bottom:6px"><strong>${label}</strong>: ${formatValue(
+                                value
+                            )}</div>`;
+                        })
+                        .join("");
+                    return (
+                        `<div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.1)">` +
+                        rows +
+                        `</div>`
+                    );
+                };
+
+                const renderLppPopup = (properties) => {
+                    const lineCombined = [
+                        properties.lineNumber,
+                        properties.lineName,
+                    ]
+                        .filter(Boolean)
+                        .map((value) => escapeHTML(String(value)))
+                        .join(" &ndash; ");
+                    const rows =
+                        createRow("Prevoznik", properties.operator) +
+                        createRow("Smer", properties.lineDestination) +
+                        createRow("Vozilo", properties.busName) +
+                        createRow("Hitrost", formatSpeed(properties.speed)) +
+                        createRow(
+                            "Vzig",
+                            formatIgnitionStatus(properties.ignition)
+                        );
+                    const extra = renderExtraFields(properties, [
+                        "lineNumber",
+                        "lineName",
+                        "operator",
+                        "lineDestination",
+                        "busName",
+                        "speed",
+                        "ignition",
+                    ]);
+                    return (
+                        `<div style="min-width:220px">` +
+                        (lineCombined
+                            ? `<div style="font-weight:700; font-size:16px; margin-bottom:8px">${lineCombined}</div>`
+                            : "") +
+                        rows +
+                        extra +
+                        `</div>`
+                    );
+                };
+
+                const renderIjppPopup = (properties) => {
+                    const heading =
+                        properties.lineName ||
+                        properties.title ||
+                        properties.routeId ||
+                        "Vozilo";
+                    const relation = summarizeStops(properties.stops);
+                    const rows =
+                        createRow("Prevoznik", properties.operator) +
+                        createRow("Relacija", relation) +
+                        createRow("Pot", properties.journeyPatternId) +
+                        createRow("Voznja", properties.tripId) +
+                        createRow("Ruta", properties.routeId);
+                    const stopsSection = renderStopsList(properties.stops);
+                    const extra = renderExtraFields(properties, [
+                        "lineName",
+                        "title",
+                        "routeId",
+                        "operator",
+                        "stops",
+                        "journeyPatternId",
+                        "tripId",
+                    ]);
+                    const routeButton =
+                        '<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>';
+                    return (
+                        `<div style="min-width:240px">` +
+                        `<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
+                            String(heading)
+                        )}</div>` +
+                        rows +
+                        stopsSection +
+                        routeButton +
+                        extra +
+                        `</div>`
+                    );
+                };
+
+                const renderDefaultBusPopup = (properties) => {
+                    const extra = renderExtraFields(properties, []);
+                    if (extra)
+                        return `<div style="min-width:200px">${extra}</div>`;
+                    return `<div style="min-width:180px">Ni podatkov</div>`;
+                };
+
+                const attachPopup = (layerId, formatter, afterOpen) => {
                     map.on("click", layerId, (e) => {
                         const f = e.features?.[0];
                         if (!f) return;
-                        const html = formatter(f.properties);
-                        new maplibregl.Popup({ closeButton: true })
-                            .setLngLat(e.lngLat)
-                            .setHTML(html)
-                            .addTo(map);
+                        const content = formatter(f.properties);
+                        const popup = new maplibregl.Popup({
+                            closeButton: true,
+                        }).setLngLat(e.lngLat);
+                        if (
+                            content &&
+                            typeof content === "object" &&
+                            typeof Node !== "undefined" &&
+                            content instanceof Node
+                        ) {
+                            popup.setDOMContent(content);
+                        } else {
+                            popup.setHTML(String(content ?? ""));
+                        }
+                        popup.addTo(map);
+                        if (typeof afterOpen === "function") {
+                            afterOpen(popup, f.properties || {}, e.lngLat);
+                        }
                     });
                     map.on("mouseenter", layerId, () => {
                         map.getCanvas().style.cursor = "pointer";
@@ -581,29 +838,70 @@ const Map = React.memo(function Map({
                     );
                 });
 
-                attachPopup("buses-points", (p) => {
-                    const route = p.title || "";
-                    const line = p.lineName || "";
-                    const op = p.operator || "";
-                    return (
-                        `<div style="min-width:160px">` +
-                        `<p>${route}</p>` +
-                        `<p>${line}</p>` +
-                        `<p>${op}</p>` +
-                        `</div>`
-                    );
-                });
-
-                attachPopup("trainStops-points", (p) => {
-                    const name = p.name || "";
-                    const id = p.id || "";
-                    return (
-                        `<div style="min-width:160px">` +
-                        `<div style="font-weight:600">${name}</div>` +
-                        `<div>ID: ${id}</div>` +
-                        `</div>`
-                    );
-                });
+                attachPopup(
+                    "buses-points",
+                    (p) => {
+                        if (!p || typeof p !== "object")
+                            return `<div style="min-width:180px">Ni podatkov</div>`;
+                        if (p.sourceType === "lpp") return renderLppPopup(p);
+                        if (p.sourceType === "ijpp") return renderIjppPopup(p);
+                        return renderDefaultBusPopup(p);
+                    },
+                    (popup, properties) => {
+                        if (
+                            !properties ||
+                            properties.sourceType !== "ijpp" ||
+                            typeof onSelectVehicle !== "function"
+                        )
+                            return;
+                        const container = popup.getElement();
+                        if (!container) return;
+                        const button = container.querySelector(
+                            '[data-role="view-route"]'
+                        );
+                        if (!button) return;
+                        const handler = (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const payload = {
+                                lineName: properties.lineName || null,
+                                operator: properties.operator || null,
+                                tripId: properties.tripId || null,
+                                routeId: properties.routeId || null,
+                                journeyPatternId:
+                                    properties.journeyPatternId || null,
+                                stops: Array.isArray(properties.stops)
+                                    ? properties.stops
+                                    : [],
+                                vehicleRef:
+                                    properties.vehicleRef ||
+                                    properties.vehicleId ||
+                                    null,
+                                destination:
+                                    properties.lineDestination ||
+                                    properties.destination ||
+                                    null,
+                                origin: properties.origin || null,
+                                lastKnown: Date.now(),
+                            };
+                            try {
+                                localStorage.setItem(
+                                    "selectedBusRoute",
+                                    JSON.stringify(payload)
+                                );
+                            } catch (err) {
+                                console.warn("Shranjevanje ni uspelo:", err);
+                            }
+                            onSelectVehicle(payload);
+                            setCurentUrl("/route");
+                            window.location.hash = "/route";
+                            popup.remove();
+                        };
+                        button.addEventListener("click", handler, {
+                            once: true,
+                        });
+                    }
+                );
             });
         });
 
@@ -626,13 +924,6 @@ const Map = React.memo(function Map({
         const src = map.getSource("busStops");
         if (src && src.setData) src.setData(busStopsGeoJSON);
     }, [busStopsGeoJSON]);
-
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-        const src = map.getSource("trainStops");
-        if (src && src.setData) src.setData(trainStopsGeoJSON);
-    }, [trainStopsGeoJSON]);
 
     useEffect(() => {
         const map = mapInstanceRef.current;

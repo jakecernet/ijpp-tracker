@@ -204,6 +204,226 @@ h2 {
     backdrop-filter: var(--blur);
 }
 
+.route-view {
+    background: rgba(20, 20, 34, 0.82);
+    border: 1px solid var(--stroke);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-height: calc(100vh - 140px);
+    overflow-y: auto;
+    color: var(--text);
+    backdrop-filter: var(--blur);
+}
+
+.route-view::-webkit-scrollbar {
+    width: 10px;
+}
+
+.route-view::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.route-view::-webkit-scrollbar-thumb {
+    background: rgba(123, 120, 189, 0.4);
+    border-radius: 999px;
+}
+
+.route-view--empty {
+    justify-content: flex-start;
+}
+
+.route-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.route-title {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.route-title h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.route-subtitle {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.route-meta {
+    color: var(--muted);
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+}
+
+.route-button {
+    background: linear-gradient(135deg, var(--brand), var(--brand-2));
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.3s ease, filter 0.25s ease;
+    box-shadow: 0 12px 28px rgba(91, 140, 255, 0.28);
+}
+
+.route-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(91, 140, 255, 0.36);
+    filter: brightness(1.05);
+}
+
+.route-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 8px 18px rgba(91, 140, 255, 0.2);
+}
+
+.route-button:focus-visible {
+    outline: 2px solid rgba(123, 120, 255, 0.8);
+    outline-offset: 2px;
+}
+
+.route-button--ghost {
+    background: transparent;
+    border: 1px solid var(--stroke);
+    color: var(--text);
+    box-shadow: none;
+}
+
+.route-button--ghost:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: none;
+    box-shadow: none;
+}
+
+.route-button--ghost:active {
+    transform: translateY(1px);
+}
+
+.route-card {
+    background: rgba(18, 18, 29, 0.86);
+    border: 1px solid var(--stroke);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.route-card.route-info {
+    gap: 12px;
+}
+
+.route-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.route-info-label {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.route-info-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.route-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.route-actions .route-button {
+    width: 100%;
+    max-width: 260px;
+}
+
+.route-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.route-stoplist {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.route-stop {
+    position: relative;
+    padding: 14px 18px 14px 36px;
+    border-radius: 14px;
+    background: rgba(13, 13, 22, 0.85);
+    border: 1px solid rgba(123, 120, 189, 0.25);
+}
+
+.route-stop::before {
+    content: "";
+    position: absolute;
+    left: 16px;
+    top: 20px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--brand);
+    box-shadow: 0 0 12px rgba(91, 140, 255, 0.6);
+}
+
+.route-stop-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.route-stop-meta {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.route-note {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.route-alert {
+    color: #ff758f;
+    background: rgba(255, 117, 143, 0.12);
+    border: 1px solid rgba(255, 117, 143, 0.32);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-weight: 600;
+}
+
+.route-empty {
+    color: var(--muted);
+    text-align: center;
+}
+
 .arrival-item,
 .station-item,
 .glass-card {
