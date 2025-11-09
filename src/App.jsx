@@ -8,7 +8,6 @@ import busStopsSource from "./unified_stops.json";
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
-const SettingsTab = lazy(() => import("./tabs/settings"));
 const BusRouteTab = lazy(() => import("./tabs/busRoute"));
 
 const ijppArrivalsLink =
