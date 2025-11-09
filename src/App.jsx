@@ -367,15 +367,6 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/route"
-                                element={
-                                    <BusRouteTab
-                                        selectedVehicle={selectedVehicle}
-                                        lppRoute={lppRoute}
-                                    />
-                                }
-                            />
-                            <Route
                                 path="/arrivals"
                                 element={
                                     <ArrivalsTab
@@ -397,15 +388,11 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/settings"
+                                path="/route"
                                 element={
-                                    <SettingsTab
-                                        setActiveOperators={setActiveOperators}
-                                        activeOperators={activeOperators}
-                                        radius={radius}
-                                        setRadius={setRadius}
-                                        busRadius={busRadius}
-                                        setBusRadius={setBusRadius}
+                                    <BusRouteTab
+                                        selectedVehicle={selectedVehicle}
+                                        lppRoute={lppRoute}
                                     />
                                 }
                             />
@@ -458,48 +445,6 @@ function App() {
                         </button>
                     </NavLink>
                 </nav>
-                <button
-                    className="fab"
-                    aria-label="Nastavitve"
-                    onClick={() => setIsSettingsOpen(true)}
-                >
-                    <Settings size={50} />
-                </button>
-                {isSettingsOpen && (
-                    <div
-                        className="modal-overlay"
-                        role="dialog"
-                        aria-modal="true"
-                        onClick={(e) => {
-                            if (e.currentTarget === e.target)
-                                setIsSettingsOpen(false);
-                        }}
-                    >
-                        <div className="modal">
-                            <div className="modal-header">
-                                <h3>Nastavitve</h3>
-                                <button
-                                    className="icon-button"
-                                    onClick={() => setIsSettingsOpen(false)}
-                                    aria-label="Zapri"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-                            <Suspense fallback={<div>Loading…</div>}>
-                                <SettingsTab
-                                    setActiveOperators={setActiveOperators}
-                                    activeOperators={activeOperators}
-                                    radius={radius}
-                                    setRadius={setRadius}
-                                    busRadius={busRadius}
-                                    setBusRadius={setBusRadius}
-                                    onClose={() => setIsSettingsOpen(false)}
-                                />
-                            </Suspense>
-                        </div>
-                    </div>
-                )}
             </div>
         </Router>
     );

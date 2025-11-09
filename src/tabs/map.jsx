@@ -183,7 +183,7 @@ const Map = React.memo(function Map({
 
         mapInstanceRef.current = map;
         map.addControl(
-            new maplibregl.NavigationControl({ showCompass: false }),
+            new maplibregl.NavigationControl({ showCompass: true }),
             "top-right"
         );
 
@@ -806,6 +806,7 @@ const Map = React.memo(function Map({
                     });
                 };
 
+                //popup za vlake
                 attachPopup("trainPositions-points", (p) => {
                     const number = p.id || p.St_vlaka || "";
                     const relation = p.relation || p.Relacija || "";
@@ -821,20 +822,32 @@ const Map = React.memo(function Map({
                     return (
                         `<div style="min-width:180px">` +
                         (number
-                            ? `<div style="font-weight:600">Vlak ${number}</div>`
+                            ? `<h3 style="font-weight:500">${relation}</h3>`
                             : "") +
-                        (relation ? `<div>Relacija: ${relation}</div>` : "") +
+                        (relation ? `<div>Vlak ${number}</div>` : "") +
                         (station
-                            ? `<div>Naslednja postaja: ${station}</div>`
+                            ? ` <div style="display:flex; justify-content:space-between; margin-top:6px">
+                                    <p style="color:gray">Naslednja postaja:</p>
+                                    <h4 style="font-weight:700">${station}</h4>
+                                </div>`
                             : "") +
-                        (departure ? `<div>Odhod: ${departure}</div>` : "") +
+                        (departure
+                            ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
+                                <p style="color:gray">Odhod:</p>
+                                <h4 style="font-weight:700">${departure}</h4>
+                               </div>`
+                            : "") +
                         (delay !== null
-                            ? `<div>Zamuda: ${delay} min</div>`
+                            ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
+                                    <p style="color:gray">Zamuda:</p>
+                                    <h4 style="font-weight:700">${delay} min</h4>
+                                </div>`
                             : "") +
                         `</div>`
                     );
                 });
 
+                //popup za buse in route
                 attachPopup(
                     "buses-points",
                     (p) => {
@@ -1011,7 +1024,9 @@ const Map = React.memo(function Map({
                 .addTo(map);
             if (popupText) {
                 m.setPopup(
-                    new maplibregl.Popup().setHTML(`<h4>${popupText}</h4>`)
+                    new maplibregl.Popup({ closeButton: false }).setHTML(
+                        `<h4>${popupText}</h4>`
+                    )
                 );
                 el.style.cursor = "pointer";
             }

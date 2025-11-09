@@ -47,6 +47,11 @@ const BusRouteTab = ({ selectedVehicle, lppRoute }) => {
                                                 {stop.arrivals[1].eta_min} min
                                             </p>
                                         )}
+                                        {stop.arrivals[2] && (
+                                            <p>
+                                                {stop.arrivals[2].eta_min} min
+                                            </p>
+                                        )}
                                     </span>
                                 </li>
                             ))}

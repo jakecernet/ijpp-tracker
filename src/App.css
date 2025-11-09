@@ -43,7 +43,6 @@ body {
     font-family: "Proxima Nova", Inter, system-ui, Avenir, Helvetica, Arial,
         sans-serif;
     color: var(--text);
-    min-height: 100vh;
 }
 
 .mobile-container {
@@ -58,6 +57,7 @@ body {
     flex: 1;
     overflow: hidden;
     padding: 12px;
+    text-align: center;
 }
 
 .insideDiv {
@@ -176,6 +176,7 @@ h2 {
         border-radius: 14px;
         color: var(--text);
         box-shadow: var(--shadow);
+        text-align: center;
     }
 
     .stops {
