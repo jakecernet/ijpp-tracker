@@ -3,29 +3,24 @@ import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings, X, ArrowRightLeft } from "lucide-react";
 import "./App.css";
 
-import busStopsSource from "./unified_stops.json";
+import busStopsSource from "./unified_stops_with_gtfs.json";
 
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const BusRouteTab = lazy(() => import("./tabs/busRoute"));
 
-const ijppArrivalsLink =
-    "https://tracker.cernetic.cc/api/ijpp-arrivals?stop-id=";
-const lppArrivalsLink =
-    "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
+import {
+    fetchLPPPositions,
+    fetchIJPPPositions,
+    fetchTrainPositions,
+    fetchLppArrivals,
+    fetchIjppArrivals,
+    fetchLppRoute,
+} from "./Api.jsx";
+import { se } from "date-fns/locale";
 
-const lppLocationsLink =
-    "https://mestnipromet.cyou/api/v1/resources/buses/info";
-const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
-
-const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
-
-async function fetchJson(url) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-}
+// arrival/route fetching moved to src/Api.jsx
 
 function App() {
     const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
@@ -38,15 +33,6 @@ function App() {
         localStorage.getItem("userLocation")
             ? JSON.parse(localStorage.getItem("userLocation"))
             : [46.056, 14.5058]
-    );
-    const [activeOperators, setActiveOperators] = useState(
-        localStorage.getItem("activeOperators")
-            ? JSON.parse(localStorage.getItem("activeOperators"))
-            : ["lpp", "arriva", "nomago", "murska"]
-    );
-    const [radius, setRadius] = useState(localStorage.getItem("radius") || 20);
-    const [busRadius, setBusRadius] = useState(
-        localStorage.getItem("busRadius") || 20
     );
 
     const [gpsPositions, setGpsPositions] = useState([]);
@@ -100,102 +86,30 @@ function App() {
         }
     }, [activeStation]);
 
-    // Fetch GPS positions for LPP buses
+    //Fetch train and bus positions periodically
     useEffect(() => {
-        const fetchLPPPositions = async () => {
-            try {
-                const data = await fetchJson(lppLocationsLink);
+        setInterval(() => {
+            const fetchPositions = async () => {
+                try {
+                    const [lpp, ijpp, trains] = await Promise.all([
+                        fetchLPPPositions(),
+                        fetchIJPPPositions(),
+                        fetchTrainPositions(),
+                    ]);
 
-                const lppPositions = data.data
-                    .filter(() => activeOperators.includes("lpp"))
-                    .map((bus) => ({
-                        gpsLocation: [bus.latitude, bus.longitude],
-                        operator:
-                            "Javno podjetje Ljubljanski potniški promet d.o.o.",
-                        lineNumber: bus.line_number,
-                        lineId: bus.line_id,
-                        lineName: bus.line_name,
-                        lineDestination: bus.line_destination,
-                        speed: bus.speed,
-                        busName: bus.bus_name,
-                        ignition: bus.ignition,
-                        tripId: bus.trip_id,
-                    }));
+                    const lppPositions = Array.isArray(lpp) ? lpp : [];
+                    const ijppPositions = Array.isArray(ijpp) ? ijpp : [];
+                    const trainPositions = Array.isArray(trains) ? trains : [];
 
-                setGpsPositions(lppPositions);
-            } catch (error) {
-                console.error("Error fetching lpp positions:", error);
-            }
-        };
+                    setGpsPositions([...lppPositions, ...ijppPositions]);
+                    setTrainPositions(trainPositions);
+                } catch (error) {
+                    console.error("Error fetching positions:", error);
+                }
+            };
 
-        fetchLPPPositions();
-        const intervalId = setInterval(fetchLPPPositions, 30000);
-        return () => clearInterval(intervalId);
-    }, [activeOperators]);
-
-    // Fetch GPS positions for other buses (Arriva, Nomago...)
-    useEffect(() => {
-        const fetchIJPPPositions = async () => {
-            try {
-                const data = await fetchJson(ijppLocationsLink);
-                const ijppPositions = Array.isArray(data)
-                    ? data.map((vehicle) => ({
-                          gpsLocation: [
-                              parseFloat(vehicle?.VehicleLocation?.Latitude) ||
-                                  0,
-                              parseFloat(vehicle?.VehicleLocation?.Longitude) ||
-                                  0,
-                          ],
-                          operator:
-                              vehicle?.OperatorData?.agency_name ||
-                              vehicle?.OperatorRef ||
-                              "",
-                          lineName:
-                              vehicle?.PublishedLineName ||
-                              vehicle?.LineRef ||
-                              "",
-                          journeyPatternId:
-                              vehicle?.JourneyPatternRef ||
-                              vehicle?.JourneyPatternName ||
-                              null,
-                          tripId:
-                              vehicle?.LineData?.tripId ||
-                              vehicle?.LineData?.trip?.trip_id ||
-                              null,
-                          routeId:
-                              vehicle?.LineData?.trip?.route_id ||
-                              vehicle?.LineData?.trip?.routeId ||
-                              null,
-                          stops: vehicle?.LineData?.stops || [],
-                      }))
-                    : [];
-                setGpsPositions((prevPositions) => [
-                    ...prevPositions,
-                    ...ijppPositions,
-                ]);
-            } catch (error) {
-                console.error("Error fetching ijpp positions:", error);
-            }
-        };
-        fetchIJPPPositions();
-        const intervalId = setInterval(fetchIJPPPositions, 30000);
-        return () => clearInterval(intervalId);
-    }, [activeOperators]);
-
-    // Fetch positions of Slovenske železnice trains
-    useEffect(() => {
-        const fetchTrainPositions = async () => {
-            try {
-                const data = await fetchJson(
-                    "https://api.modra.ninja/sz/lokacije_raw"
-                );
-                setTrainPositions(data);
-            } catch (error) {
-                console.error("Error fetching train positions:", error);
-            }
-        };
-
-        fetchTrainPositions();
+            fetchPositions();
+        }, 15000);
     }, []);
 
     // Fetch positions of Slovenske železnice train stops (ne dela api)
@@ -238,96 +152,55 @@ function App() {
 
     // LPP arrivals
     useEffect(() => {
-        const fetchLppArrivals = async () => {
+        const load = async () => {
             const lppCode = activeStation?.ref_id;
             if (!lppCode) {
                 setLppArrivals([]);
                 return;
             }
             try {
-                if (!activeOperators.includes("lpp")) {
-                    setLppArrivals([]);
-                    return;
-                }
-
-                const raw = await fetchJson(lppArrivalsLink + lppCode);
-
-                const list = Array.isArray(raw?.data?.arrivals)
-                    ? raw.data.arrivals
-                    : [];
-
-                const arrivals = list
-                    .map((arrival) => ({
-                        etaMinutes: arrival.eta_min,
-                        routeName: arrival.route_name,
-                        tripName: arrival.trip_name,
-                        routeId: arrival.route_id,
-                        tripId: arrival.trip_id,
-                        vehicleId: arrival.vehicle_id,
-                        type: arrival.type,
-                        depot: arrival.depot,
-                        from: arrival.stations?.departure,
-                        to: arrival.stations?.arrival,
-                    }))
-                    .sort((a, b) => a.etaMinutes - b.etaMinutes);
-
+                const arrivals = await fetchLppArrivals(lppCode);
                 setLppArrivals(arrivals);
-                console.log("LPP arrivals fetched:", raw);
             } catch (error) {
-                console.error("Error fetching LPP arrivals:", error);
+                console.error("Error loading LPP arrivals:", error);
+                setLppArrivals([]);
             }
         };
-        fetchLppArrivals();
-    }, [activeStation, activeOperators]);
+        load();
+    }, [activeStation]);
 
     // IJPP arrivals
     useEffect(() => {
-        const fetchIjppArrivals = async () => {
+        const load = async () => {
             const ijppId = activeStation?.ijpp_id;
             if (!ijppId) {
                 setIjppArrivals([]);
                 return;
             }
             try {
-                const raw = await fetchJson(ijppArrivalsLink + ijppId);
-                const list = Array.isArray(raw?.routes) ? raw.routes : [];
-                const arrivals = list
-                    .map((arrival) => ({
-                        name:
-                            arrival.trips.first_stop +
-                            " - " +
-                            arrival.trips.last_stop,
-                        arrivalTime: arrival.trips.stop_times.arrival_time,
-                    }))
-                    .sort((a, b) => a.etaMinutes - b.etaMinutes);
+                const arrivals = await fetchIjppArrivals(ijppId);
                 setIjppArrivals(arrivals);
-                console.log("IJPP arrivals fetched:", raw);
             } catch (error) {
-                console.error("Error fetching IJPP arrivals:", error);
+                console.error("Error loading IJPP arrivals:", error);
+                setIjppArrivals([]);
             }
         };
-        fetchIjppArrivals();
-    }, [activeStation, activeOperators]);
+        load();
+    }, [activeStation]);
 
     // LPP route
     useEffect(() => {
-        const fetchLppRoute = async () => {
-            if (!selectedVehicle) {
-                return;
-            }
+        const load = async () => {
+            if (!selectedVehicle) return;
             try {
-                const raw = await fetchJson(
-                    lppRouteLink + selectedVehicle.tripId
-                );
-                const route = raw?.data;
+                const route = await fetchLppRoute(selectedVehicle.tripId);
                 setLppRoute(route);
-                console.log("LPP route fetched:", raw);
             } catch (error) {
-                console.error("Error fetching LPP route:", error);
+                console.error("Error loading LPP route:", error);
             }
         };
-        fetchLppRoute();
-    }, [selectedVehicle, activeOperators]);
+        load();
+    }, [selectedVehicle]);
 
     return (
         <Router>
