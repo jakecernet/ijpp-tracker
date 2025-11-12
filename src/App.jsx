@@ -17,10 +17,9 @@ import {
     fetchLppArrivals,
     fetchIjppArrivals,
     fetchLppRoute,
+    fetchSzStops,
+    fetchSzTrip,
 } from "./Api.jsx";
-import { se } from "date-fns/locale";
-
-// arrival/route fetching moved to src/Api.jsx
 
 function App() {
     const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
@@ -67,6 +66,7 @@ function App() {
     const [lppArrivals, setLppArrivals] = useState([]);
 
     const [lppRoute, setLppRoute] = useState([]);
+    const [szRoute, setSzRoute] = useState([]);
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -197,6 +197,34 @@ function App() {
                 setLppRoute(route);
             } catch (error) {
                 console.error("Error loading LPP route:", error);
+            }
+        };
+        load();
+    }, [selectedVehicle]);
+
+    // Fetch SZ stops
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const stops = await fetchSzStops();
+                setSzStops(stops);
+                console.log("SZ stops loaded:", stops);
+            } catch (error) {
+                console.error("Error loading SZ stops:", error);
+            }
+        };
+        load();
+    }, []);
+
+    // Fetch SZ trip info
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const route = await fetchSzTrip("20251112_19%3A32_sz_434288");
+                setSzRoute(route);
+                console.log("SZ route loaded:", route);
+            } catch (error) {
+                console.error("Error loading SZ route:", error);
             }
         };
         load();

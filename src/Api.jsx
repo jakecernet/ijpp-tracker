@@ -13,13 +13,27 @@ const ijppArrivalsLink =
 const lppArrivalsLink =
     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
+const szRouteLink =
+    "https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
 
+const szStopsLink =
+    "https://mapper-motis.ojpp-gateway.derp.si/api/v1/map/stops?min=49.415360776528956%2C7.898969151846785&max=36.38523043114108%2C26.9347879737411&zoom=20";
+
+/**
+ * Fetches JSON data from a given URL
+ * @param {*} url - Link
+ * @returns JSON data
+ */
 async function fetchJson(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
 }
 
+/**
+ * Fetches LPP bus positions
+ * @returns Array of LPP bus positions
+ */
 const fetchLPPPositions = async () => {
     try {
         const data = await fetchJson(lppLocationsLink);
@@ -43,6 +57,10 @@ const fetchLPPPositions = async () => {
     }
 };
 
+/**
+ * Fetches IJPP vehicle positions
+ * @returns Array of IJPP vehicle positions
+ */
 const fetchIJPPPositions = async () => {
     try {
         const data = await fetchJson(ijppLocationsLink);
@@ -80,6 +98,10 @@ const fetchIJPPPositions = async () => {
     }
 };
 
+/**
+ * Fetches SZ train positions
+ * @returns Array of SZ train positions
+ */
 const fetchTrainPositions = async () => {
     try {
         const data = await fetchJson(szLocationsLink);
@@ -117,6 +139,11 @@ const fetchTrainPositions = async () => {
     }
 };
 
+/**
+ * Helper function to decode a polyline string into coordinates
+ * @param {string} str - Encoded polyline string
+ * @returns {Array} Array of [longitude, latitude] coordinates
+ */
 function decodePolyline(str) {
     let index = 0,
         lat = 0,
@@ -150,6 +177,11 @@ function decodePolyline(str) {
     return coordinates;
 }
 
+/**
+ * Fetches LPP arrivals for a given station code
+ * @param {string} stationCode - Station code
+ * @returns Array of arrivals
+ */
 const fetchLppArrivals = async (stationCode) => {
     if (!stationCode) return [];
     try {
@@ -178,6 +210,11 @@ const fetchLppArrivals = async (stationCode) => {
     }
 };
 
+/**
+ * Fetches IJPP arrivals for a given IJPP stop ID
+ * @param {string} ijppId - IJPP stop ID
+ * @returns Array of arrivals
+ */
 const fetchIjppArrivals = async (ijppId) => {
     if (!ijppId) return [];
     try {
@@ -204,6 +241,11 @@ const fetchIjppArrivals = async (ijppId) => {
     }
 };
 
+/**
+ * Fetches LPP route details for a given trip ID
+ * @param {string} tripId - Trip ID
+ * @returns Route details
+ */
 const fetchLppRoute = async (tripId) => {
     if (!tripId) return null;
     try {
@@ -215,5 +257,80 @@ const fetchLppRoute = async (tripId) => {
     }
 };
 
+/**
+ * Fetches SZ trip details for a given trip ID
+ * @param {string} tripId - Trip ID
+ * @returns Trip details
+ */
+const fetchSzTrip = async (tripId) => {
+    if (!tripId) return null;
+    try {
+        const fetched = await fetchJson(szRouteLink + tripId);
+        const raw = fetched?.legs || null;
+        const data = Array.isArray(raw)
+            ? [
+                  {
+                      from: {
+                          name: raw[0]?.from?.name || "",
+                          stopId: raw[0]?.from?.stopId || "",
+                          gpsLocation: [
+                              raw[0]?.from?.lat || 0,
+                              raw[0]?.from?.lon || 0,
+                          ],
+                          departure: raw[0]?.from?.departure || "",
+                      },
+
+                      to: {
+                          name: raw[0]?.to?.name || "",
+                          stopId: raw[0]?.to?.stopId || "",
+                          gpsLocation: [
+                              raw[0]?.to?.lat || 0,
+                              raw[0]?.to?.lon || 0,
+                          ],
+                          arrival: raw[0]?.to?.arrival || "",
+                      },
+
+                      tripName: raw[0]?.headsign || "",
+                      duration: raw[0]?.duration || "",
+                      startTime: raw[0]?.startTime || "",
+                      endTime: raw[0]?.endTime || "",
+                      realTime: raw[0]?.realTime || false,
+                      tripId: raw[0]?.tripId || "",
+                      shortName: raw[0]?.routeShortName || "",
+                      stops: raw[0]?.intermediateStops.map((stop) => ({
+                          name: stop?.name || "",
+                          stopId: stop?.stopId || "",
+                          gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+                          arrival: stop?.arrival || "",
+                          departure: stop?.departure || "",
+                      })),
+                  },
+              ]
+            : null;
+        return data;
+    } catch (error) {
+        console.error("Error fetching SZ trip:", error);
+        return null;
+    }
+};
+
+/**
+ * Fetches stops for sz trains
+ * @returns Array of stops
+ */
+const fetchSzStops = async () => {
+    try {
+        const raw = await fetchJson(szStopsLink);
+        const filtered = Array.isArray(raw)
+            ? raw.filter((stop) => stop.stopId.slice(0, 2) === "sz")
+            : [];
+        return filtered;
+    } catch (error) {
+        console.error("Error fetching SZ stops:", error);
+        return [];
+    }
+};
+
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
 export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute };
+export { fetchSzStops, fetchSzTrip };

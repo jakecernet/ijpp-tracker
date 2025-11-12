@@ -33,6 +33,7 @@ const OSM_RASTER_STYLE = {
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         },
     },
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
 
@@ -375,13 +376,13 @@ function renderTrainPopup(properties) {
         (number ? `<div>Vlak ${escapeHTML(number)}</div>` : "") +
         (departure
             ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
-                    <p style="color:gray">Odhod:</p>
+                    <p style="color:gray">Odhod iz prejšnje postaje:</p>
                     <h4 style="font-weight:700">${escapeHTML(departure)}</h4>
                 </div>`
             : "") +
         (arrival !== null
             ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
-                    <p style="color:gray">Prihod:</p>
+                    <p style="color:gray">Prihod na naslednjo postajo:</p>
                     <h4 style="font-weight:700">${escapeHTML(arrival)}</h4>
                 </div>`
             : "") +
@@ -1027,7 +1028,7 @@ const Map = React.memo(function Map({
             map.remove();
             mapInstanceRef.current = null;
         };
-    }, [busesGeoJSON, busStopsGeoJSON, trainPositionsGeoJSON]);
+    }, []);
 
     useEffect(() => {
         const map = mapInstanceRef.current;

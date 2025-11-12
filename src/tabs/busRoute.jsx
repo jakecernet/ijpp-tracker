@@ -17,8 +17,8 @@ const BusRouteTab = ({ selectedVehicle, lppRoute }) => {
             <div className="stops">
                 <h2>Postaje na poti:</h2>
                 <ul>
-                    {selectedVehicle?.stops?.map((stop) => (
-                        <li>
+                    {selectedVehicle?.stops?.map((stop, key) => (
+                        <li key={key}>
                             <h3>
                                 {stop.stop_name}
                             </h3>
