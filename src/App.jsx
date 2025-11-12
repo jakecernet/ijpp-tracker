@@ -3,14 +3,13 @@ import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, Settings, X, ArrowRightLeft } from "lucide-react";
 import "./App.css";
 
-import busStopsSource from "./unified_stops_with_gtfs.json";
-
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const BusRouteTab = lazy(() => import("./tabs/busRoute"));
 
 import {
+    fetchAllBusStops,
     fetchLPPPositions,
     fetchIJPPPositions,
     fetchTrainPositions,
@@ -47,19 +46,7 @@ function App() {
         }
     });
 
-    const [busStops] = useState(
-        Array.isArray(busStopsSource)
-            ? busStopsSource.map((s) => ({
-                  name: s.name,
-                  refID: s.ref_id ? s.ref_id : null,
-                  ijppID: s.ijpp_id ? s.ijpp_id : null,
-                  gpsLocation: [s.latitude, s.longitude],
-                  busLines: s.route_groups_on_station
-                      ? s.route_groups_on_station
-                      : [],
-              }))
-            : []
-    );
+    const [busStops, setBusStops] = useState([]);
     const [szStops, setSzStops] = useState([]);
 
     const [ijppArrivals, setIjppArrivals] = useState([]);
@@ -85,6 +72,20 @@ function App() {
             setCurrentUrl("/map");
         }
     }, [activeStation]);
+
+    // Fetch all bus stops
+    useEffect(() => {
+        const loadBusStops = async () => {
+            try {
+                const stops = await fetchAllBusStops();
+                setBusStops(stops);
+            } catch (error) {
+                console.error("Error loading bus stops:", error);
+                setBusStops([]);
+            }
+        };
+        loadBusStops();
+    }, []);
 
     //Fetch train and bus positions periodically
     useEffect(() => {
@@ -219,7 +220,7 @@ function App() {
     // Fetch SZ trip info
     useEffect(() => {
         const load = async () => {
-            if(!selectedVehicle) return;
+            if (!selectedVehicle) return;
             try {
                 const route = await fetchSzTrip(selectedVehicle.tripId);
                 setSzRoute(route ?? []);

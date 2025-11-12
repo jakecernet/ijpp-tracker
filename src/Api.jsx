@@ -1,6 +1,10 @@
 const now = new Date();
 const later = new Date(now.getTime() + 60000); // 1 minute window
 
+const busStopsLink =
+    "https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/unified_stops_with_gtfs.json";
+
+
 const lppLocationsLink =
     "https://mestnipromet.cyou/api/v1/resources/buses/info";
 const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
@@ -18,6 +22,48 @@ const szRouteLink =
 
 const szStopsLink =
     "https://mapper-motis.ojpp-gateway.derp.si/api/v1/map/stops?min=49.415360776528956%2C7.898969151846785&max=36.38523043114108%2C26.9347879737411&zoom=20";
+
+/**
+ *  Fetches all bus stops
+ *  @returns Array of bus stops 
+*/
+const fetchAllBusStops = async () => {
+    try {
+        const raw = await fetchJson(busStopsLink);
+        const list = Array.isArray(raw) ? raw : [];
+
+        return list
+            .map((stop) => {
+                const latitude = Number(stop.latitude ?? stop.lat ?? stop["Latitude"]);
+                const longitude = Number(stop.longitude ?? stop.lon ?? stop["Longitude"]);
+                const gpsLocation = Array.isArray(stop.gpsLocation)
+                    ? stop.gpsLocation
+                    : [latitude, longitude];
+
+                if (!Number.isFinite(gpsLocation?.[0]) || !Number.isFinite(gpsLocation?.[1])) {
+                    return null;
+                }
+
+                const refId = stop.ref_id ?? stop.refID ?? stop.refId ?? null;
+                const ijppId = stop.ijpp_id ?? stop.ijppID ?? stop.ijppId ?? null;
+
+                return {
+                    ...stop,
+                    name: stop.name ?? stop.stop_name ?? "",
+                    gpsLocation: gpsLocation,
+                    coordinates: gpsLocation,
+                    ref_id: refId,
+                    refID: refId,
+                    ijpp_id: ijppId,
+                    ijppID: ijppId,
+                };
+            })
+            .filter(Boolean);
+    } catch (error) {
+        console.error("Error fetching bus stops:", error);
+        return [];
+    }
+};
 
 /**
  * Fetches JSON data from a given URL
@@ -334,3 +380,4 @@ const fetchSzStops = async () => {
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
 export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute };
 export { fetchSzStops, fetchSzTrip };
+export { fetchAllBusStops };
