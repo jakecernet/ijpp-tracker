@@ -362,18 +362,19 @@ function renderDefaultBusPopup(properties) {
 }
 
 function renderTrainPopup(properties) {
-    const number = properties.id || properties.St_vlaka || "";
+    const number = properties.tripShort || properties.id || "";
     const fromStation = properties.fromStation;
     const toStation = properties.toStation;
     const departure = properties.departure || properties.Odhod || "";
     const arrival = properties.arrival;
 
     return (
-        `<div style="min-width:200px">` +
-        /* (relation
-            ? `<h3 style="font-weight:500">${escapeHTML(relation)}</h3>`
-            : "") + */
-        (number ? `<div>Vlak ${escapeHTML(number)}</div>` : "") +
+        `<div style="min-width:220px">` +
+        (number
+            ? `<div style="font-weight:600; font-size:16px; margin-bottom:4px">${escapeHTML(
+                  number
+              )}</div>`
+            : "") +
         (departure
             ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
                     <p style="color:gray">Odhod iz prejšnje postaje:</p>
@@ -398,6 +399,7 @@ function renderTrainPopup(properties) {
                 <p>${escapeHTML(toStation)}</p>
               </div>`
             : "") +
+        `<button type="button" class="popup-button" data-role="view-sz-route" style="margin-top:12px; width:100%">Prikaži linijo</button>` +
         `</div>`
     );
 }
@@ -668,8 +670,71 @@ function configureBusStopPopup({ map, onSelectStop }) {
     });
 }
 
-function configureTrainPopup(map) {
-    attachPopup(map, "trainPositions-points", renderTrainPopup);
+function configureTrainPopup({ map, onSelectVehicle, onNavigateRoute }) {
+    attachPopup(
+        map,
+        "trainPositions-points",
+        renderTrainPopup,
+        (popup, properties) => {
+            if (!properties) return;
+            const container = popup.getElement();
+            if (!container) return;
+            const button = container.querySelector(
+                '[data-role="view-sz-route"]'
+            );
+            if (!button) return;
+
+            button.addEventListener(
+                "click",
+                (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    let from = properties.from;
+                    let to = properties.to;
+
+                    if (typeof from === "string") {
+                        try {
+                            from = JSON.parse(from);
+                        } catch (error) {
+                            console.warn(
+                                "Ne morem razvozljati podatkov 'from':",
+                                error
+                            );
+                            from = null;
+                        }
+                    }
+
+                    if (typeof to === "string") {
+                        try {
+                            to = JSON.parse(to);
+                        } catch (error) {
+                            console.warn(
+                                "Ne morem razvozljati podatkov 'to':",
+                                error
+                            );
+                            to = null;
+                        }
+                    }
+
+                    onSelectVehicle({
+                        tripId: properties.tripId || null,
+                        tripShort: properties.tripShort || null,
+                        departure: properties.departure || null,
+                        arrival: properties.arrival || null,
+                        realTime:
+                            properties.realTime === true ||
+                            properties.realTime === "true",
+                        from,
+                        to,
+                    });
+                    onNavigateRoute();
+                    popup.remove();
+                },
+                { once: true }
+            );
+        }
+    );
 }
 
 function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
@@ -928,21 +993,32 @@ const Map = React.memo(function Map({
                     if (!coord) return null;
                     const [lng, lat] = String(coord)
                         .split(",")
-                        .map((value) => Number(value.trim()));
+                        .map((value) => Number(value.trim()))
+                        .slice(0, 2);
                     if (!Number.isFinite(lat) || !Number.isFinite(lng))
                         return null;
                     return [lat, lng];
                 },
-                (train) => ({
-                    id: train?.tripId,
-                    relation: train?.from.name + " - " + train?.to.name,
-                    fromStation: train?.from.name,
-                    toStation: train?.to.name,
-                    departure: train?.departure,
-                    arrival: train?.arrival,
-                    icon: "train",
-                    brand: "sz",
-                })
+                (train) => {
+                    const relation = [train?.from?.name, train?.to?.name]
+                        .filter(Boolean)
+                        .join(" - ");
+                    return {
+                        id: train?.tripId,
+                        relation,
+                        fromStation: train?.from?.name,
+                        toStation: train?.to?.name,
+                        departure: train?.departure,
+                        arrival: train?.arrival,
+                        icon: "train",
+                        brand: "sz",
+                        tripId: train?.tripId ?? null,
+                        tripShort: train?.tripShort ?? null,
+                        realTime: train?.realtime ?? false,
+                        from: JSON.stringify(train?.from ?? null),
+                        to: JSON.stringify(train?.to ?? null),
+                    };
+                }
             ),
         [trainPositions]
     );
@@ -999,28 +1075,36 @@ const Map = React.memo(function Map({
                 },
             });
 
-            configureTrainPopup(map);
+            const handleSelectVehicle = (vehicle) => {
+                const { setSelectedVehicle: applySelectedVehicle } =
+                    handlersRef.current;
+                try {
+                    localStorage.setItem(
+                        "selectedBusRoute",
+                        JSON.stringify(vehicle)
+                    );
+                } catch (err) {
+                    console.warn("Shranjevanje ni uspelo:", err);
+                }
+                applySelectedVehicle(vehicle);
+            };
+
+            const handleNavigateRoute = () => {
+                const { setCurrentUrl: applyUrl } = handlersRef.current;
+                applyUrl("/route");
+                window.location.hash = "/route";
+            };
+
+            configureTrainPopup({
+                map,
+                onSelectVehicle: handleSelectVehicle,
+                onNavigateRoute: handleNavigateRoute,
+            });
 
             configureBusPopup({
                 map,
-                onSelectVehicle: (vehicle) => {
-                    const { setSelectedVehicle: applySelectedVehicle } =
-                        handlersRef.current;
-                    try {
-                        localStorage.setItem(
-                            "selectedBusRoute",
-                            JSON.stringify(vehicle)
-                        );
-                    } catch (err) {
-                        console.warn("Shranjevanje ni uspelo:", err);
-                    }
-                    applySelectedVehicle(vehicle);
-                },
-                onNavigateRoute: () => {
-                    const { setCurrentUrl: applyUrl } = handlersRef.current;
-                    applyUrl("/route");
-                    window.location.hash = "/route";
-                },
+                onSelectVehicle: handleSelectVehicle,
+                onNavigateRoute: handleNavigateRoute,
             });
         });
 

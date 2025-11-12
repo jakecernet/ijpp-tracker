@@ -219,12 +219,14 @@ function App() {
     // Fetch SZ trip info
     useEffect(() => {
         const load = async () => {
+            if(!selectedVehicle) return;
             try {
-                const route = await fetchSzTrip("20251112_19%3A32_sz_434288");
-                setSzRoute(route);
+                const route = await fetchSzTrip(selectedVehicle.tripId);
+                setSzRoute(route ?? []);
                 console.log("SZ route loaded:", route);
             } catch (error) {
                 console.error("Error loading SZ route:", error);
+                setSzRoute([]);
             }
         };
         load();
@@ -293,6 +295,7 @@ function App() {
                                     <BusRouteTab
                                         selectedVehicle={selectedVehicle}
                                         lppRoute={lppRoute}
+                                        szRoute={szRoute}
                                     />
                                 }
                             />
