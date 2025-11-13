@@ -2,7 +2,14 @@ import { useState, useEffect, useMemo } from "react";
 import { format, formatDistanceToNow, set } from "date-fns";
 import { sl } from "date-fns/locale";
 
-const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
+const ArrivalsTab = ({
+    activeStation,
+    stopArrivals,
+    lppArrivals,
+    szArrivals,
+    getSzTripFromId,
+    setCurrentUrl,
+}) => {
     const [arrivals, setArrivals] = useState([]);
     const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -80,6 +87,12 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
         );
     }, [arrivals, searchTerm]);
 
+    const filteredSzArrivals = useMemo(() => {
+        return szArrivals?.stopTimes?.filter((arrival) =>
+            arrival.headsign.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [szArrivals, searchTerm]);
+
     const formatArrivalTime = (arrivalTime) => {
         if (!arrivalTime) return "N/A";
         return format(arrivalTime, "HH:mm", { locale: sl });
@@ -91,6 +104,20 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
             addSuffix: false,
             locale: sl,
         });
+    };
+
+    const formatDelay = (scheduledDeparture, actualDeparture) => {
+        if (!scheduledDeparture || !actualDeparture) return "N/A";
+
+        const scheduled = new Date(scheduledDeparture);
+        const actual = new Date(actualDeparture);
+
+        if (isNaN(scheduled) || isNaN(actual)) return "N/A";
+
+        const diffMinutes = Math.round((actual - scheduled) / 60000);
+
+        if (diffMinutes === 0) return " 0 min";
+        return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
     };
 
     const shortenOperatorName = (operator) => {
@@ -139,9 +166,6 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
                 {!stationSelected && (
                     <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
                 )}
-                {stationSelected && !error && filteredArrivals.length === 0 && (
-                    <p>Ni prihajajočih prihodov za izbrano postajo.</p>
-                )}
                 {!error &&
                     lppArrivals.map((arrival, index) => (
                         <div
@@ -163,6 +187,31 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
                 {!stationSelected && (
                     <p>Ni prihajajočih prihodov za izbrano postajo.</p>
                 )}
+                {filteredSzArrivals?.map((arrival, index) => (
+                    <div
+                        key={index}
+                        className="sz-arrival-item arrival-item"
+                        onClick={() => {
+                            getSzTripFromId(arrival.tripId);
+                            setCurrentUrl("/route");
+                            window.location.hash = "/route";
+                        }}
+                    >
+                        <h2>{arrival.headsign}</h2>
+                        <h2>
+                            {formatArrivalTime(arrival.place.departure)} (
+                            {formatRelativeTime(arrival.place.departure)})
+                        </h2>
+                        <p>
+                            Zamuda:
+                            {formatDelay(
+                                arrival.place.scheduledDeparture,
+                                arrival.place.departure
+                            )}
+                        </p>
+                        <p>SŽ - Potniški promet d.o.o.</p>
+                    </div>
+                ))}
             </div>
         </div>
     );

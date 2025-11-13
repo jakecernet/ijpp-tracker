@@ -123,6 +123,13 @@ h2 {
     height: calc(100vh - 240px);
 }
 
+.sz-arrival-item{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    align-items: center;
+    gap: 12px;
+}
+
 .lpp-arrival-item {
     display: flex;
     align-items: center;
@@ -234,6 +241,7 @@ h2 {
     border-radius: 12px;
     margin-top: 6px;
     padding-right: 6px;
+    text-align: left;
 }
 
 .station-item {
@@ -242,53 +250,6 @@ h2 {
     gap: 12px;
 }
 
-/* Settings layout */
-.settings {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-.setting-item {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-.setting-item ul {
-    list-style: none;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.setting-item ul div {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-.setting-item label {
-    font-size: 15px;
-    color: var(--text);
-}
-.setting-item input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-}
-.setting-item input[type="range"] {
-    width: 100%;
-}
-
-.save-button {
-    background: linear-gradient(135deg, var(--brand), var(--brand-2));
-    color: #fff;
-    border: none;
-    padding: 12px 14px;
-    border-radius: 12px;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-/* Bottom nav (glass) */
 .bottom-nav {
     display: flex;
     justify-content: space-around;
@@ -319,66 +280,6 @@ h2 {
     margin-top: 5px;
 }
 
-.fab {
-    position: fixed;
-    z-index: 1000;
-    right: 50px;
-    bottom: 120px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: 1px solid var(--stroke);
-    background: linear-gradient(
-        135deg,
-        rgba(46, 74, 138, 0.5),
-        rgba(66, 49, 139, 0.5)
-    );
-    color: var(--text);
-    backdrop-filter: var(--blur);
-    box-shadow: var(--shadow);
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    svg {
-        width: 35px;
-        height: 35px;
-    }
-}
-
-.fab:hover {
-    filter: brightness(1.1);
-}
-
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    z-index: 1000;
-}
-
-.modal {
-    width: min(680px, 96vw);
-    max-height: 86vh;
-    overflow: auto;
-    background: var(--card);
-    backdrop-filter: var(--blur);
-    border: 1px solid var(--stroke);
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: var(--shadow);
-}
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
 .icon-button {
     background: none;
     border: 1px solid var(--stroke);

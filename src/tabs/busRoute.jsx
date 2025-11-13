@@ -1,4 +1,4 @@
-const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute }) => {
+const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute, setCurrentUrl, setActiveStation }) => {
     const isLPP = selectedVehicle?.lineNumber != null;
     const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
     const szTrip = isSZ && Array.isArray(szRoute) ? szRoute[0] : null;
@@ -45,7 +45,13 @@ const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute }) => {
                         {isLPP && (
                             <ul>
                                 {lppRoute?.map((stop) => (
-                                    <li>
+                                    <li key={stop.stop_id} onClick={() => {
+                                        console.log("Clicked stop:", stop);
+                                        setActiveStation(stop);
+                                        localStorage.setItem("activeStation", JSON.stringify(stop));
+                                        setCurrentUrl("/arrivals");
+                                        window.location.hash = "/arrivals";
+                                    }}>
                                         <h3>{stop.name}</h3>
                                         <span
                                             style={{
@@ -101,7 +107,12 @@ const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute }) => {
                                     </span>
                                 </li>
                                 {szStops.map((stop) => (
-                                    <li key={stop.stopId || stop.name}>
+                                    <li key={stop.stopId || stop.name} onClick={() => {
+                                        console.log("Clicked stop:", stop);
+                                        setActiveStation(stop);
+                                        setCurrentUrl("/arrivals");
+                                        window.location.hash = "/arrivals";
+                                    }}>
                                         <h4>{stop.name}</h4>
                                         <span
                                             style={{

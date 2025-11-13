@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin, Settings, X, ArrowRightLeft } from "lucide-react";
+import { Map, Clock, MapPin, ArrowRightLeft } from "lucide-react";
 import "./App.css";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -18,6 +18,7 @@ import {
     fetchLppRoute,
     fetchSzStops,
     fetchSzTrip,
+    fetchSzArrivals,
 } from "./Api.jsx";
 
 function App() {
@@ -51,11 +52,29 @@ function App() {
 
     const [ijppArrivals, setIjppArrivals] = useState([]);
     const [lppArrivals, setLppArrivals] = useState([]);
+    const [szArrivals, setSzArrivals] = useState([]);
 
     const [lppRoute, setLppRoute] = useState([]);
     const [szRoute, setSzRoute] = useState([]);
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    const getSzTripFromId = async (tripId) => {
+        try {
+            const route = await fetchSzTrip(tripId);
+            setSzRoute(route ?? []);
+            localStorage.setItem(
+                "selectedBusRoute",
+                JSON.stringify({
+                    tripId: tripId,
+                    tripName: route[0]?.tripName,
+                    shortName: route[0]?.shortName,
+                })
+            );
+        } catch (error) {
+            console.error("Error loading SZ trip from ID:", error);
+        }
+    };
 
     useEffect(() => {
         if (!isSettingsOpen) return;
@@ -113,23 +132,6 @@ function App() {
         }, 15000);
     }, []);
 
-    // Fetch positions of Slovenske železnice train stops (ne dela api)
-    /* useEffect(() => {
-        const fetchszStops = async () => {
-            try {
-                const data = await fetchJson(
-                    "https://tracker.cernetic.cc/api/sz-stops"
-                );
-                setSzStops(data);
-                console.log("Train stops fetched:", data);
-            } catch (error) {
-                console.error("Error fetching train stops:", error);
-            }
-        };
-
-        fetchszStops();
-    }, []); */
-
     // Get user's location
     useEffect(() => {
         if (navigator.geolocation) {
@@ -181,9 +183,26 @@ function App() {
             try {
                 const arrivals = await fetchIjppArrivals(ijppId);
                 setIjppArrivals(arrivals);
+                console.log("IJPP arrivals loaded:", arrivals);
             } catch (error) {
                 console.error("Error loading IJPP arrivals:", error);
                 setIjppArrivals([]);
+            }
+        };
+        load();
+    }, [activeStation]);
+
+    // SZ arrivals
+    useEffect(() => {
+        const load = async () => {
+            const szId = activeStation?.stopId;
+            try {
+                const arrivals = await fetchSzArrivals(szId);
+                setSzArrivals(arrivals);
+                console.log("SZ arrivals loaded:", arrivals);
+            } catch (error) {
+                console.error("Error loading SZ arrivals:", error);
+                setSzArrivals([]);
             }
         };
         load();
@@ -193,6 +212,7 @@ function App() {
     useEffect(() => {
         const load = async () => {
             if (!selectedVehicle) return;
+            if (!selectedVehicle.lineId) return;
             try {
                 const route = await fetchLppRoute(selectedVehicle.tripId);
                 setLppRoute(route);
@@ -276,6 +296,9 @@ function App() {
                                         activeStation={activeStation}
                                         stopArrivals={ijppArrivals}
                                         lppArrivals={lppArrivals}
+                                        szArrivals={szArrivals}
+                                        getSzTripFromId={getSzTripFromId}
+                                        setCurrentUrl={setCurrentUrl}
                                     />
                                 }
                             />
@@ -285,6 +308,7 @@ function App() {
                                     <NearMeTab
                                         setActiveStation={setActiveStation}
                                         busStops={busStops}
+                                        szStops={szStops}
                                         userLocation={userLocation}
                                         setCurentUrl={setCurrentUrl}
                                     />
@@ -297,6 +321,8 @@ function App() {
                                         selectedVehicle={selectedVehicle}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
+                                        setCurrentUrl={setCurrentUrl}
+                                        setActiveStation={setActiveStation}
                                     />
                                 }
                             />

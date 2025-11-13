@@ -4,7 +4,6 @@ const later = new Date(now.getTime() + 60000); // 1 minute window
 const busStopsLink =
     "https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/unified_stops_with_gtfs.json";
 
-
 const lppLocationsLink =
     "https://mestnipromet.cyou/api/v1/resources/buses/info";
 const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
@@ -19,14 +18,16 @@ const lppArrivalsLink =
 const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
 const szRouteLink =
     "https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
+const szArrivalsLink =
+    "https://mapper-motis.ojpp-gateway.derp.si/api/v1/stoptimes?stopId=";
 
 const szStopsLink =
-    "https://mapper-motis.ojpp-gateway.derp.si/api/v1/map/stops?min=49.415360776528956%2C7.898969151846785&max=36.38523043114108%2C26.9347879737411&zoom=20";
+    "https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/sz_stops.json";
 
 /**
  *  Fetches all bus stops
- *  @returns Array of bus stops 
-*/
+ *  @returns Array of bus stops
+ */
 const fetchAllBusStops = async () => {
     try {
         const raw = await fetchJson(busStopsLink);
@@ -34,18 +35,26 @@ const fetchAllBusStops = async () => {
 
         return list
             .map((stop) => {
-                const latitude = Number(stop.latitude ?? stop.lat ?? stop["Latitude"]);
-                const longitude = Number(stop.longitude ?? stop.lon ?? stop["Longitude"]);
+                const latitude = Number(
+                    stop.latitude ?? stop.lat ?? stop["Latitude"]
+                );
+                const longitude = Number(
+                    stop.longitude ?? stop.lon ?? stop["Longitude"]
+                );
                 const gpsLocation = Array.isArray(stop.gpsLocation)
                     ? stop.gpsLocation
                     : [latitude, longitude];
 
-                if (!Number.isFinite(gpsLocation?.[0]) || !Number.isFinite(gpsLocation?.[1])) {
+                if (
+                    !Number.isFinite(gpsLocation?.[0]) ||
+                    !Number.isFinite(gpsLocation?.[1])
+                ) {
                     return null;
                 }
 
                 const refId = stop.ref_id ?? stop.refID ?? stop.refId ?? null;
-                const ijppId = stop.ijpp_id ?? stop.ijppID ?? stop.ijppId ?? null;
+                const ijppId =
+                    stop.ijpp_id ?? stop.ijppID ?? stop.ijppId ?? null;
 
                 return {
                     ...stop,
@@ -367,17 +376,30 @@ const fetchSzTrip = async (tripId) => {
 const fetchSzStops = async () => {
     try {
         const raw = await fetchJson(szStopsLink);
-        const filtered = Array.isArray(raw)
-            ? raw.filter((stop) => stop.stopId.slice(0, 2) === "sz")
-            : [];
-        return filtered;
+        return raw;
     } catch (error) {
         console.error("Error fetching SZ stops:", error);
         return [];
     }
 };
 
+/**
+ * Fetches next 100 SZ trips for a selected train station
+ * @returns Array of trips
+ */
+const fetchSzArrivals = async (stationCode) => {
+    if (!stationCode) return [];
+    try {
+        const url = szArrivalsLink + `${encodeURIComponent(stationCode)}&n=100`;
+        const raw = await fetchJson(url);
+        return raw;
+    } catch (error) {
+        console.error("Error fetching SZ arrivals:", error);
+        return [];
+    }
+};
+
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
 export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute };
-export { fetchSzStops, fetchSzTrip };
+export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };
