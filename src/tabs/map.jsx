@@ -56,6 +56,7 @@ const CLUSTER_CONFIG = {
     buses: { radius: 40, maxZoom: 14, color: "#5b8cff" },
     busStops: { radius: 60, maxZoom: 20, color: "#7a5bff" },
     trainPositions: { radius: 80, maxZoom: 15, color: "#ff5b5b" },
+    trainStops: { radius: 60, maxZoom: 20, color: "#ffa45b" },
 };
 
 const ICON_SIZE_BY_LAYER = {
@@ -98,12 +99,26 @@ const ICON_SIZE_BY_LAYER = {
         16,
         0.5,
     ],
+    trainStops: [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.24,
+        12,
+        0.32,
+        14,
+        0.4,
+        16,
+        0.48,
+    ],
 };
 
 const ICON_ANCHOR_BY_LAYER = {
     buses: "center",
     busStops: "bottom",
     trainPositions: "center",
+    trainStops: "bottom",
 };
 
 const BRAND_COLORS = {
@@ -583,7 +598,9 @@ function setupSourcesAndLayers(map, dataBySource) {
             ICON_SIZE_BY_LAYER[id],
             ICON_ANCHOR_BY_LAYER[id]
         );
-        if (id !== "busStops") registerHaloLayer(map, id);
+        if (!["busStops", "trainStops"].includes(id)) {
+            registerHaloLayer(map, id);
+        }
         registerClusterInteraction(map, id);
     });
 }
@@ -658,6 +675,25 @@ function configureBusStopPopup({ map, onSelectStop }) {
         const props = feature.properties || {};
         const [lng, lat] = feature.geometry.coordinates;
         const popupContent = createBusStopPopup(
+            props,
+            [lat, lng],
+            onSelectStop
+        );
+
+        new maplibregl.Popup({ closeButton: false })
+            .setLngLat([lng, lat])
+            .setDOMContent(popupContent)
+            .addTo(map);
+    });
+}
+
+function configureTrainStopPopup({ map, onSelectStop }) {
+    map.on("click", "trainStops-points", (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const [lng, lat] = feature.geometry.coordinates;
+        const popupContent = createTrainStopPopup(
             props,
             [lat, lng],
             onSelectStop
@@ -856,6 +892,39 @@ function createBusStopPopup({ name, id, ref_id }, coordinates, onSelect) {
     return wrapper;
 }
 
+function createTrainStopPopup({ name, stopId, id }, coordinates, onSelect) {
+    const wrapper = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = name || "";
+    wrapper.appendChild(title);
+
+    if (stopId) {
+        const code = document.createElement("p");
+        code.textContent = stopId;
+        code.style.margin = "4px 0";
+        code.style.opacity = "0.75";
+        wrapper.appendChild(code);
+    }
+
+    const button = document.createElement("button");
+    button.textContent = "Izberi postajo";
+    button.className = "popup-button";
+    wrapper.appendChild(button);
+
+    button.addEventListener("click", () => {
+        onSelect({
+            id: stopId ?? id ?? name,
+            name,
+            stopId: stopId ?? null,
+            gpsLocation: coordinates,
+            lat: coordinates?.[0] ?? null,
+            lon: coordinates?.[1] ?? null,
+        });
+    });
+
+    return wrapper;
+}
+
 // --- Marker helpers ----------------------------------------------------------
 
 function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
@@ -892,6 +961,7 @@ function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
 const Map = React.memo(function Map({
     gpsPositions,
     busStops,
+    trainStops = [],
     activeStation,
     setActiveStation,
     userLocation,
@@ -984,6 +1054,50 @@ const Map = React.memo(function Map({
         [busStops]
     );
 
+    const trainStopsGeoJSON = useMemo(
+        () =>
+            toGeoJSONPoints(
+                trainStops,
+                (stop) => {
+                    const lat = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[0]
+                            : stop?.lat
+                    );
+                    const lon = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[1]
+                            : stop?.lon
+                    );
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                        return null;
+                    }
+                    return [lat, lon];
+                },
+                (stop) => {
+                    const lat = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[0]
+                            : stop?.lat
+                    );
+                    const lon = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[1]
+                            : stop?.lon
+                    );
+                    return {
+                        id: stop?.stopId ?? stop?.id ?? stop?.name,
+                        name: stop?.name ?? "",
+                        stopId: stop?.stopId ?? null,
+                        icon: "train-stop",
+                        lat: Number.isFinite(lat) ? lat : null,
+                        lon: Number.isFinite(lon) ? lon : null,
+                    };
+                }
+            ),
+        [trainStops]
+    );
+
     const trainPositionsGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
@@ -1048,6 +1162,7 @@ const Map = React.memo(function Map({
                 buses: busesGeoJSON,
                 busStops: busStopsGeoJSON,
                 trainPositions: trainPositionsGeoJSON,
+                trainStops: trainStopsGeoJSON,
             });
 
             configureBusStopPopup({
@@ -1063,6 +1178,46 @@ const Map = React.memo(function Map({
                         coordinates: stop.gpsLocation,
                         id: stop.id,
                         ref_id: stop.ref_id,
+                    };
+
+                    applyActive(payload);
+                    localStorage.setItem(
+                        "activeStation",
+                        JSON.stringify(payload)
+                    );
+                    applyUrl("/arrivals");
+                    window.location.hash = "/arrivals";
+                },
+            });
+
+            configureTrainStopPopup({
+                map,
+                onSelectStop: (stop) => {
+                    const {
+                        setActiveStation: applyActive,
+                        setCurrentUrl: applyUrl,
+                    } = handlersRef.current;
+
+                    const coordinates = Array.isArray(stop?.gpsLocation)
+                        ? stop.gpsLocation
+                        : [stop?.lat, stop?.lon];
+                    if (
+                        !Array.isArray(coordinates) ||
+                        !Number.isFinite(coordinates[0]) ||
+                        !Number.isFinite(coordinates[1])
+                    ) {
+                        return;
+                    }
+
+                    const payload = {
+                        name: stop.name,
+                        coordinates,
+                        gpsLocation: coordinates,
+                        stopId: stop.stopId ?? null,
+                        id: stop.id ?? stop.stopId ?? stop.name,
+                        lat: coordinates[0],
+                        lon: coordinates[1],
+                        type: "train-stop",
                     };
 
                     applyActive(payload);
@@ -1120,7 +1275,13 @@ const Map = React.memo(function Map({
         updateSourceData(map, "buses", busesGeoJSON);
         updateSourceData(map, "busStops", busStopsGeoJSON);
         updateSourceData(map, "trainPositions", trainPositionsGeoJSON);
-    }, [busesGeoJSON, busStopsGeoJSON, trainPositionsGeoJSON]);
+        updateSourceData(map, "trainStops", trainStopsGeoJSON);
+    }, [
+        busesGeoJSON,
+        busStopsGeoJSON,
+        trainPositionsGeoJSON,
+        trainStopsGeoJSON,
+    ]);
 
     useEffect(() => {
         const map = mapInstanceRef.current;

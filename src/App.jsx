@@ -265,6 +265,7 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
+                                        trainStops={szStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
@@ -280,6 +281,7 @@ function App() {
                                     <MapTab
                                         gpsPositions={gpsPositions}
                                         busStops={busStops}
+                                        trainStops={szStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
