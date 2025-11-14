@@ -30,16 +30,87 @@
     --stroke: rgba(255, 255, 255, 0.12);
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
     --blur: saturate(140%) blur(12px);
+
+    /* Imported from theme.css: modern dark tokens */
+    /* Base surfaces */
+    --color-bg-solid: #090b10;
+    --color-bg-alt: #11151d;
+    --color-bg-elevated: #181e289f;
+    --color-bg-overlay: #1f273393;
+    --color-bg-glow: radial-gradient(
+            circle at 20% 20%,
+            rgba(53, 131, 255, 0.25),
+            transparent 60%
+        ),
+        radial-gradient(
+            circle at 80% 30%,
+            rgba(158, 53, 255, 0.18),
+            transparent 65%
+        );
+
+    /* Text */
+    --color-text-primary: #f5f7fa;
+    --color-text-secondary: #c2c8d4;
+    --color-text-tertiary: #8b93a3;
+    --color-text-invert: #0d1117;
+
+    /* Brand gradient */
+    --color-brand-start: #538bff;
+    --color-brand-mid: #6f5bff;
+    --color-brand-end: #9b3bff;
+    --brand-gradient: linear-gradient(
+        135deg,
+        var(--color-brand-start),
+        var(--color-brand-mid) 45%,
+        var(--color-brand-end)
+    );
+
+    /* Accents */
+    --color-accent-green: #34d399;
+    --color-accent-blue: #3b82f6;
+    --color-accent-purple: #8b5cf6;
+    --color-accent-amber: #f59e0b;
+    --color-accent-pink: #ec4899;
+
+    /* Border & separators */
+    --color-border-subtle: rgba(255, 255, 255, 0.08);
+    --color-border: rgba(255, 255, 255, 0.14);
+    --color-border-strong: rgba(255, 255, 255, 0.22);
+
+    /* Shadows */
+    --shadow-sm: 0 2px 6px -2px rgba(0, 0, 0, 0.5), 0 0 2px rgba(0, 0, 0, 0.4);
+    --shadow-md-2: 0 6px 16px -4px rgba(0, 0, 0, 0.55),
+        0 2px 4px rgba(0, 0, 0, 0.5);
+    --shadow-lg-2: 0 16px 40px -6px rgba(0, 0, 0, 0.6),
+        0 4px 14px rgba(0, 0, 0, 0.55);
+
+    /* Radii */
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --radius-xl: 26px;
+
+    /* Blur / glass */
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: saturate(140%) blur(14px);
+
+    /* Transitions */
+    --ease-snappy: cubic-bezier(0.4, 0.14, 0.25, 1);
+    --ease-fluid: cubic-bezier(0.33, 0.11, 0.11, 1);
+    --duration-fast: 120ms;
+    --duration-med: 260ms;
+    --duration-slow: 480ms;
+
+    /* Focus */
+    --focus-ring: 0 0 0 2px rgba(255, 255, 255, 0.6),
+        0 0 0 4px rgba(99, 102, 241, 0.6);
 }
 
 body {
-    background: radial-gradient(
-            1200px 800px at 20% -10%,
-            #141421 0%,
-            transparent 60%
-        ),
-        radial-gradient(900px 700px at 100% 0%, #101020 0%, transparent 60%),
-        linear-gradient(180deg, var(--bg-0), var(--bg-1));
+    background: var(--color-bg-solid);
+    background-image: var(--color-bg-glow);
     font-family: "Proxima Nova", Inter, system-ui, Avenir, Helvetica, Arial,
         sans-serif;
     color: var(--text);
@@ -56,7 +127,6 @@ body {
 .content {
     flex: 1;
     overflow: hidden;
-    padding: 12px;
     text-align: center;
 }
 
@@ -64,6 +134,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    padding: 12px;
 }
 
 h1,
@@ -79,10 +150,8 @@ h2 {
 
 .map-container {
     background: var(--bg-2);
-    border: 1px solid var(--stroke);
-    border-radius: 16px;
     overflow: hidden;
-    height: calc(100vh - 120px);
+    height: 100vh;
     box-shadow: var(--shadow);
 }
 
@@ -123,7 +192,7 @@ h2 {
     height: calc(100vh - 240px);
 }
 
-.sz-arrival-item{
+.sz-arrival-item {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr 1fr;
     align-items: center;
@@ -178,20 +247,16 @@ h2 {
 .route {
     .data {
         background: var(--card);
-        border: 1px solid var(--stroke);
         padding: 14px 16px;
-        border-radius: 14px;
         color: var(--text);
         box-shadow: var(--shadow);
         text-align: center;
     }
 
     .stops {
-        margin-top: 10px;
+        margin-top: 20px;
         padding: 12px 16px;
         background: var(--card);
-        border: 1px solid var(--stroke);
-        border-radius: 14px;
         color: var(--text);
         box-shadow: var(--shadow);
 
@@ -201,7 +266,7 @@ h2 {
             display: flex;
             flex-direction: column;
             gap: 10px;
-            max-height: calc(100vh - 270px);
+            max-height: calc(100vh - 250px);
             overflow-y: auto;
             margin-top: 10px;
 
@@ -224,12 +289,27 @@ h2 {
 .arrival-item,
 .station-item,
 .glass-card {
-    background: var(--card);
-    border: 1px solid var(--stroke);
+    background: linear-gradient(
+        180deg,
+        var(--color-bg-elevated),
+        var(--color-bg-overlay)
+    );
+    border: 1px solid var(--color-border-subtle);
     padding: 14px 16px;
-    border-radius: 14px;
+    border-radius: var(--radius-lg);
     color: var(--text);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-md-2);
+    transition: background var(--duration-med) var(--ease-fluid),
+        box-shadow var(--duration-med) var(--ease-fluid),
+        transform var(--duration-med) var(--ease-fluid),
+        border-color var(--duration-fast) linear;
+}
+.arrival-item:hover,
+.station-item:hover,
+.glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg-2);
+    border-color: var(--color-border);
 }
 
 .station-list {
@@ -254,13 +334,11 @@ h2 {
     display: flex;
     justify-content: space-around;
     align-items: center;
-    background: var(--card);
-    backdrop-filter: var(--blur);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: var(--glass-blur);
     padding: 14px 10px;
-    border-top: 1px solid var(--stroke);
-    border-left: 1px solid var(--stroke);
-    border-right: 1px solid var(--stroke);
-    border-radius: 16px 16px 0 0;
+    box-shadow: var(--shadow-md-2);
 }
 
 .bottom-nav button {
@@ -271,10 +349,25 @@ h2 {
     border: none;
     cursor: pointer;
     font-size: 12px;
-    color: var(--muted);
+    color: var(--color-text-tertiary);
+    gap: 4px;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast) var(--ease-snappy),
+        transform var(--duration-fast) var(--ease-snappy),
+        background var(--duration-fast) var(--ease-snappy);
 }
 .bottom-nav button.active {
-    color: var(--text);
+    color: var(--color-text-primary);
+    background: linear-gradient(
+        145deg,
+        rgba(91, 140, 255, 0.18),
+        rgba(122, 91, 255, 0.14)
+    );
+}
+.bottom-nav button:hover {
+    color: #fff;
+    transform: translateY(-2px);
 }
 .bottom-nav button span {
     margin-top: 5px;
@@ -287,6 +380,18 @@ h2 {
     border-radius: 8px;
     padding: 6px 10px;
     cursor: pointer;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .arrival-item,
+    .station-item,
+    .glass-card,
+    .bottom-nav button,
+    .skeleton {
+        transition: none !important;
+        animation: none !important;
+    }
 }
 
 @media screen and (min-width: 480px) {

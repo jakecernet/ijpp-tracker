@@ -176,11 +176,11 @@ const ArrivalsTab = ({
                                 <div className="circle">
                                     {arrival.routeName}
                                 </div>
-                                <h2>{arrival.tripName}</h2>
+                                <h3>{arrival.tripName}</h3>
                             </div>
                             <div className="right">
-                                <h2>{arrival.etaMinutes} min</h2>
-                                <p>Prevoznik: LPP</p>
+                                <h3>{arrival.etaMinutes} min</h3>
+                                <p>LPP</p>
                             </div>
                         </div>
                     ))}

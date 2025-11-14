@@ -1315,7 +1315,7 @@ const Map = React.memo(function Map({
     }, [userLocation, activeStation]);
 
     return (
-        <div className="insideDiv">
+        <div>
             <div className="map-container">
                 <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
             </div>

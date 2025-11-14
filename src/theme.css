@@ -1,0 +1,231 @@
+/* Modern Dark Theme Tokens */
+:root {
+    /* Base surfaces */
+    --color-bg-solid: #090b10;
+    --color-bg-alt: #11151d;
+    --color-bg-elevated: #181e28;
+    --color-bg-overlay: #1f2733;
+    --color-bg-glow: radial-gradient(
+            circle at 20% 20%,
+            rgba(53, 131, 255, 0.25),
+            transparent 60%
+        ),
+        radial-gradient(
+            circle at 80% 30%,
+            rgba(158, 53, 255, 0.18),
+            transparent 65%
+        );
+
+    /* Text */
+    --color-text-primary: #f5f7fa;
+    --color-text-secondary: #c2c8d4;
+    --color-text-tertiary: #8b93a3;
+    --color-text-invert: #0d1117;
+
+    /* Brand gradient */
+    --color-brand-start: #538bff;
+    --color-brand-mid: #6f5bff;
+    --color-brand-end: #9b3bff;
+    --brand-gradient: linear-gradient(
+        135deg,
+        var(--color-brand-start),
+        var(--color-brand-mid) 45%,
+        var(--color-brand-end)
+    );
+
+    /* Accents */
+    --color-accent-green: #34d399;
+    --color-accent-blue: #3b82f6;
+    --color-accent-purple: #8b5cf6;
+    --color-accent-amber: #f59e0b;
+    --color-accent-pink: #ec4899;
+
+    /* Border & separators */
+    --color-border-subtle: rgba(255, 255, 255, 0.08);
+    --color-border: rgba(255, 255, 255, 0.14);
+    --color-border-strong: rgba(255, 255, 255, 0.22);
+
+    /* Shadows */
+    --shadow-sm: 0 2px 6px -2px rgba(0, 0, 0, 0.5), 0 0 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 16px -4px rgba(0, 0, 0, 0.55),
+        0 2px 4px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 16px 40px -6px rgba(0, 0, 0, 0.6),
+        0 4px 14px rgba(0, 0, 0, 0.55);
+
+    /* Radii */
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --radius-xl: 26px;
+
+    /* Blur / glass */
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: saturate(140%) blur(14px);
+
+    /* Transitions */
+    --ease-snappy: cubic-bezier(0.4, 0.14, 0.25, 1);
+    --ease-fluid: cubic-bezier(0.33, 0.11, 0.11, 1);
+    --duration-fast: 120ms;
+    --duration-med: 260ms;
+    --duration-slow: 480ms;
+
+    /* Focus */
+    --focus-ring: 0 0 0 2px rgba(255, 255, 255, 0.6),
+        0 0 0 4px rgba(99, 102, 241, 0.6);
+}
+
+html,
+body {
+    background: var(--color-bg-solid);
+    background-image: var(--color-bg-glow);
+    color: var(--color-text-primary);
+}
+
+/* Utility classes */
+.ui-card {
+    background: linear-gradient(
+        180deg,
+        var(--color-bg-elevated),
+        var(--color-bg-overlay)
+    );
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+    transition: background var(--duration-med) var(--ease-fluid),
+        box-shadow var(--duration-med) var(--ease-fluid),
+        transform var(--duration-med) var(--ease-fluid),
+        border-color var(--duration-fast) linear;
+}
+.ui-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        circle at 35% 20%,
+        rgba(91, 140, 255, 0.35),
+        transparent 70%
+    );
+    opacity: 0;
+    transition: opacity var(--duration-med) var(--ease-fluid);
+    pointer-events: none;
+}
+.ui-card:hover,
+.ui-card:focus-within {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--color-border);
+}
+.ui-card:hover::before,
+.ui-card:focus-within::before {
+    opacity: 0.5;
+}
+
+.nav-bar {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    justify-content: space-around;
+    padding: 14px 12px;
+    position: relative;
+}
+.nav-bar button {
+    background: none;
+    border: none;
+    color: var(--color-text-tertiary);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    transition: color var(--duration-fast) var(--ease-snappy),
+        transform var(--duration-fast) var(--ease-snappy),
+        background var(--duration-fast) var(--ease-snappy);
+}
+.nav-bar button.active {
+    color: var(--color-text-primary);
+    background: linear-gradient(
+        145deg,
+        rgba(91, 140, 255, 0.18),
+        rgba(122, 91, 255, 0.14)
+    );
+}
+.nav-bar button:hover {
+    color: #fff;
+    transform: translateY(-2px);
+}
+.nav-bar button:active {
+    transform: translateY(-1px);
+}
+
+.brand-pill {
+    background: var(--brand-gradient);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    letter-spacing: 0.5px;
+    font-size: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.fade-slide-enter {
+    opacity: 0;
+    transform: translateY(14px);
+}
+.fade-slide-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity var(--duration-med) var(--ease-fluid),
+        transform var(--duration-med) var(--ease-fluid);
+}
+.fade-slide-exit {
+    opacity: 1;
+    transform: translateY(0);
+}
+.fade-slide-exit-active {
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity var(--duration-fast) var(--ease-snappy),
+        transform var(--duration-fast) var(--ease-snappy);
+}
+
+.skeleton {
+    position: relative;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.06) 0%,
+        rgba(255, 255, 255, 0.13) 50%,
+        rgba(255, 255, 255, 0.06) 100%
+    );
+    background-size: 300% 100%;
+    animation: shimmer 1.8s linear infinite;
+    border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 200% 50%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-card,
+    .nav-bar button,
+    .fade-slide-enter-active,
+    .fade-slide-exit-active {
+        transition: none !important;
+        animation: none !important;
+    }
+}
