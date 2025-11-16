@@ -1,4 +1,10 @@
-const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute, setCurrentUrl, setActiveStation }) => {
+const BusRouteTab = ({
+    selectedVehicle,
+    lppRoute,
+    szRoute,
+    setCurrentUrl,
+    setActiveStation,
+}) => {
     const isLPP = selectedVehicle?.lineNumber != null;
     const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
     const szTrip = isSZ && Array.isArray(szRoute) ? szRoute[0] : null;
@@ -34,56 +40,59 @@ const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute, setCurrentUrl, setAct
             </div>
             {!isSZ && (
                 <div className="stops">
-                    <h2>Postaje na poti:</h2>
-                    <ul>
-                        {selectedVehicle?.stops?.map((stop, key) => (
-                            <li key={key}>
-                                <h3>{stop.stop_name}</h3>
-                                <p>{stop.arrival_time.slice(0, -3)}</p>
-                            </li>
-                        ))}
-                        {isLPP && (
-                            <ul>
-                                {lppRoute?.map((stop) => (
-                                    <li key={stop.stop_id} onClick={() => {
+                    {isLPP ? (
+                        <ul>
+                            {lppRoute?.map((stop) => (
+                                <li
+                                    key={stop.stop_id}
+                                    onClick={() => {
                                         console.log("Clicked stop:", stop);
                                         setActiveStation(stop);
-                                        localStorage.setItem("activeStation", JSON.stringify(stop));
+                                        localStorage.setItem(
+                                            "activeStation",
+                                            JSON.stringify(stop)
+                                        );
                                         setCurrentUrl("/arrivals");
                                         window.location.hash = "/arrivals";
-                                    }}>
-                                        <h3>{stop.name}</h3>
-                                        <span
-                                            style={{
-                                                display: "flex",
-                                                flexDirection: "row",
-                                                gap: "20px",
-                                            }}
-                                        >
-                                            {stop.arrivals[0] && (
-                                                <p>
-                                                    {stop.arrivals[0].eta_min}{" "}
-                                                    min
-                                                </p>
-                                            )}
-                                            {stop.arrivals[1] && (
-                                                <p>
-                                                    {stop.arrivals[1].eta_min}{" "}
-                                                    min
-                                                </p>
-                                            )}
-                                            {stop.arrivals[2] && (
-                                                <p>
-                                                    {stop.arrivals[2].eta_min}{" "}
-                                                    min
-                                                </p>
-                                            )}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </ul>
+                                    }}
+                                >
+                                    <h3>{stop.name}</h3>
+                                    <span
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "row",
+                                            gap: "20px",
+                                        }}
+                                    >
+                                        {stop.arrivals[0] && (
+                                            <p>
+                                                {stop.arrivals[0].eta_min} min
+                                            </p>
+                                        )}
+                                        {stop.arrivals[1] && (
+                                            <p>
+                                                {stop.arrivals[1].eta_min} min
+                                            </p>
+                                        )}
+                                        {stop.arrivals[2] && (
+                                            <p>
+                                                {stop.arrivals[2].eta_min} min
+                                            </p>
+                                        )}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <ul>
+                            {selectedVehicle?.stops?.map((stop, key) => (
+                                <li key={key}>
+                                    <h3>{stop.stop_name}</h3>
+                                    <p>{stop.arrival_time.slice(0, -3)}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
             )}
             {isSZ && (
@@ -107,12 +116,15 @@ const BusRouteTab = ({ selectedVehicle, lppRoute, szRoute, setCurrentUrl, setAct
                                     </span>
                                 </li>
                                 {szStops.map((stop) => (
-                                    <li key={stop.stopId || stop.name} onClick={() => {
-                                        console.log("Clicked stop:", stop);
-                                        setActiveStation(stop);
-                                        setCurrentUrl("/arrivals");
-                                        window.location.hash = "/arrivals";
-                                    }}>
+                                    <li
+                                        key={stop.stopId || stop.name}
+                                        onClick={() => {
+                                            console.log("Clicked stop:", stop);
+                                            setActiveStation(stop);
+                                            setCurrentUrl("/arrivals");
+                                            window.location.hash = "/arrivals";
+                                        }}
+                                    >
                                         <h4>{stop.name}</h4>
                                         <span
                                             style={{

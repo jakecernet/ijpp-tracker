@@ -255,7 +255,7 @@ function App() {
 
     return (
         <Router>
-            <div className="mobile-container">
+            <div className="container">
                 <div className="content">
                     <Suspense fallback={<div>Loading...</div>}>
                         <Routes>
@@ -331,49 +331,29 @@ function App() {
                         </Routes>
                     </Suspense>
                 </div>
-                <nav className="bottom-nav">
+                <nav>
                     <NavLink to="/map">
-                        <button
-                            onClick={() => setCurrentUrl("/map")}
-                            className={
-                                currentUrl === "/map" || currentUrl === "/"
-                                    ? "active"
-                                    : ""
-                            }
-                        >
+                        <button onClick={() => setCurrentUrl("/map")}>
                             <Map size={24} />
-                            <span>Zemljevid</span>
+                            <h3>Zemljevid</h3>
                         </button>
                     </NavLink>
                     <NavLink to="/arrivals">
-                        <button
-                            onClick={() => setCurrentUrl("/arrivals")}
-                            className={
-                                currentUrl === "/arrivals" ? "active" : ""
-                            }
-                        >
+                        <button onClick={() => setCurrentUrl("/arrivals")}>
                             <Clock size={24} />
-                            <span>Prihodi</span>
+                            <h3>Prihodi</h3>
                         </button>
                     </NavLink>
                     <NavLink to="/stations">
-                        <button
-                            onClick={() => setCurrentUrl("/stations")}
-                            className={
-                                currentUrl === "/stations" ? "active" : ""
-                            }
-                        >
+                        <button onClick={() => setCurrentUrl("/stations")}>
                             <MapPin size={24} />
-                            <span>V bližini</span>
+                            <h3>V bližini</h3>
                         </button>
                     </NavLink>
                     <NavLink to="/route">
-                        <button
-                            onClick={() => setCurrentUrl("/route")}
-                            className={currentUrl === "/route" ? "active" : ""}
-                        >
+                        <button onClick={() => setCurrentUrl("/route")}>
                             <ArrowRightLeft size={24} />
-                            <span>Pot</span>
+                            <h3>Pot</h3>
                         </button>
                     </NavLink>
                 </nav>

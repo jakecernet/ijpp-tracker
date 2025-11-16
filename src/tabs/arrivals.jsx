@@ -93,6 +93,18 @@ const ArrivalsTab = ({
         );
     }, [szArrivals, searchTerm]);
 
+    const filteredLPPArrivals = useMemo(() => {
+        return lppArrivals.filter(
+            (arrival) =>
+                arrival.tripName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                arrival.routeName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())
+        );
+    }, [lppArrivals, searchTerm]);
+
     const formatArrivalTime = (arrivalTime) => {
         if (!arrivalTime) return "N/A";
         return format(arrivalTime, "HH:mm", { locale: sl });
@@ -138,15 +150,13 @@ const ArrivalsTab = ({
     return (
         <div className="insideDiv">
             <h2>Prihodi na: {activeStation.name}</h2>
-            <div>
-                <input
-                    type="text"
-                    placeholder="Išči po številki linije"
-                    className="search-input"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
+            <input
+                type="text"
+                placeholder="Išči po številki linije"
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
             {error && <p>{error}</p>}
             <div className="arrival-list">
                 {!error &&
@@ -167,7 +177,7 @@ const ArrivalsTab = ({
                     <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
                 )}
                 {!error &&
-                    lppArrivals.map((arrival, index) => (
+                    filteredLPPArrivals.map((arrival, index) => (
                         <div
                             key={index}
                             className="lpp-arrival-item arrival-item"
@@ -178,10 +188,8 @@ const ArrivalsTab = ({
                                 </div>
                                 <h3>{arrival.tripName}</h3>
                             </div>
-                            <div className="right">
-                                <h3>{arrival.etaMinutes} min</h3>
-                                <p>LPP</p>
-                            </div>
+                            <h3>{arrival.etaMinutes} min</h3>
+                            <p>LPP</p>
                         </div>
                     ))}
                 {!stationSelected && (
