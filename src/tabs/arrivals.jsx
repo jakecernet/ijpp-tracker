@@ -2,12 +2,20 @@ import { useState, useEffect, useMemo } from "react";
 import { format, formatDistanceToNow, set } from "date-fns";
 import { sl } from "date-fns/locale";
 
-const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
+const ArrivalsTab = ({
+    activeStation,
+    stopArrivals,
+    lppArrivals,
+    szArrivals,
+    getSzTripFromId,
+    setLppRouteFromArrival,
+}) => {
     const [arrivals, setArrivals] = useState([]);
     const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [error, setError] = useState(null);
 
+    // Ceu kup sranja za formatiranje in sortiranje prihodov
     useEffect(() => {
         if (stopArrivals.length === 0) return;
         const now = new Date();
@@ -74,11 +82,32 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
         );
     }, [activeStation]);
 
+    // Filtriranje ijpp prihodov
     const filteredArrivals = useMemo(() => {
         return arrivals.filter((arrival) =>
             arrival.routeName.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [arrivals, searchTerm]);
+
+    // Filtriranje sz prihodov
+    const filteredSzArrivals = useMemo(() => {
+        return szArrivals?.stopTimes?.filter((arrival) =>
+            arrival.headsign.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [szArrivals, searchTerm]);
+
+    // Filtriranje lpp prihodov
+    const filteredLPPArrivals = useMemo(() => {
+        return lppArrivals.filter(
+            (arrival) =>
+                arrival.tripName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase()) ||
+                arrival.routeName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())
+        );
+    }, [lppArrivals, searchTerm]);
 
     const formatArrivalTime = (arrivalTime) => {
         if (!arrivalTime) return "N/A";
@@ -93,6 +122,22 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
         });
     };
 
+    // Formatiranje zamude za sz prihode
+    const formatDelay = (scheduledDeparture, actualDeparture) => {
+        if (!scheduledDeparture || !actualDeparture) return "N/A";
+
+        const scheduled = new Date(scheduledDeparture);
+        const actual = new Date(actualDeparture);
+
+        if (isNaN(scheduled) || isNaN(actual)) return "N/A";
+
+        const diffMinutes = Math.round((actual - scheduled) / 60000);
+
+        if (diffMinutes === 0) return " 0 min";
+        return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
+    };
+
+    // Uradna imena --> normalna imena
     const shortenOperatorName = (operator) => {
         switch (operator) {
             case "Javno podjetje Ljubljanski potniški promet d.o.o.":
@@ -111,15 +156,13 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
     return (
         <div className="insideDiv">
             <h2>Prihodi na: {activeStation.name}</h2>
-            <div>
-                <input
-                    type="text"
-                    placeholder="Išči po številki linije"
-                    className="search-input"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
+            <input
+                type="text"
+                placeholder="Išči po številki linije"
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
             {error && <p>{error}</p>}
             <div className="arrival-list">
                 {!error &&
@@ -139,29 +182,53 @@ const ArrivalsTab = ({ activeStation, stopArrivals, lppArrivals }) => {
                 {!stationSelected && (
                     <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
                 )}
-                {stationSelected && !error && filteredArrivals.length === 0 && (
-                    <p>Ni prihajajočih prihodov za izbrano postajo.</p>
-                )}
-            </div>
-            <div className="lpp-arrivals-list">
                 {!error &&
-                    lppArrivals.map((arrival, index) => (
-                        <div key={index} className="arrival-item">
+                    filteredLPPArrivals.map((arrival, index) => (
+                        <div
+                            key={index}
+                            className="lpp-arrival-item arrival-item"
+                            onClick={() => {
+                                setLppRouteFromArrival(arrival);
+                                window.location.hash = "/route";
+                            }}
+                        >
                             <div className="left">
                                 <div className="circle">
                                     {arrival.routeName}
                                 </div>
-                                <h2>{arrival.tripName}</h2>
+                                <h3>{arrival.tripName}</h3>
                             </div>
-                            <div className="right">
-                                <h2>{arrival.etaMinutes} min</h2>
-                                <p>Prevoznik: LPP</p>
-                            </div>
+                            <h3>{arrival.etaMinutes} min</h3>
+                            <p>LPP</p>
                         </div>
                     ))}
                 {!stationSelected && (
                     <p>Ni prihajajočih prihodov za izbrano postajo.</p>
                 )}
+                {filteredSzArrivals?.map((arrival, index) => (
+                    <div
+                        key={index}
+                        className="sz-arrival-item arrival-item"
+                        onClick={() => {
+                            getSzTripFromId(arrival.tripId);
+                            window.location.hash = "/route";
+                        }}
+                    >
+                        <h2>{arrival.headsign}</h2>
+                        <h2>
+                            {formatArrivalTime(arrival.place.departure)} (
+                            {formatRelativeTime(arrival.place.departure)})
+                        </h2>
+                        <p>
+                            Zamuda:
+                            {formatDelay(
+                                arrival.place.scheduledDeparture,
+                                arrival.place.departure
+                            )}
+                        </p>
+                        <p>SŽ - Potniški promet d.o.o.</p>
+                    </div>
+                ))}
             </div>
         </div>
     );

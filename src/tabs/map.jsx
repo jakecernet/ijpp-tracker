@@ -13,6 +13,11 @@ import trainStopPNG from "../img/trainStop.png";
 import szPNG from "../img/sz.png";
 import locationPNG from "../img/location.png";
 
+// --- Map style configuration -------------------------------------------------
+
+const DEFAULT_CENTER = [46.0569, 14.5058];
+const DEFAULT_ZOOM = 13;
+
 const OSM_RASTER_STYLE = {
     version: 8,
     sources: {
@@ -28,13 +33,393 @@ const OSM_RASTER_STYLE = {
                 '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         },
     },
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
+
+const ICON_SOURCES = [
+    { id: "bus-stop", image: busStopPNG },
+    { id: "train-stop", image: trainStopPNG },
+    { id: "train", image: szPNG },
+    { id: "user", image: userPNG },
+    { id: "station", image: locationPNG },
+    { id: "arriva", image: arrivaPNG },
+    { id: "lpp", image: lppPNG },
+    { id: "nomago", image: nomagoPNG },
+    { id: "marprom", image: marpromPNG },
+    { id: "murska", image: murskaPNG },
+    { id: "bus-generic", image: locationPNG },
+    { id: "train-generic", image: locationPNG },
+];
+
+const CLUSTER_CONFIG = {
+    buses: { radius: 40, maxZoom: 14, color: "#5b8cff" },
+    busStops: { radius: 60, maxZoom: 20, color: "#7a5bff" },
+    trainPositions: { radius: 80, maxZoom: 15, color: "#ff5b5b" },
+    trainStops: { radius: 60, maxZoom: 20, color: "#ffa45b" },
+};
+
+const ICON_SIZE_BY_LAYER = {
+    buses: [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.28,
+        12,
+        0.36,
+        14,
+        0.44,
+        16,
+        0.52,
+    ],
+    busStops: [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.24,
+        12,
+        0.32,
+        14,
+        0.4,
+        16,
+        0.48,
+    ],
+    trainPositions: [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.26,
+        12,
+        0.34,
+        14,
+        0.42,
+        16,
+        0.5,
+    ],
+    trainStops: [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.24,
+        12,
+        0.32,
+        14,
+        0.4,
+        16,
+        0.48,
+    ],
+};
+
+const ICON_ANCHOR_BY_LAYER = {
+    buses: "center",
+    busStops: "bottom",
+    trainPositions: "center",
+    trainStops: "bottom",
+};
+
+const BRAND_COLORS = {
+    arriva: { fill: "#5bc0ff", stroke: "#0091ea" },
+    sz: { fill: "#5bc9ff", stroke: "#0091ea" },
+    nomago: { fill: "#ffeb3b", stroke: "#fbc02d" },
+    lpp: { fill: "#4caf50", stroke: "#388e3c" },
+    marprom: { fill: "#f44336", stroke: "#d32f2f" },
+    default: { fill: "#607d8b", stroke: "#455a64" },
+};
+
+const operatorToIcon = {
+    "Javno podjetje Ljubljanski potniški promet d.o.o.": "lpp",
+    "Nomago d.o.o.": "nomago",
+    "Arriva d.o.o.": "arriva",
+    "Javno podjetje za mestni potniški promet Marprom, d.o.o.": "marprom",
+    "Avtobusni promet Murska Sobota d.d.": "murska",
+};
+
+const HALO_RADIUS = [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    22,
+    22,
+    30,
+    26,
+    34,
+    30,
+    38,
+    34,
+];
 
 const STYLE =
     typeof window !== "undefined"
         ? localStorage.getItem("mapStyleUrl") || OSM_RASTER_STYLE
         : OSM_RASTER_STYLE;
+
+// --- Popup layout helpers ----------------------------------------------------
+
+function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, (char) => {
+        switch (char) {
+            case "&":
+                return "&amp;";
+            case "<":
+                return "&lt;";
+            case ">":
+                return "&gt;";
+            case '"':
+                return "&quot;";
+            case "'":
+                return "&#39;";
+            default:
+                return char;
+        }
+    });
+}
+
+function formatValue(value) {
+    if (value === null || value === undefined || value === "") {
+        return '<span style="opacity:0.6">&mdash;</span>';
+    }
+    if (typeof value === "object") {
+        try {
+            const text = JSON.stringify(value, null, 2);
+            return `<pre style="margin:4px 0; white-space:pre-wrap">${escapeHTML(
+                text
+            )}</pre>`;
+        } catch {
+            return `<pre style="margin:4px 0; white-space:pre-wrap">${escapeHTML(
+                String(value)
+            )}</pre>`;
+        }
+    }
+    return `<span>${escapeHTML(String(value))}</span>`;
+}
+
+function prettifyKey(key) {
+    const spaced = key
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    if (!spaced) return key;
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function createRow(label, value) {
+    if (value === null || value === undefined || value === "") return "";
+    return (
+        `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
+        `<span style="opacity:0.7">${escapeHTML(label)}</span>` +
+        `<span style="font-weight:600; text-align:right">${escapeHTML(
+            String(value)
+        )}</span>` +
+        `</div>`
+    );
+}
+
+function formatSpeed(speed) {
+    if (!Number.isFinite(speed)) return null;
+    return `${Math.round(speed)} km/h`;
+}
+
+function summarizeStops(stops) {
+    if (!Array.isArray(stops) || stops.length === 0) return null;
+    const getName = (stop) =>
+        stop?.name ??
+        stop?.stop_name ??
+        stop?.common_name ??
+        stop?.Name ??
+        stop?.naziv ??
+        stop?.stop ??
+        null;
+    const first = getName(stops[0]);
+    const last = getName(stops[stops.length - 1]);
+    if (first && last && first !== last) return `${first} -> ${last}`;
+    return first || last || null;
+}
+
+function renderStopsList(stops) {
+    if (!Array.isArray(stops) || stops.length === 0) return "";
+    const names = stops
+        .map(
+            (stop) =>
+                stop?.name ??
+                stop?.stop_name ??
+                stop?.common_name ??
+                stop?.Name ??
+                stop?.naziv ??
+                stop?.stop ??
+                null
+        )
+        .filter(Boolean);
+    if (!names.length) return "";
+    const preview = names.slice(0, 4);
+    const items = preview
+        .map(
+            (name) =>
+                `<li style="margin:0; padding:0; list-style-position:inside">${escapeHTML(
+                    name
+                )}</li>`
+        )
+        .join("");
+    const moreCount = names.length - preview.length;
+    const moreLabel =
+        moreCount > 0
+            ? `<li style="margin:0; padding:0; list-style-position:inside; opacity:0.7">+${moreCount} postaj</li>`
+            : "";
+    return (
+        `<div style="margin-top:10px">` +
+        `<div style="font-weight:600; margin-bottom:4px">Postaje</div>` +
+        `<ul style="margin:0; padding-left:16px">${items}${moreLabel}</ul>` +
+        `</div>`
+    );
+}
+
+function renderExtraFields(properties, usedKeys = []) {
+    const ignore = new Set([...usedKeys, "icon", "brand", "sourceType"]);
+    const entries = Object.entries(properties || {}).filter(
+        ([key]) => !ignore.has(key)
+    );
+    if (!entries.length) return "";
+    const rows = entries
+        .map(([key, value]) => {
+            const label = escapeHTML(prettifyKey(key));
+            return `<div style="margin-bottom:6px"><strong>${label}</strong>: ${formatValue(
+                value
+            )}</div>`;
+        })
+        .join("");
+    return (
+        `<div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.1)">` +
+        rows +
+        `</div>`
+    );
+}
+
+// --- Popup renderers ---------------------------------------------------------
+
+function renderLppPopup(properties) {
+    const title = [properties.lineNumber, properties.lineName]
+        .filter(Boolean)
+        .map((value) => escapeHTML(String(value)))
+        .join(" | ");
+    const rows =
+        createRow("Prevoznik", properties.operator) +
+        createRow("Smer", properties.lineDestination) +
+        createRow("Vozilo", properties.busName) +
+        createRow("Hitrost", formatSpeed(properties.speed)) +
+        createRow("Vžig", properties.ignition ? "Vključen" : "Izključen");
+    const extra = renderExtraFields(properties, [
+        "lineNumber",
+        "lineName",
+        "operator",
+        "lineDestination",
+        "busName",
+        "speed",
+        "ignition",
+        "lineId",
+        "tripId",
+    ]);
+
+    return (
+        `<div style="min-width:240px">` +
+        (title
+            ? `<div style="font-weight:500; font-size:16px; margin-bottom:8px">${title}</div>`
+            : "") +
+        rows +
+        extra +
+        `<button type="button" class="popup-button" style="margin-top:12px; width:100%" data-role="view-lpp-route">Prikaži linijo</button>` +
+        `</div>`
+    );
+}
+
+function renderIjppPopup(properties) {
+    const heading =
+        properties.lineName ||
+        properties.title ||
+        properties.routeId ||
+        "Vozilo";
+    const relation = summarizeStops(properties.stops);
+    const rows =
+        createRow("Prevoznik", properties.operator) +
+        createRow("Relacija", relation);
+    const stopsSection = renderStopsList(properties.stops);
+    const extra = renderExtraFields(properties, [
+        "lineName",
+        "title",
+        "routeId",
+        "operator",
+        "stops",
+        "journeyPatternId",
+        "tripId",
+    ]);
+
+    return (
+        `<div style="min-width:240px">` +
+        `<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
+            String(heading)
+        )}</div>` +
+        rows +
+        stopsSection +
+        '<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
+        extra +
+        `</div>`
+    );
+}
+
+function renderDefaultBusPopup(properties) {
+    const extra = renderExtraFields(properties, []);
+    return extra
+        ? `<div style="min-width:200px">${extra}</div>`
+        : `<div style="min-width:180px">Ni podatkov</div>`;
+}
+
+function renderTrainPopup(properties) {
+    const number = properties.tripShort || properties.id || "";
+    const fromStation = properties.fromStation;
+    const toStation = properties.toStation;
+    const departure = properties.departure || properties.Odhod || "";
+    const arrival = properties.arrival;
+
+    return (
+        `<div style="min-width:220px">` +
+        (number
+            ? `<div style="font-weight:600; font-size:16px; margin-bottom:4px">${escapeHTML(
+                  number
+              )}</div>`
+            : "") +
+        (departure
+            ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
+                    <p style="color:gray">Odhod iz prejšnje postaje:</p>
+                    <h4 style="font-weight:700">${escapeHTML(departure)}</h4>
+                </div>`
+            : "") +
+        (arrival !== null
+            ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
+                    <p style="color:gray">Prihod na naslednjo postajo:</p>
+                    <h4 style="font-weight:700">${escapeHTML(arrival)}</h4>
+                </div>`
+            : "") +
+        (fromStation
+            ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
+                <p style="color:gray">Prejšnja postaja: </p>
+                <p>${escapeHTML(fromStation)}</p> 
+            </div>`
+            : "") +
+        (toStation
+            ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
+                <p style="color:gray">Naslednja postaja: </p>
+                <p>${escapeHTML(toStation)}</p>
+              </div>`
+            : "") +
+        `<button type="button" class="popup-button" data-role="view-sz-route" style="margin-top:12px; width:100%">Prikaži linijo</button>` +
+        `</div>`
+    );
+}
+
+// --- GeoJSON helpers ---------------------------------------------------------
 
 function toGeoJSONPoints(items, getCoord, getProps) {
     return {
@@ -42,13 +427,7 @@ function toGeoJSONPoints(items, getCoord, getProps) {
         features: (items || [])
             .map((item) => {
                 const [lat, lng] = getCoord(item) || [];
-                if (
-                    typeof lat !== "number" ||
-                    typeof lng !== "number" ||
-                    Number.isNaN(lat) ||
-                    Number.isNaN(lng)
-                )
-                    return null;
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
                 return {
                     type: "Feature",
                     geometry: { type: "Point", coordinates: [lng, lat] },
@@ -59,45 +438,592 @@ function toGeoJSONPoints(items, getCoord, getProps) {
     };
 }
 
-const operatorToIcon = {
-    "Javno podjetje Ljubljanski potniški promet d.o.o.": "lpp",
-    "Nomago d.o.o.": "nomago",
-    "Arriva d.o.o.": "arriva",
-    "Javno podjetje za mestni potniški promet Marprom, d.o.o.": "marprom",
-    "Avtobusni promet Murska Sobota d.d.": "murska",
-};
+// --- Map layer setup ---------------------------------------------------------
+
+function registerHaloLayer(map, prefix) {
+    const id = `${prefix}-halo`;
+    if (map.getLayer(id)) return;
+    const { fill, stroke } = BRAND_COLORS.default;
+    const haloColorExpr = [
+        "match",
+        ["coalesce", ["get", "brand"], ["get", "icon"]],
+        "arriva",
+        BRAND_COLORS.arriva.fill,
+        "sz",
+        BRAND_COLORS.sz.fill,
+        "nomago",
+        BRAND_COLORS.nomago.fill,
+        "lpp",
+        BRAND_COLORS.lpp.fill,
+        "marprom",
+        BRAND_COLORS.marprom.fill,
+        fill,
+    ];
+    const haloStrokeExpr = [
+        "match",
+        ["coalesce", ["get", "brand"], ["get", "icon"]],
+        "arriva",
+        BRAND_COLORS.arriva.stroke,
+        "sz",
+        BRAND_COLORS.sz.stroke,
+        "nomago",
+        BRAND_COLORS.nomago.stroke,
+        "lpp",
+        BRAND_COLORS.lpp.stroke,
+        "marprom",
+        BRAND_COLORS.marprom.stroke,
+        stroke,
+    ];
+
+    map.addLayer(
+        {
+            id,
+            type: "circle",
+            source: prefix,
+            filter: ["!", ["has", "point_count"]],
+            paint: {
+                "circle-color": haloColorExpr,
+                "circle-radius": HALO_RADIUS,
+                "circle-stroke-color": haloStrokeExpr,
+                "circle-stroke-width": 2.8,
+                "circle-opacity": 0.6,
+            },
+        },
+        `${prefix}-points`
+    );
+}
+
+function ensureSource(map, id, data, cluster, radius, maxZoom) {
+    if (map.getSource(id)) return;
+    map.addSource(id, {
+        type: "geojson",
+        data,
+        cluster,
+        clusterRadius: radius,
+        clusterMaxZoom: maxZoom,
+    });
+}
+
+function ensureClusterLayers(map, id, color) {
+    if (!map.getLayer(`${id}-clusters`)) {
+        map.addLayer({
+            id: `${id}-clusters`,
+            type: "circle",
+            source: id,
+            filter: ["has", "point_count"],
+            paint: {
+                "circle-color": color,
+                "circle-radius": [
+                    "step",
+                    ["get", "point_count"],
+                    10,
+                    20,
+                    13,
+                    50,
+                    17,
+                ],
+                "circle-opacity": 0.8,
+            },
+        });
+    }
+
+    if (!map.getLayer(`${id}-cluster-count`)) {
+        map.addLayer({
+            id: `${id}-cluster-count`,
+            type: "symbol",
+            source: id,
+            filter: ["has", "point_count"],
+            layout: {
+                "text-field": ["get", "point_count_abbreviated"],
+                "text-font": ["Open Sans Semibold"],
+                "text-size": 10,
+            },
+            paint: { "text-color": "#ffffff" },
+        });
+    }
+}
+
+function ensurePointLayer(map, id, iconSize, anchor) {
+    if (map.getLayer(`${id}-points`)) return;
+    map.addLayer({
+        id: `${id}-points`,
+        type: "symbol",
+        source: id,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+            "icon-image": ["get", "icon"],
+            "icon-allow-overlap": true,
+            "icon-size": iconSize,
+            "icon-anchor": anchor,
+        },
+    });
+}
+
+function registerClusterInteraction(map, prefix) {
+    map.on("click", `${prefix}-clusters`, (event) => {
+        const features = map.queryRenderedFeatures(event.point, {
+            layers: [`${prefix}-clusters`],
+        });
+        const clusterId = features[0]?.properties?.cluster_id;
+        if (!clusterId) return;
+        const source = map.getSource(prefix);
+        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+            if (err) return;
+            map.easeTo({ center: features[0].geometry.coordinates, zoom });
+        });
+    });
+
+    map.on("mouseenter", `${prefix}-clusters`, () => {
+        map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", `${prefix}-clusters`, () => {
+        map.getCanvas().style.cursor = "";
+    });
+}
+
+function setupSourcesAndLayers(map, dataBySource) {
+    Object.entries(CLUSTER_CONFIG).forEach(([id, config]) => {
+        ensureSource(
+            map,
+            id,
+            dataBySource[id],
+            true,
+            config.radius,
+            config.maxZoom
+        );
+        ensureClusterLayers(map, id, config.color);
+        ensurePointLayer(
+            map,
+            id,
+            ICON_SIZE_BY_LAYER[id],
+            ICON_ANCHOR_BY_LAYER[id]
+        );
+        if (!["busStops", "trainStops"].includes(id)) {
+            registerHaloLayer(map, id);
+        }
+        registerClusterInteraction(map, id);
+    });
+}
+
+function updateSourceData(map, id, data) {
+    const source = map.getSource(id);
+    if (source && source.setData) source.setData(data);
+}
+
+function ensureIcons(map) {
+    return Promise.all(
+        ICON_SOURCES.map(({ id, image }) => loadImage(map, id, image))
+    );
+}
+
+function loadImage(map, id, src) {
+    return new Promise((resolve) => {
+        if (map.hasImage(id)) {
+            resolve();
+            return;
+        }
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            try {
+                map.addImage(id, img, { sdf: false });
+            } catch (err) {
+                console.warn(`Ne morem dodati slike "${id}":`, err);
+            }
+            resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = src;
+    });
+}
+
+// --- Popup wiring ------------------------------------------------------------
+
+function attachPopup(map, layerId, formatter, afterOpen) {
+    map.on("click", layerId, (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const content = formatter(feature.properties || {});
+        const popup = new maplibregl.Popup({ closeButton: false }).setLngLat(
+            event.lngLat
+        );
+
+        if (content && typeof content === "object" && content instanceof Node) {
+            popup.setDOMContent(content);
+        } else {
+            popup.setHTML(String(content ?? ""));
+        }
+
+        popup.addTo(map);
+        if (typeof afterOpen === "function") {
+            afterOpen(popup, feature.properties || {}, event.lngLat);
+        }
+    });
+
+    map.on("mouseenter", layerId, () => {
+        map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", layerId, () => {
+        map.getCanvas().style.cursor = "";
+    });
+}
+
+function configureBusStopPopup({ map, onSelectStop }) {
+    map.on("click", "busStops-points", (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const [lng, lat] = feature.geometry.coordinates;
+        const popupContent = createBusStopPopup(
+            props,
+            [lat, lng],
+            onSelectStop
+        );
+
+        new maplibregl.Popup({ closeButton: false })
+            .setLngLat([lng, lat])
+            .setDOMContent(popupContent)
+            .addTo(map);
+    });
+}
+
+function configureTrainStopPopup({ map, onSelectStop }) {
+    map.on("click", "trainStops-points", (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const [lng, lat] = feature.geometry.coordinates;
+        const popupContent = createTrainStopPopup(
+            props,
+            [lat, lng],
+            onSelectStop
+        );
+
+        new maplibregl.Popup({ closeButton: false })
+            .setLngLat([lng, lat])
+            .setDOMContent(popupContent)
+            .addTo(map);
+    });
+}
+
+function configureTrainPopup({ map, onSelectVehicle, onNavigateRoute }) {
+    attachPopup(
+        map,
+        "trainPositions-points",
+        renderTrainPopup,
+        (popup, properties) => {
+            if (!properties) return;
+            const container = popup.getElement();
+            if (!container) return;
+            const button = container.querySelector(
+                '[data-role="view-sz-route"]'
+            );
+            if (!button) return;
+
+            button.addEventListener(
+                "click",
+                (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    let from = properties.from;
+                    let to = properties.to;
+
+                    if (typeof from === "string") {
+                        try {
+                            from = JSON.parse(from);
+                        } catch (error) {
+                            console.warn(
+                                "Ne morem razvozljati podatkov 'from':",
+                                error
+                            );
+                            from = null;
+                        }
+                    }
+
+                    if (typeof to === "string") {
+                        try {
+                            to = JSON.parse(to);
+                        } catch (error) {
+                            console.warn(
+                                "Ne morem razvozljati podatkov 'to':",
+                                error
+                            );
+                            to = null;
+                        }
+                    }
+
+                    onSelectVehicle({
+                        tripId: properties.tripId || null,
+                        tripShort: properties.tripShort || null,
+                        departure: properties.departure || null,
+                        arrival: properties.arrival || null,
+                        realTime:
+                            properties.realTime === true ||
+                            properties.realTime === "true",
+                        from,
+                        to,
+                    });
+                    onNavigateRoute();
+                    popup.remove();
+                },
+                { once: true }
+            );
+        }
+    );
+}
+
+function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
+    attachPopup(
+        map,
+        "buses-points",
+        (properties) => {
+            if (!properties || typeof properties !== "object") {
+                return `<div style="min-width:180px">Ni podatkov</div>`;
+            }
+            if (properties.sourceType === "lpp")
+                return renderLppPopup(properties);
+            if (properties.sourceType === "ijpp")
+                return renderIjppPopup(properties);
+            return renderDefaultBusPopup(properties);
+        },
+        (popup, properties) => {
+            if (!properties) return;
+            const container = popup.getElement();
+            if (!container) return;
+
+            if (properties.sourceType === "ijpp") {
+                const button = container.querySelector(
+                    '[data-role="view-route"]'
+                );
+                if (button) {
+                    button.addEventListener(
+                        "click",
+                        (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const rawStops = properties.stops;
+                            let stops = [];
+                            if (Array.isArray(rawStops)) {
+                                stops = rawStops;
+                            } else if (typeof rawStops === "string") {
+                                try {
+                                    stops = JSON.parse(rawStops);
+                                } catch (err) {
+                                    console.warn(
+                                        "Neveljaven format postaj:",
+                                        err
+                                    );
+                                }
+                            }
+                            onSelectVehicle({
+                                lineName: properties.lineName || null,
+                                operator: properties.operator || null,
+                                tripId: properties.tripId || null,
+                                routeId: properties.routeId || null,
+                                journeyPatternId:
+                                    properties.journeyPatternId || null,
+                                stops,
+                                vehicleRef:
+                                    properties.vehicleRef ||
+                                    properties.vehicleId ||
+                                    null,
+                                destination:
+                                    properties.lineDestination ||
+                                    properties.destination ||
+                                    null,
+                                origin: properties.origin || null,
+                                lastKnown: Date.now(),
+                            });
+                            onNavigateRoute();
+                            popup.remove();
+                        },
+                        { once: true }
+                    );
+                }
+            }
+
+            if (properties.sourceType === "lpp") {
+                const button = container.querySelector(
+                    '[data-role="view-lpp-route"]'
+                );
+                if (button) {
+                    button.addEventListener(
+                        "click",
+                        (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onSelectVehicle({
+                                lineId: properties.lineId ?? null,
+                                tripId: properties.tripId ?? null,
+                                lineNumber: properties.lineNumber ?? null,
+                                lineName: properties.lineName ?? null,
+                            });
+                            onNavigateRoute();
+                            popup.remove();
+                        },
+                        { once: true }
+                    );
+                }
+            }
+        }
+    );
+}
+
+function createBusStopPopup({ name, id, ref_id }, coordinates, onSelect) {
+    const wrapper = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = name || "";
+    const button = document.createElement("button");
+    button.textContent = "Tukaj sem";
+    button.className = "popup-button";
+    wrapper.appendChild(title);
+    wrapper.appendChild(button);
+
+    button.addEventListener("click", () => {
+        onSelect({
+            id: id ?? name,
+            name,
+            gpsLocation: coordinates,
+            ref_id: ref_id ?? null,
+        });
+    });
+
+    return wrapper;
+}
+
+function createTrainStopPopup({ name, stopId, id }, coordinates, onSelect) {
+    const wrapper = document.createElement("div");
+    const title = document.createElement("h3");
+    title.textContent = name || "";
+    wrapper.appendChild(title);
+
+    if (stopId) {
+        const code = document.createElement("p");
+        code.textContent = stopId;
+        code.style.margin = "4px 0";
+        code.style.opacity = "0.75";
+        wrapper.appendChild(code);
+    }
+
+    const button = document.createElement("button");
+    button.textContent = "Izberi postajo";
+    button.className = "popup-button";
+    wrapper.appendChild(button);
+
+    button.addEventListener("click", () => {
+        onSelect({
+            id: stopId ?? id ?? name,
+            name,
+            stopId: stopId ?? null,
+            gpsLocation: coordinates,
+            lat: coordinates?.[0] ?? null,
+            lon: coordinates?.[1] ?? null,
+        });
+    });
+
+    return wrapper;
+}
+
+// --- Marker helpers ----------------------------------------------------------
+
+function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
+    if (markersRef.current[key]) {
+        markersRef.current[key].remove();
+        markersRef.current[key] = null;
+    }
+    if (!coords) return;
+
+    const element = document.createElement("img");
+    element.src = img;
+    element.style.width = `${size[0]}px`;
+    element.style.height = `${size[1]}px`;
+    element.style.transform = "translate(-50%, -100%)";
+
+    const marker = new maplibregl.Marker({ element, anchor: "bottom" })
+        .setLngLat([coords[1], coords[0]])
+        .addTo(map);
+
+    if (popup) {
+        marker.setPopup(
+            new maplibregl.Popup({ closeButton: false }).setHTML(
+                `<h4>${escapeHTML(popup)}</h4>`
+            )
+        );
+        element.style.cursor = "pointer";
+    }
+
+    markersRef.current[key] = marker;
+}
+
+// --- React component ---------------------------------------------------------
 
 const Map = React.memo(function Map({
     gpsPositions,
     busStops,
-    trainStops,
+    trainStops = [],
     activeStation,
     setActiveStation,
     userLocation,
-    setCurentUrl,
     trainPositions,
+    setSelectedVehicle,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
+    const initialCenterRef = useRef(
+        userLocation || activeStation?.coordinates || DEFAULT_CENTER
+    );
+    const handlersRef = useRef({
+        setActiveStation,
+        setSelectedVehicle,
+    });
+
+    useEffect(() => {
+        handlersRef.current = {
+            setActiveStation,
+            setSelectedVehicle,
+        };
+    }, [setActiveStation, setSelectedVehicle]);
 
     const center = useMemo(
-        () => activeStation?.coordinates || userLocation || [46.0569, 14.5058],
+        () => activeStation?.coordinates || userLocation || DEFAULT_CENTER,
         [activeStation, userLocation]
     );
 
     const busesGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
-                gpsPositions || [],
-                (g) => g.gpsLocation,
-                (g) => ({
-                    title: g.route || "",
-                    lineName: g.lineName || "",
-                    operator: g.operator || "",
-                    icon: operatorToIcon[g.operator] || "bus-generic",
-                    brand: operatorToIcon[g.operator] || "generic",
-                })
+                gpsPositions,
+                (position) => position?.gpsLocation,
+                (position) => {
+                    const props = { ...position };
+                    delete props.gpsLocation;
+
+                    if (props.title === undefined && position?.route) {
+                        props.title = position.route;
+                    }
+                    if (!props.lineName && position?.lineName) {
+                        props.lineName = position.lineName;
+                    }
+
+                    const isLpp =
+                        (typeof position?.operator === "string" &&
+                            position.operator
+                                .toLowerCase()
+                                .includes("ljubljanski potniški promet")) ||
+                        position?.lineNumber !== undefined ||
+                        position?.lineId !== undefined;
+
+                    props.sourceType = isLpp ? "lpp" : "ijpp";
+                    props.icon =
+                        operatorToIcon[position?.operator] || "bus-generic";
+                    props.brand =
+                        operatorToIcon[position?.operator] || "generic";
+                    props.operator = position?.operator || props.operator || "";
+
+                    return props;
+                }
             ),
         [gpsPositions]
     );
@@ -105,14 +1031,22 @@ const Map = React.memo(function Map({
     const busStopsGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
-                busStops || [],
-                (s) => s.gpsLocation,
-                (s) => ({
-                    id: s.id,
-                    name: s.name,
-                    icon: "bus-stop",
-                    ref_id: s.ref_id ?? null,
-                })
+                busStops,
+                (stop) => stop?.gpsLocation,
+                (stop) => {
+                    const id =
+                        stop?.ijppID ??
+                        stop?.refID ??
+                        stop?.ref_id ??
+                        stop?.id ??
+                        stop?.name;
+                    return {
+                        id,
+                        name: stop?.name,
+                        icon: "bus-stop",
+                        ref_id: stop?.ref_id ?? stop?.refID ?? null,
+                    };
+                }
             ),
         [busStops]
     );
@@ -120,9 +1054,43 @@ const Map = React.memo(function Map({
     const trainStopsGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
-                trainStops || [],
-                (t) => [t.lat, t.lng],
-                (t) => ({ id: t.id, name: t.name || t.naziv, icon: "train-stop" })
+                trainStops,
+                (stop) => {
+                    const lat = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[0]
+                            : stop?.lat
+                    );
+                    const lon = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[1]
+                            : stop?.lon
+                    );
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                        return null;
+                    }
+                    return [lat, lon];
+                },
+                (stop) => {
+                    const lat = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[0]
+                            : stop?.lat
+                    );
+                    const lon = Number(
+                        Array.isArray(stop?.gpsLocation)
+                            ? stop.gpsLocation[1]
+                            : stop?.lon
+                    );
+                    return {
+                        id: stop?.stopId ?? stop?.id ?? stop?.name,
+                        name: stop?.name ?? "",
+                        stopId: stop?.stopId ?? null,
+                        icon: "train-stop",
+                        lat: Number.isFinite(lat) ? lat : null,
+                        lon: Number.isFinite(lon) ? lon : null,
+                    };
+                }
             ),
         [trainStops]
     );
@@ -130,480 +1098,161 @@ const Map = React.memo(function Map({
     const trainPositionsGeoJSON = useMemo(
         () =>
             toGeoJSONPoints(
-                trainPositions || [],
-                (t) => {
-                    const coord = t?.Koordinate;
+                trainPositions,
+                (train) => {
+                    const coord = train?.gpsLocation;
                     if (!coord) return null;
                     const [lng, lat] = String(coord)
                         .split(",")
-                        .map((v) => Number(v.trim()));
-                    if (
-                        typeof lat !== "number" ||
-                        typeof lng !== "number" ||
-                        Number.isNaN(lat) ||
-                        Number.isNaN(lng)
-                    )
+                        .map((value) => Number(value.trim()))
+                        .slice(0, 2);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lng))
                         return null;
                     return [lat, lng];
                 },
-                (t) => ({
-                    id: t.St_vlaka,
-                    relation: t.Relacija,
-                    station: t.Postaja,
-                    departure: t.Odhod,
-                    delay: t.Zamuda_cas,
-                    rank: t.Rang,
-                    type: t.Vrsta_vlaka,
-                    icon: "train",
-                    brand: "sz",
-                })
+                (train) => {
+                    const relation = [train?.from?.name, train?.to?.name]
+                        .filter(Boolean)
+                        .join(" - ");
+                    return {
+                        id: train?.tripId,
+                        relation,
+                        fromStation: train?.from?.name,
+                        toStation: train?.to?.name,
+                        departure: train?.departure,
+                        arrival: train?.arrival,
+                        icon: "train",
+                        brand: "sz",
+                        tripId: train?.tripId ?? null,
+                        tripShort: train?.tripShort ?? null,
+                        realTime: train?.realtime ?? false,
+                        from: JSON.stringify(train?.from ?? null),
+                        to: JSON.stringify(train?.to ?? null),
+                    };
+                }
             ),
         [trainPositions]
     );
 
     useEffect(() => {
         if (mapInstanceRef.current) return;
+
         const map = new maplibregl.Map({
             container: mapRef.current,
             style: STYLE,
-            center: [center[1], center[0]],
-            zoom: 13,
+            center: [initialCenterRef.current[1], initialCenterRef.current[0]],
+            zoom: DEFAULT_ZOOM,
             attributionControl: false,
         });
 
         mapInstanceRef.current = map;
+
         map.addControl(
-            new maplibregl.NavigationControl({ showCompass: false }),
+            new maplibregl.NavigationControl({ showCompass: true }),
             "top-right"
         );
 
-        map.on("load", () => {
-            const addImage = (name, src, options) =>
-                new Promise((resolve) => {
-                    const img = new Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => {
-                        try {
-                            map.addImage(name, img, options || {});
-                            resolve();
-                        } catch {
-                            resolve();
-                        }
+        map.on("load", async () => {
+            await ensureIcons(map);
+
+            setupSourcesAndLayers(map, {
+                buses: busesGeoJSON,
+                busStops: busStopsGeoJSON,
+                trainPositions: trainPositionsGeoJSON,
+                trainStops: trainStopsGeoJSON,
+            });
+
+            configureBusStopPopup({
+                map,
+                onSelectStop: (stop) => {
+                    const {
+                        setActiveStation: applyActive,
+                    } = handlersRef.current;
+
+                    const payload = {
+                        name: stop.name,
+                        coordinates: stop.gpsLocation,
+                        id: stop.id,
+                        ref_id: stop.ref_id,
                     };
-                    img.onerror = () => resolve();
-                    img.src = src;
-                });
 
-            const imageAdds = [
-                addImage("bus-stop", busStopPNG, { sdf: false }),
-                addImage("train-stop", trainStopPNG, { sdf: false }),
-                addImage("train", szPNG, { sdf: false }),
-                addImage("user", userPNG, { sdf: false }),
-                addImage("station", locationPNG, { sdf: false }),
-                addImage("arriva", arrivaPNG, { sdf: false }),
-                addImage("lpp", lppPNG, { sdf: false }),
-                addImage("nomago", nomagoPNG, { sdf: false }),
-                addImage("marprom", marpromPNG, { sdf: false }),
-                addImage("murska", murskaPNG, { sdf: false }),
-                addImage("bus-generic", locationPNG, { sdf: false }),
-                addImage("train-generic", locationPNG, { sdf: false }),
-            ];
-
-            Promise.all(imageAdds).then(() => {
-                if (!map.getSource("buses")) {
-                    map.addSource("buses", {
-                        type: "geojson",
-                        data: busesGeoJSON,
-                        cluster: true,
-                        clusterRadius: 40,
-                        clusterMaxZoom: 14,
-                    });
-                }
-                if (!map.getSource("busStops")) {
-                    map.addSource("busStops", {
-                        type: "geojson",
-                        data: busStopsGeoJSON,
-                        cluster: true,
-                        clusterRadius: 60,
-                        clusterMaxZoom: 20,
-                    });
-                }
-                // lppBusStops merged into busStops
-                if (!map.getSource("trainStops")) {
-                    map.addSource("trainStops", {
-                        type: "geojson",
-                        data: trainStopsGeoJSON,
-                        cluster: true,
-                        clusterRadius: 80,
-                        clusterMaxZoom: 15,
-                    });
-                }
-                // New: train positions source
-                if (!map.getSource("trainPositions")) {
-                    map.addSource("trainPositions", {
-                        type: "geojson",
-                        data: trainPositionsGeoJSON,
-                        cluster: true,
-                        clusterRadius: 80,
-                        clusterMaxZoom: 15,
-                    });
-                }
-
-                // Cluster layers (smaller circles, fewer)
-                const addClusterLayers = (prefix, color) => {
-                    if (!map.getLayer(`${prefix}-clusters`)) {
-                        map.addLayer({
-                            id: `${prefix}-clusters`,
-                            type: "circle",
-                            source: prefix,
-                            filter: ["has", "point_count"],
-                            paint: {
-                                "circle-color": color,
-                                "circle-radius": [
-                                    "step",
-                                    ["get", "point_count"],
-                                    10,
-                                    20,
-                                    13,
-                                    50,
-                                    17,
-                                ],
-                                "circle-opacity": 0.8,
-                            },
-                        });
-                    }
-                    if (!map.getLayer(`${prefix}-cluster-count`)) {
-                        map.addLayer({
-                            id: `${prefix}-cluster-count`,
-                            type: "symbol",
-                            source: prefix,
-                            filter: ["has", "point_count"],
-                            layout: {
-                                "text-field": [
-                                    "get",
-                                    "point_count_abbreviated",
-                                ],
-                                "text-font": ["Open Sans Semibold"],
-                                "text-size": 10,
-                            },
-                            paint: { "text-color": "#ffffff" },
-                        });
-                    }
-                };
-
-                addClusterLayers("buses", "#5b8cff");
-                addClusterLayers("busStops", "#7a5bff");
-                // lppBusStops merged into busStops
-                addClusterLayers("trainStops", "#5b8cff");
-                addClusterLayers("trainPositions", "#ff5b5b");
-
-                // Unclustered icons with smaller, zoom-based sizes
-                const addUnclusteredIconLayer = (
-                    prefix,
-                    sizeExpr,
-                    anchor = "bottom"
-                ) => {
-                    if (!map.getLayer(`${prefix}-points`)) {
-                        map.addLayer({
-                            id: `${prefix}-points`,
-                            type: "symbol",
-                            source: prefix,
-                            filter: ["!", ["has", "point_count"]],
-                            layout: {
-                                "icon-image": ["get", "icon"],
-                                "icon-allow-overlap": true,
-                                "icon-size": sizeExpr,
-                                "icon-anchor": anchor,
-                            },
-                        });
-                    }
-                };
-
-                const busSize = [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    8,
-                    0.28,
-                    12,
-                    0.36,
-                    14,
-                    0.44,
-                    16,
-                    0.52,
-                ];
-                const stopSize = [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    8,
-                    0.24,
-                    12,
-                    0.32,
-                    14,
-                    0.4,
-                    16,
-                    0.48,
-                ];
-                const trainSize = [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    8,
-                    0.26,
-                    12,
-                    0.34,
-                    14,
-                    0.42,
-                    16,
-                    0.5,
-                ];
-                const trainPosSize = [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    8,
-                    0.26,
-                    12,
-                    0.34,
-                    14,
-                    0.42,
-                    16,
-                    0.5,
-                ];
-
-                // Center vehicle icons so they sit inside their halo circles
-                addUnclusteredIconLayer("buses", busSize, "center");
-                addUnclusteredIconLayer("busStops", stopSize, "bottom");
-                // lppBusStops merged into busStops
-                addUnclusteredIconLayer("trainStops", trainSize, "bottom");
-                addUnclusteredIconLayer(
-                    "trainPositions",
-                    trainPosSize,
-                    "center"
-                );
-
-                // New: colored circle halos under bus/train position icons
-                const brandColorExpr = [
-                    "match",
-                    ["coalesce", ["get", "brand"], ["get", "icon"]],
-                    "arriva",
-                    "#5bc0ff", // light blue
-                    "sz",
-                    "#5bc9ff", // SŽ light blue
-                    "nomago",
-                    "#ffeb3b", // yellow
-                    "lpp",
-                    "#4caf50", // green
-                    "marprom",
-                    "#f44336", // red
-                    /* default */ "#607d8b", // grey-blue
-                ];
-                const brandColorExprDarkened = [
-                    "match",
-                    ["coalesce", ["get", "brand"], ["get", "icon"]],
-                    "arriva",
-                    "#0091ea", // dark blue
-                    "sz",
-                    "#0091ea", // SŽ dark blue
-                    "nomago",
-                    "#fbc02d", // dark yellow
-                    "lpp",
-                    "#388e3c", // dark green
-                    "marprom",
-                    "#d32f2f", // dark red
-                    /* default */ "#455a64", // dark grey-blue
-                ];
-                const circleRadius = [
-                    "interpolate",
-                    ["linear"],
-                    ["zoom"],
-                    22,
-                    22,
-                    30,
-                    26,
-                    34,
-                    30,
-                    38,
-                    34,
-                ];
-                const addUnclusteredCircleLayer = (prefix) => {
-                    const id = `${prefix}-halo`;
-                    if (!map.getLayer(id)) {
-                        map.addLayer(
-                            {
-                                id,
-                                type: "circle",
-                                source: prefix,
-                                filter: ["!", ["has", "point_count"]],
-                                paint: {
-                                    "circle-color": brandColorExpr,
-                                    "circle-radius": circleRadius,
-                                    "circle-stroke-color":
-                                        brandColorExprDarkened,
-                                    "circle-stroke-width": 2.8,
-                                    "circle-opacity": 0.6,
-                                },
-                            },
-                            // place below the icon layer
-                            `${prefix}-points`
-                        );
-                    }
-                };
-
-                addUnclusteredCircleLayer("buses");
-                addUnclusteredCircleLayer("trainPositions");
-
-                // Cluster interactions
-                const registerClusterClick = (prefix) => {
-                    map.on("click", `${prefix}-clusters`, (e) => {
-                        const features = map.queryRenderedFeatures(e.point, {
-                            layers: [`${prefix}-clusters`],
-                        });
-                        const clusterId = features[0]?.properties?.cluster_id;
-                        if (!clusterId) return;
-                        const source = map.getSource(prefix);
-                        source.getClusterExpansionZoom(
-                            clusterId,
-                            (err, zoom) => {
-                                if (err) return;
-                                map.easeTo({
-                                    center: features[0].geometry.coordinates,
-                                    zoom,
-                                });
-                            }
-                        );
-                    });
-                    map.on("mouseenter", `${prefix}-clusters`, () => {
-                        map.getCanvas().style.cursor = "pointer";
-                    });
-                    map.on("mouseleave", `${prefix}-clusters`, () => {
-                        map.getCanvas().style.cursor = "";
-                    });
-                };
-
-                registerClusterClick("buses");
-                registerClusterClick("busStops");
-                // lppBusStops merged into busStops
-                registerClusterClick("trainStops");
-                registerClusterClick("trainPositions");
-
-                // Bus stop popup with action button
-                map.on("click", "busStops-points", (e) => {
-                    const f = e.features?.[0];
-                    if (!f) return;
-                    const { id, name, ref_id } = f.properties || {};
-                    const [lng, lat] = f.geometry.coordinates;
-
-                    const wrapper = document.createElement("div");
-                    const title = document.createElement("h3");
-                    title.textContent = name || "";
-                    const btn = document.createElement("button");
-                    btn.textContent = "Tukaj sem";
-                    btn.className = "popup-button";
-                    wrapper.appendChild(title);
-                    wrapper.appendChild(btn);
-
-                    const popup = new maplibregl.Popup({ closeButton: true })
-                        .setLngLat([lng, lat])
-                        .setDOMContent(wrapper)
-                        .addTo(map);
-
-                    btn.addEventListener("click", () => {
-                        const busStop = {
-                            id: id ?? name,
-                            name,
-                            gpsLocation: [lat, lng],
-                            ref_id: ref_id ?? null,
-                        };
-                        const payload = {
-                            name: busStop.name,
-                            coordinates: busStop.gpsLocation,
-                            id: busStop.id,
-                            ref_id: busStop.ref_id,
-                        };
-                        setActiveStation(payload);
-                        localStorage.setItem(
-                            "activeStation",
-                            JSON.stringify(payload)
-                        );
-                        setCurentUrl("/arrivals");
-                        document.location.href = "/#/arrivals";
-                        popup.remove();
-                    });
-                });
-
-                // Simple popups for buses and train stops
-                const attachPopup = (layerId, formatter) => {
-                    map.on("click", layerId, (e) => {
-                        const f = e.features?.[0];
-                        if (!f) return;
-                        const html = formatter(f.properties);
-                        new maplibregl.Popup({ closeButton: true })
-                            .setLngLat(e.lngLat)
-                            .setHTML(html)
-                            .addTo(map);
-                    });
-                    map.on("mouseenter", layerId, () => {
-                        map.getCanvas().style.cursor = "pointer";
-                    });
-                    map.on("mouseleave", layerId, () => {
-                        map.getCanvas().style.cursor = "";
-                    });
-                };
-
-                attachPopup("trainPositions-points", (p) => {
-                    const number = p.id || p.St_vlaka || "";
-                    const relation = p.relation || p.Relacija || "";
-                    const station = p.station || p.Postaja || "";
-                    const departure = p.departure || p.Odhod || "";
-                    const delay =
-                        p.delay !== undefined
-                            ? p.delay
-                            : p.Zamuda_cas !== undefined
-                            ? p.Zamuda_cas
-                            : null;
-
-                    return (
-                        `<div style="min-width:180px">` +
-                        (number
-                            ? `<div style="font-weight:600">Vlak ${number}</div>`
-                            : "") +
-                        (relation ? `<div>Relacija: ${relation}</div>` : "") +
-                        (station
-                            ? `<div>Naslednja postaja: ${station}</div>`
-                            : "") +
-                        (departure ? `<div>Odhod: ${departure}</div>` : "") +
-                        (delay !== null
-                            ? `<div>Zamuda: ${delay} min</div>`
-                            : "") +
-                        `</div>`
+                    applyActive(payload);
+                    localStorage.setItem(
+                        "activeStation",
+                        JSON.stringify(payload)
                     );
-                });
+                    applyUrl("/arrivals");
+                    window.location.hash = "/arrivals";
+                },
+            });
 
-                attachPopup("buses-points", (p) => {
-                    const route = p.title || "";
-                    const line = p.lineName || "";
-                    const op = p.operator || "";
-                    return (
-                        `<div style="min-width:160px">` +
-                        `<p>${route}</p>` +
-                        `<p>${line}</p>` +
-                        `<p>${op}</p>` +
-                        `</div>`
-                    );
-                });
+            configureTrainStopPopup({
+                map,
+                onSelectStop: (stop) => {
+                    const {
+                        setActiveStation: applyActive,
+                    } = handlersRef.current;
 
-                attachPopup("trainStops-points", (p) => {
-                    const name = p.name || "";
-                    const id = p.id || "";
-                    return (
-                        `<div style="min-width:160px">` +
-                        `<div style="font-weight:600">${name}</div>` +
-                        `<div>ID: ${id}</div>` +
-                        `</div>`
+                    const coordinates = Array.isArray(stop?.gpsLocation)
+                        ? stop.gpsLocation
+                        : [stop?.lat, stop?.lon];
+                    if (
+                        !Array.isArray(coordinates) ||
+                        !Number.isFinite(coordinates[0]) ||
+                        !Number.isFinite(coordinates[1])
+                    ) {
+                        return;
+                    }
+
+                    const payload = {
+                        name: stop.name,
+                        coordinates,
+                        gpsLocation: coordinates,
+                        stopId: stop.stopId ?? null,
+                        id: stop.id ?? stop.stopId ?? stop.name,
+                        lat: coordinates[0],
+                        lon: coordinates[1],
+                        type: "train-stop",
+                    };
+
+                    applyActive(payload);
+                    localStorage.setItem(
+                        "activeStation",
+                        JSON.stringify(payload)
                     );
-                });
+                    applyUrl("/arrivals");
+                    window.location.hash = "/arrivals";
+                },
+            });
+
+            const handleSelectVehicle = (vehicle) => {
+                const { setSelectedVehicle: applySelectedVehicle } =
+                    handlersRef.current;
+                try {
+                    localStorage.setItem(
+                        "selectedBusRoute",
+                        JSON.stringify(vehicle)
+                    );
+                } catch (err) {
+                    console.warn("Shranjevanje ni uspelo:", err);
+                }
+                applySelectedVehicle(vehicle);
+            };
+
+            const handleNavigateRoute = () => {
+                window.location.hash = "/route";
+            };
+
+            configureTrainPopup({
+                map,
+                onSelectVehicle: handleSelectVehicle,
+                onNavigateRoute: handleNavigateRoute,
+            });
+
+            configureBusPopup({
+                map,
+                onSelectVehicle: handleSelectVehicle,
+                onNavigateRoute: handleNavigateRoute,
             });
         });
 
@@ -616,30 +1265,16 @@ const Map = React.memo(function Map({
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
-        const src = map.getSource("buses");
-        if (src && src.setData) src.setData(busesGeoJSON);
-    }, [busesGeoJSON]);
-
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-        const src = map.getSource("busStops");
-        if (src && src.setData) src.setData(busStopsGeoJSON);
-    }, [busStopsGeoJSON]);
-
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-        const src = map.getSource("trainStops");
-        if (src && src.setData) src.setData(trainStopsGeoJSON);
-    }, [trainStopsGeoJSON]);
-
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-        const src = map.getSource("trainPositions");
-        if (src && src.setData) src.setData(trainPositionsGeoJSON);
-    }, [trainPositionsGeoJSON]);
+        updateSourceData(map, "buses", busesGeoJSON);
+        updateSourceData(map, "busStops", busStopsGeoJSON);
+        updateSourceData(map, "trainPositions", trainPositionsGeoJSON);
+        updateSourceData(map, "trainStops", trainStopsGeoJSON);
+    }, [
+        busesGeoJSON,
+        busStopsGeoJSON,
+        trainPositionsGeoJSON,
+        trainStopsGeoJSON,
+    ]);
 
     useEffect(() => {
         const map = mapInstanceRef.current;
@@ -650,41 +1285,30 @@ const Map = React.memo(function Map({
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
-        const ensureMarker = (key, coords, img, size = [22, 22], popupText) => {
-            if (markersRef.current[key]) {
-                markersRef.current[key].remove();
-                markersRef.current[key] = null;
-            }
-            if (!coords) return;
-            const el = document.createElement("img");
-            el.src = img;
-            el.style.width = `${size[0]}px`;
-            el.style.height = `${size[1]}px`;
-            el.style.transform = "translate(-50%, -100%)";
-            const m = new maplibregl.Marker({ element: el, anchor: "bottom" })
-                .setLngLat([coords[1], coords[0]])
-                .addTo(map);
-            if (popupText) {
-                m.setPopup(
-                    new maplibregl.Popup().setHTML(`<h4>${popupText}</h4>`)
-                );
-                el.style.cursor = "pointer";
-            }
-            markersRef.current[key] = m;
-        };
 
-        ensureMarker("user", userLocation, userPNG, [22, 22], "Vaša lokacija");
-        ensureMarker(
-            "active",
-            activeStation?.coordinates,
-            locationPNG,
-            [22, 22],
-            "Aktivna postaja"
-        );
+        refreshMarker({
+            map,
+            markersRef,
+            key: "user",
+            coords: userLocation,
+            img: userPNG,
+            size: [22, 22],
+            popup: "Vaša lokacija",
+        });
+
+        refreshMarker({
+            map,
+            markersRef,
+            key: "active",
+            coords: activeStation?.coordinates,
+            img: locationPNG,
+            size: [22, 22],
+            popup: "Aktivna postaja",
+        });
     }, [userLocation, activeStation]);
 
     return (
-        <div className="insideDiv">
+        <div>
             <div className="map-container">
                 <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
             </div>
