@@ -3,11 +3,6 @@ import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
 import { Map, Clock, MapPin, ArrowRightLeft } from "lucide-react";
 import "./App.css";
 
-const MapTab = lazy(() => import("./tabs/map"));
-const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
-const NearMeTab = lazy(() => import("./tabs/nearMe"));
-const BusRouteTab = lazy(() => import("./tabs/busRoute"));
-
 import {
     fetchAllBusStops,
     fetchLPPPositions,
@@ -21,8 +16,12 @@ import {
     fetchSzArrivals,
 } from "./Api.jsx";
 
+const MapTab = lazy(() => import("./tabs/map"));
+const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
+const NearMeTab = lazy(() => import("./tabs/nearMe"));
+const RouteTab = lazy(() => import("./tabs/route.jsx"));
+
 function App() {
-    const [currentUrl, setCurrentUrl] = useState(window.location.hash.slice(1));
     const [activeStation, setActiveStation] = useState(
         localStorage.getItem("activeStation")
             ? JSON.parse(localStorage.getItem("activeStation"))
@@ -57,8 +56,14 @@ function App() {
     const [lppRoute, setLppRoute] = useState([]);
     const [szRoute, setSzRoute] = useState([]);
 
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    // Redirecta na zemljevid, če ni izbrane postaje
+    useEffect(() => {
+        if (!activeStation || activeStation.length === 0) {
+            document.location.href = "/#/map";
+        }
+    }, [activeStation]);
 
+    // Za fetchanje SZ tripov iz prihodov
     const getSzTripFromId = async (tripId) => {
         try {
             const route = await fetchSzTrip(tripId);
@@ -76,23 +81,7 @@ function App() {
         }
     };
 
-    useEffect(() => {
-        if (!isSettingsOpen) return;
-        const onKey = (e) => {
-            if (e.key === "Escape") setIsSettingsOpen(false);
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [isSettingsOpen]);
-
-    useEffect(() => {
-        if (!activeStation || activeStation.length === 0) {
-            document.location.href = "/#/map";
-            setCurrentUrl("/map");
-        }
-    }, [activeStation]);
-
-    // Fetch all bus stops
+    // Fetcha busne postaje ob zagonu
     useEffect(() => {
         const loadBusStops = async () => {
             try {
@@ -106,7 +95,7 @@ function App() {
         loadBusStops();
     }, []);
 
-    //Fetch train and bus positions periodically
+    // Na 15 sekund fetcha pozicije vlakov + busov
     useEffect(() => {
         setInterval(() => {
             const fetchPositions = async () => {
@@ -132,7 +121,7 @@ function App() {
         }, 15000);
     }, []);
 
-    // Get user's location
+    // Dobi userjevo lokacijo
     useEffect(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
@@ -153,7 +142,7 @@ function App() {
         }
     }, []);
 
-    // LPP arrivals
+    // LPP prihodi
     useEffect(() => {
         const load = async () => {
             const lppCode = activeStation?.ref_id || activeStation.station_code;
@@ -172,7 +161,7 @@ function App() {
         load();
     }, [activeStation]);
 
-    // IJPP arrivals
+    // IJPP prihodi
     useEffect(() => {
         const load = async () => {
             const ijppId = activeStation?.ijpp_id;
@@ -192,7 +181,7 @@ function App() {
         load();
     }, [activeStation]);
 
-    // SZ arrivals
+    // SZ prihodi
     useEffect(() => {
         const load = async () => {
             const szId = activeStation?.stopId;
@@ -226,6 +215,7 @@ function App() {
         load();
     }, [selectedVehicle]);
 
+    // Dobi LPP routo iz prihodov (na isto foro kot SZ)
     const setLppRouteArrival = async (arrival) => {
         try {
             const route = await fetchLppRoute(arrival.tripId);
@@ -249,7 +239,7 @@ function App() {
         }
     };
 
-    // Fetch SZ stops
+    // Fetcha SZ postaje ob zagonu
     useEffect(() => {
         const load = async () => {
             try {
@@ -263,7 +253,7 @@ function App() {
         load();
     }, []);
 
-    // Fetch SZ trip info
+    // Fetcha SZ routo
     useEffect(() => {
         const load = async () => {
             if (!selectedVehicle) return;
@@ -295,7 +285,6 @@ function App() {
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        setCurrentUrl={setCurrentUrl}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                     />
@@ -311,7 +300,6 @@ function App() {
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        setCurrentUrl={setCurrentUrl}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                     />
@@ -326,7 +314,6 @@ function App() {
                                         lppArrivals={lppArrivals}
                                         szArrivals={szArrivals}
                                         getSzTripFromId={getSzTripFromId}
-                                        setCurrentUrl={setCurrentUrl}
                                         setLppRouteFromArrival={
                                             setLppRouteArrival
                                         }
@@ -341,18 +328,16 @@ function App() {
                                         busStops={busStops}
                                         szStops={szStops}
                                         userLocation={userLocation}
-                                        setCurentUrl={setCurrentUrl}
                                     />
                                 }
                             />
                             <Route
                                 path="/route"
                                 element={
-                                    <BusRouteTab
+                                    <RouteTab
                                         selectedVehicle={selectedVehicle}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
-                                        setCurrentUrl={setCurrentUrl}
                                         setActiveStation={setActiveStation}
                                     />
                                 }
@@ -362,25 +347,25 @@ function App() {
                 </div>
                 <nav>
                     <NavLink to="/map">
-                        <button onClick={() => setCurrentUrl("/map")}>
+                        <button>
                             <Map size={24} />
                             <h3>Zemljevid</h3>
                         </button>
                     </NavLink>
                     <NavLink to="/arrivals">
-                        <button onClick={() => setCurrentUrl("/arrivals")}>
+                        <button>
                             <Clock size={24} />
                             <h3>Prihodi</h3>
                         </button>
                     </NavLink>
                     <NavLink to="/stations">
-                        <button onClick={() => setCurrentUrl("/stations")}>
+                        <button>
                             <MapPin size={24} />
                             <h3>V bližini</h3>
                         </button>
                     </NavLink>
                     <NavLink to="/route">
-                        <button onClick={() => setCurrentUrl("/route")}>
+                        <button>
                             <ArrowRightLeft size={24} />
                             <h3>Pot</h3>
                         </button>

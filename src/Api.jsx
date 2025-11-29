@@ -1,5 +1,5 @@
 const now = new Date();
-const later = new Date(now.getTime() + 60000); // 1 minute window
+const later = new Date(now.getTime() + 60000); // 1 minuta
 
 const busStopsLink =
     "https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/unified_stops_with_gtfs.json";
@@ -25,8 +25,19 @@ const szStopsLink =
     "https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/sz_stops.json";
 
 /**
- *  Fetches all bus stops
- *  @returns Array of bus stops
+ * Helper za fetchanje JSON podatkov
+ * @param {*} url - Link
+ * @returns JSON s podatki
+ */
+async function fetchJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return response.json();
+}
+
+/**
+ *  Fetcha vse bus postaje
+ *  @returns Tabelo vseh bus postaj
  */
 const fetchAllBusStops = async () => {
     try {
@@ -75,19 +86,8 @@ const fetchAllBusStops = async () => {
 };
 
 /**
- * Fetches JSON data from a given URL
- * @param {*} url - Link
- * @returns JSON data
- */
-async function fetchJson(url) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return response.json();
-}
-
-/**
- * Fetches LPP bus positions
- * @returns Array of LPP bus positions
+ * Fetcha LPP bus pozicije
+ * @returns Tabela z LPP pozicijami
  */
 const fetchLPPPositions = async () => {
     try {
@@ -113,8 +113,8 @@ const fetchLPPPositions = async () => {
 };
 
 /**
- * Fetches IJPP vehicle positions
- * @returns Array of IJPP vehicle positions
+ * Fetcha IJPP podatke o vozilih (preko proxyja za https://ijpp.nikigre.si/getData)
+ * @returns Tabela z IJPP pozicijami in routami ('stops' lastnost)
  */
 const fetchIJPPPositions = async () => {
     try {
@@ -154,8 +154,8 @@ const fetchIJPPPositions = async () => {
 };
 
 /**
- * Fetches SZ train positions
- * @returns Array of SZ train positions
+ * Fetcha pozicije vlakov
+ * @returns Tabelo s pozicijami vlakov
  */
 const fetchTrainPositions = async () => {
     try {
@@ -195,9 +195,9 @@ const fetchTrainPositions = async () => {
 };
 
 /**
- * Helper function to decode a polyline string into coordinates
- * @param {string} str - Encoded polyline string
- * @returns {Array} Array of [longitude, latitude] coordinates
+ * Helper za dekodiranje nekega sranja za dobit lokacije vlakov
+ * @param {string} str - Polyline tekst
+ * @returns {Array} Tabelo [longitude, latitude] koordinat
  */
 function decodePolyline(str) {
     let index = 0,
@@ -233,9 +233,9 @@ function decodePolyline(str) {
 }
 
 /**
- * Fetches LPP arrivals for a given station code
- * @param {string} stationCode - Station code
- * @returns Array of arrivals
+ * Fetcha LPP prihode za dano postajo (preko proxyja za https://data.lpp.si/api/station/arrival)
+ * @param {string} stationCode - ID postaje
+ * @returns Tabelo prihodov
  */
 const fetchLppArrivals = async (stationCode) => {
     if (!stationCode) return [];
@@ -258,7 +258,6 @@ const fetchLppArrivals = async (stationCode) => {
                 to: arrival.stations?.arrival,
             }))
             .sort((a, b) => a.etaMinutes - b.etaMinutes);
-            console.log(arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching LPP arrivals:", error);
@@ -267,9 +266,9 @@ const fetchLppArrivals = async (stationCode) => {
 };
 
 /**
- * Fetches IJPP arrivals for a given IJPP stop ID
- * @param {string} ijppId - IJPP stop ID
- * @returns Array of arrivals
+ * Fetcha IJPP prihode za dano IJPP postajo (trenutno ne dela)
+ * @param {string} ijppId - ID IJPP postaje
+ * @returns Tabelo prihodov
  */
 const fetchIjppArrivals = async (ijppId) => {
     if (!ijppId) return [];
@@ -298,9 +297,9 @@ const fetchIjppArrivals = async (ijppId) => {
 };
 
 /**
- * Fetches LPP route details for a given trip ID
- * @param {string} tripId - Trip ID
- * @returns Route details
+ * Fetcha LPP routo za določen trip ID (preko proxyja za https://data.lpp.si/api/route/arrivals-on-route)
+ * @param {string} tripId - ID tripa
+ * @returns Postaje na poti in prihode na posamezne postaje
  */
 const fetchLppRoute = async (tripId) => {
     if (!tripId) return null;
@@ -314,9 +313,9 @@ const fetchLppRoute = async (tripId) => {
 };
 
 /**
- * Fetches SZ trip details for a given trip ID
- * @param {string} tripId - Trip ID
- * @returns Trip details
+ * Fetcha pot SZ linije
+ * @param {string} tripId - ID poti
+ * @returns Podrobnosti o routi vlaka
  */
 const fetchSzTrip = async (tripId) => {
     if (!tripId) return null;
@@ -371,8 +370,8 @@ const fetchSzTrip = async (tripId) => {
 };
 
 /**
- * Fetches stops for sz trains
- * @returns Array of stops
+ * Fetcha postaje vlakov
+ * @returns Tabelo s postajami
  */
 const fetchSzStops = async () => {
     try {
@@ -385,8 +384,8 @@ const fetchSzStops = async () => {
 };
 
 /**
- * Fetches next 100 SZ trips for a selected train station
- * @returns Array of trips
+ * Fetcha naslednjih 100 prihodov za izbrano železniško postajo
+ * @returns Tabelo prihodov
  */
 const fetchSzArrivals = async (stationCode) => {
     if (!stationCode) return [];

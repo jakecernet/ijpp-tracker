@@ -965,7 +965,6 @@ const Map = React.memo(function Map({
     activeStation,
     setActiveStation,
     userLocation,
-    setCurrentUrl,
     trainPositions,
     setSelectedVehicle,
 }) {
@@ -977,17 +976,15 @@ const Map = React.memo(function Map({
     );
     const handlersRef = useRef({
         setActiveStation,
-        setCurrentUrl,
         setSelectedVehicle,
     });
 
     useEffect(() => {
         handlersRef.current = {
             setActiveStation,
-            setCurrentUrl,
             setSelectedVehicle,
         };
-    }, [setActiveStation, setCurrentUrl, setSelectedVehicle]);
+    }, [setActiveStation, setSelectedVehicle]);
 
     const center = useMemo(
         () => activeStation?.coordinates || userLocation || DEFAULT_CENTER,
@@ -1170,7 +1167,6 @@ const Map = React.memo(function Map({
                 onSelectStop: (stop) => {
                     const {
                         setActiveStation: applyActive,
-                        setCurrentUrl: applyUrl,
                     } = handlersRef.current;
 
                     const payload = {
@@ -1195,7 +1191,6 @@ const Map = React.memo(function Map({
                 onSelectStop: (stop) => {
                     const {
                         setActiveStation: applyActive,
-                        setCurrentUrl: applyUrl,
                     } = handlersRef.current;
 
                     const coordinates = Array.isArray(stop?.gpsLocation)
@@ -1245,8 +1240,6 @@ const Map = React.memo(function Map({
             };
 
             const handleNavigateRoute = () => {
-                const { setCurrentUrl: applyUrl } = handlersRef.current;
-                applyUrl("/route");
                 window.location.hash = "/route";
             };
 

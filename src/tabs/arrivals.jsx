@@ -8,7 +8,6 @@ const ArrivalsTab = ({
     lppArrivals,
     szArrivals,
     getSzTripFromId,
-    setCurrentUrl,
     setLppRouteFromArrival,
 }) => {
     const [arrivals, setArrivals] = useState([]);
@@ -16,6 +15,7 @@ const ArrivalsTab = ({
     const [searchTerm, setSearchTerm] = useState("");
     const [error, setError] = useState(null);
 
+    // Ceu kup sranja za formatiranje in sortiranje prihodov
     useEffect(() => {
         if (stopArrivals.length === 0) return;
         const now = new Date();
@@ -82,18 +82,21 @@ const ArrivalsTab = ({
         );
     }, [activeStation]);
 
+    // Filtriranje ijpp prihodov
     const filteredArrivals = useMemo(() => {
         return arrivals.filter((arrival) =>
             arrival.routeName.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [arrivals, searchTerm]);
 
+    // Filtriranje sz prihodov
     const filteredSzArrivals = useMemo(() => {
         return szArrivals?.stopTimes?.filter((arrival) =>
             arrival.headsign.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [szArrivals, searchTerm]);
 
+    // Filtriranje lpp prihodov
     const filteredLPPArrivals = useMemo(() => {
         return lppArrivals.filter(
             (arrival) =>
@@ -119,6 +122,7 @@ const ArrivalsTab = ({
         });
     };
 
+    // Formatiranje zamude za sz prihode
     const formatDelay = (scheduledDeparture, actualDeparture) => {
         if (!scheduledDeparture || !actualDeparture) return "N/A";
 
@@ -133,6 +137,7 @@ const ArrivalsTab = ({
         return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
     };
 
+    // Uradna imena --> normalna imena
     const shortenOperatorName = (operator) => {
         switch (operator) {
             case "Javno podjetje Ljubljanski potniški promet d.o.o.":
@@ -184,7 +189,6 @@ const ArrivalsTab = ({
                             className="lpp-arrival-item arrival-item"
                             onClick={() => {
                                 setLppRouteFromArrival(arrival);
-                                setCurrentUrl("/route");
                                 window.location.hash = "/route";
                             }}
                         >
@@ -207,7 +211,6 @@ const ArrivalsTab = ({
                         className="sz-arrival-item arrival-item"
                         onClick={() => {
                             getSzTripFromId(arrival.tripId);
-                            setCurrentUrl("/route");
                             window.location.hash = "/route";
                         }}
                     >

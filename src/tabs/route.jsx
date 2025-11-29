@@ -1,8 +1,7 @@
-const BusRouteTab = ({
+const RouteTab = ({
     selectedVehicle,
     lppRoute,
     szRoute,
-    setCurrentUrl,
     setActiveStation,
 }) => {
     const isLPP = selectedVehicle?.lineNumber != null;
@@ -52,7 +51,6 @@ const BusRouteTab = ({
                                             "activeStation",
                                             JSON.stringify(stop)
                                         );
-                                        setCurrentUrl("/arrivals");
                                         window.location.hash = "/arrivals";
                                     }}
                                 >
@@ -121,7 +119,6 @@ const BusRouteTab = ({
                                         onClick={() => {
                                             console.log("Clicked stop:", stop);
                                             setActiveStation(stop);
-                                            setCurrentUrl("/arrivals");
                                             window.location.hash = "/arrivals";
                                         }}
                                     >
@@ -170,4 +167,4 @@ const BusRouteTab = ({
     );
 };
 
-export default BusRouteTab;
+export default RouteTab;
