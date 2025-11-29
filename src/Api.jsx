@@ -258,6 +258,7 @@ const fetchLppArrivals = async (stationCode) => {
                 to: arrival.stations?.arrival,
             }))
             .sort((a, b) => a.etaMinutes - b.etaMinutes);
+            console.log(arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching LPP arrivals:", error);

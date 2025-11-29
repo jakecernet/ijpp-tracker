@@ -973,7 +973,7 @@ const Map = React.memo(function Map({
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
     const initialCenterRef = useRef(
-        activeStation?.coordinates || userLocation || DEFAULT_CENTER
+        userLocation || activeStation?.coordinates || DEFAULT_CENTER
     );
     const handlersRef = useRef({
         setActiveStation,

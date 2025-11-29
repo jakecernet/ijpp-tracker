@@ -9,6 +9,7 @@ const ArrivalsTab = ({
     szArrivals,
     getSzTripFromId,
     setCurrentUrl,
+    setLppRouteFromArrival,
 }) => {
     const [arrivals, setArrivals] = useState([]);
     const [stationSelected, setStationSelected] = useState(false);
@@ -181,6 +182,11 @@ const ArrivalsTab = ({
                         <div
                             key={index}
                             className="lpp-arrival-item arrival-item"
+                            onClick={() => {
+                                setLppRouteFromArrival(arrival);
+                                setCurrentUrl("/route");
+                                window.location.hash = "/route";
+                            }}
                         >
                             <div className="left">
                                 <div className="circle">

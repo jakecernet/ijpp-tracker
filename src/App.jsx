@@ -156,7 +156,7 @@ function App() {
     // LPP arrivals
     useEffect(() => {
         const load = async () => {
-            const lppCode = activeStation?.ref_id;
+            const lppCode = activeStation?.ref_id || activeStation.station_code;
             if (!lppCode) {
                 setLppArrivals([]);
                 return;
@@ -211,10 +211,13 @@ function App() {
     // LPP route
     useEffect(() => {
         const load = async () => {
-            if (!selectedVehicle) return;
-            if (!selectedVehicle.lineId) return;
             try {
-                const route = await fetchLppRoute(selectedVehicle.tripId);
+                const route = await fetchLppRoute(
+                    selectedVehicle.tripId ||
+                        JSON.parse(localStorage.getItem("selectedBusRoute"))
+                            ?.tripId
+                );
+                console.log("LPP route loaded:", route);
                 setLppRoute(route);
             } catch (error) {
                 console.error("Error loading LPP route:", error);
@@ -222,6 +225,29 @@ function App() {
         };
         load();
     }, [selectedVehicle]);
+
+    const setLppRouteArrival = async (arrival) => {
+        try {
+            const route = await fetchLppRoute(arrival.tripId);
+            setLppRoute(route);
+            setSelectedVehicle({
+                tripId: arrival.tripId,
+                lineNumber: arrival.routeName,
+                lineName: arrival.tripName,
+                operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
+            });
+            localStorage.setItem(
+                "selectedBusRoute",
+                JSON.stringify({
+                    tripId: arrival.tripId,
+                    tripName: arrival.tripName,
+                    routeName: arrival.routeName,
+                })
+            );
+        } catch (error) {
+            console.error("Error loading LPP route:", error);
+        }
+    };
 
     // Fetch SZ stops
     useEffect(() => {
@@ -301,6 +327,9 @@ function App() {
                                         szArrivals={szArrivals}
                                         getSzTripFromId={getSzTripFromId}
                                         setCurrentUrl={setCurrentUrl}
+                                        setLppRouteFromArrival={
+                                            setLppRouteArrival
+                                        }
                                     />
                                 }
                             />
