@@ -1,3 +1,5 @@
+import { de } from "date-fns/locale";
+
 const now = new Date();
 const later = new Date(now.getTime() + 60000); // 1 minuta
 
@@ -6,16 +8,16 @@ const busStopsLink =
 
 const lppLocationsLink =
     "https://mestnipromet.cyou/api/v1/resources/buses/info";
-const ijppLocationsLink = "https://tracker.cernetic.cc/api/ijpp-positions";
+const ijppLocationsLink = "https://api.beta.brezavta.si/vehicles/locations";
 const szLocationsLink = `https://mapper-motis.ojpp-gateway.derp.si/api/v1/map/trips?min=49.415360776528956%2C7.898969151846785&max=36.38523043114108%2C26.9347879737411&startTime=${encodeURIComponent(
     now.toISOString()
 )}&endTime=${encodeURIComponent(later.toISOString())}&zoom=20`;
 
-const ijppArrivalsLink =
-    "https://tracker.cernetic.cc/api/ijpp-arrivals?stop-id=";
+const ijppArrivalsLink = "https://api.beta.brezavta.si/stops/";
 const lppArrivalsLink =
     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
+const ijppRouteLink = "https://api.beta.brezavta.si/trips/";
 const szRouteLink =
     "https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
 const szArrivalsLink =
@@ -113,40 +115,30 @@ const fetchLPPPositions = async () => {
 };
 
 /**
- * Fetcha IJPP podatke o vozilih (preko proxyja za https://ijpp.nikigre.si/getData)
+ * Fetcha IJPP podatke o vozilih
  * @returns Tabela z IJPP pozicijami in routami ('stops' lastnost)
  */
 const fetchIJPPPositions = async () => {
     try {
         const data = await fetchJson(ijppLocationsLink);
         const ijppPositions = Array.isArray(data)
-            ? data.map((vehicle) => ({
-                  gpsLocation: [
-                      parseFloat(vehicle?.VehicleLocation?.Latitude) || 0,
-                      parseFloat(vehicle?.VehicleLocation?.Longitude) || 0,
-                  ],
-                  operator:
-                      vehicle?.OperatorData?.agency_name ||
-                      vehicle?.OperatorRef ||
-                      "",
-                  lineName:
-                      vehicle?.PublishedLineName || vehicle?.LineRef || "",
-                  journeyPatternId:
-                      vehicle?.JourneyPatternRef ||
-                      vehicle?.JourneyPatternName ||
-                      null,
-                  tripId:
-                      vehicle?.LineData?.tripId ||
-                      vehicle?.LineData?.trip?.trip_id ||
-                      null,
-                  routeId:
-                      vehicle?.LineData?.trip?.route_id ||
-                      vehicle?.LineData?.trip?.routeId ||
-                      null,
-                  stops: vehicle?.LineData?.stops || [],
-              }))
+            ? data
+                  .filter(
+                      (vehicle) =>
+                          vehicle?.vehicle?.operator_name !=
+                          "Ljubljanski Potniški Promet"
+                  )
+                  .map((vehicle) => ({
+                      gpsLocation: [vehicle?.lat || 0, vehicle?.lon || 0],
+                      heading: vehicle?.heading || 0,
+                      operator: vehicle?.vehicle?.operator_name || "/",
+                      lineName: vehicle?.trip_headsign,
+                      tripId: vehicle?.trip_id,
+                      vehicleId: vehicle?.vehicle?.id,
+                      stop: vehicle && vehicle.stop ? vehicle.stop.name : "/",
+                      stopStatus: vehicle?.stop_status,
+                  }))
             : [];
-
         return ijppPositions;
     } catch (error) {
         console.error("Error fetching ijpp positions:", error);
@@ -233,6 +225,40 @@ function decodePolyline(str) {
 }
 
 /**
+ *  Fetcha IJPP trip
+ * @param {string} tripId - ID tripa
+ * @returns Podrobnosti o tripu
+ */
+const fetchIJPPTrip = async (tripId) => {
+    if (!tripId) return null;
+    try {
+        const dateString = new Date().toISOString().split("T")[0];
+        const raw = await fetchJson(
+            ijppRouteLink + tripId + `?date=${dateString}`
+        );
+        const trip = {
+            tripName: raw?.trip_headsign || "",
+            tripId: raw?.gtfs_id || "",
+            stops: raw?.stop_times
+                ? raw.stop_times.map((stop) => ({
+                      arrival: seconds2time(stop.arrival_realtime),
+                      departure: seconds2time(stop.departure_realtime),
+                      realtime: stop.realtime,
+                      passed: stop.passed,
+                      name: stop.stop.name,
+                      gtfsId: stop.stop.gtfs_id,
+                      gpsLocation: [stop.stop.lat || 0, stop.stop.lon || 0],
+                  }))
+                : [],
+        };
+        return trip;
+    } catch (error) {
+        console.error("Error fetching IJPP trip:", error);
+        return null;
+    }
+};
+
+/**
  * Fetcha LPP prihode za dano postajo (preko proxyja za https://data.lpp.si/api/station/arrival)
  * @param {string} stationCode - ID postaje
  * @returns Tabelo prihodov
@@ -265,6 +291,17 @@ const fetchLppArrivals = async (stationCode) => {
     }
 };
 
+/** Pretvori sekunde od polnoči v časovni format HH:MM:SS
+ * @param {number} seconds - Sekunde od polnoči
+ * @returns Čas v formatu HH:MM:SS
+ */
+function seconds2time(seconds) {
+    let hour = `${Math.floor(seconds / 3600)}`.padStart(2, "0");
+    let minute = `${Math.floor((seconds % 3600) / 60)}`.padStart(2, "0");
+    let second = `${seconds % 60}`.padStart(2, "0");
+    return `${hour}:${minute}:${second}`;
+}
+
 /**
  * Fetcha IJPP prihode za dano IJPP postajo (trenutno ne dela)
  * @param {string} ijppId - ID IJPP postaje
@@ -273,22 +310,53 @@ const fetchLppArrivals = async (stationCode) => {
 const fetchIjppArrivals = async (ijppId) => {
     if (!ijppId) return [];
     try {
-        const raw = await fetchJson(ijppArrivalsLink + ijppId);
-        const list = Array.isArray(raw?.routes) ? raw.routes : [];
-        const arrivals = list
-            .map((arrival) => ({
-                name:
-                    (arrival?.trips?.first_stop ?? "") +
-                    " - " +
-                    (arrival?.trips?.last_stop ?? ""),
-                arrivalTime: arrival?.trips?.stop_times?.arrival_time ?? null,
-            }))
-            // some IJPP responses may not have etaMinutes; keep stable order
-            .sort((a, b) => {
-                const A = Number(a.arrivalTime) || 0;
-                const B = Number(b.arrivalTime) || 0;
-                return A - B;
-            });
+        const raw = await fetchJson(
+            ijppArrivalsLink + ijppId + "?current=true"
+        );
+        const list = Array.isArray(raw?.arrivals) ? raw.arrivals : [];
+        console.log(list);
+        const arrivals = list.map((arrival) => {
+            const computeRelative = (rt) => {
+                if (rt == null) return null;
+                // if rt looks like epoch seconds (greater than seconds in a day), treat as epoch seconds
+                if (typeof rt === "number" && rt > 86400) {
+                    return Math.round((rt * 1000 - Date.now()) / 1000);
+                }
+                // otherwise treat rt as seconds-since-midnight
+                const seconds = Number(rt);
+                if (!Number.isFinite(seconds)) return null;
+                const hh = Math.floor(seconds / 3600);
+                const mm = Math.floor((seconds % 3600) / 60);
+                const ss = Math.floor(seconds % 60);
+                const now = new Date();
+                const arrivalDate = new Date(now);
+                arrivalDate.setHours(hh, mm, ss, 0);
+                let diffSec = Math.round((arrivalDate - now) / 1000);
+                return diffSec;
+            };
+
+            return {
+                operatorName: arrival?.agency_name,
+                tripName: arrival?.trip_headsign,
+                passed: arrival?.passed,
+                realTime: arrival?.realtime,
+                scheduledArrival: seconds2time(arrival?.arrival_scheduled),
+                realtimeArrival: seconds2time(arrival?.arrival_realtime),
+                arrivalDelay: arrival?.arrival_delay,
+                scheduledDeparture: seconds2time(arrival?.departure_scheduled),
+                realtimeDeparture: seconds2time(arrival?.departure_realtime),
+                departureDelay: arrival?.departure_delay,
+                tripId: arrival?.trip_id,
+                routeId: arrival?.route_id,
+                relativeArrival: (
+                    computeRelative(arrival.arrival_realtime) / 60
+                ).toFixed(0),
+                relativeDeparture: (
+                    computeRelative(arrival.departure_realtime) / 60
+                ).toFixed(0),
+            };
+        });
+        console.log("Fetched IJPP arrivals:", arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching IJPP arrivals:", error);
@@ -400,6 +468,6 @@ const fetchSzArrivals = async (stationCode) => {
 };
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
-export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute };
+export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
 export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };

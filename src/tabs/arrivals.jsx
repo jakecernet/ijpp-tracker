@@ -4,74 +4,15 @@ import { sl } from "date-fns/locale";
 
 const ArrivalsTab = ({
     activeStation,
-    stopArrivals,
+    ijppArrivals,
     lppArrivals,
     szArrivals,
     getSzTripFromId,
     setLppRouteFromArrival,
 }) => {
-    const [arrivals, setArrivals] = useState([]);
     const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [error, setError] = useState(null);
-
-    // Ceu kup sranja za formatiranje in sortiranje prihodov
-    useEffect(() => {
-        if (stopArrivals.length === 0) return;
-        const now = new Date();
-        try {
-            const formattedArrivals = stopArrivals
-                .map((arrival) => {
-                    let arrivalDate = null;
-                    let departureDate = null;
-
-                    if (arrival.timeArrival == null) {
-                        arrival.timeArrival = arrival.timeDeparture;
-                    }
-
-                    if (arrival.timeDeparture == null) {
-                        arrival.timeDeparture = arrival.timeArrival;
-                    }
-
-                    if (arrival.timeArrival) {
-                        const [hours, minutes] = arrival.timeArrival
-                            .split(":")
-                            .map(Number);
-                        arrivalDate = set(now, { hours, minutes, seconds: 0 });
-                    }
-
-                    if (arrival.timeDeparture) {
-                        const [depHours, depMinutes] = arrival.timeDeparture
-                            .split(":")
-                            .map(Number);
-                        departureDate = set(arrivalDate || now, {
-                            hours: depHours,
-                            minutes: depMinutes,
-                            seconds: 0,
-                        });
-                    }
-
-                    return {
-                        routeName: arrival.routeName || "N/A",
-                        timeArrival: arrivalDate,
-                        timeDeparture: departureDate,
-                        operator: arrival.operator || "N/A",
-                    };
-                })
-                .filter((item) => !item.timeArrival || item.timeArrival > now)
-                .sort((a, b) => {
-                    if (!a.timeArrival && !b.timeArrival) return 0;
-                    if (!a.timeArrival) return 1;
-                    if (!b.timeArrival) return -1;
-                    return a.timeArrival.getTime() - b.timeArrival.getTime();
-                });
-            setArrivals(formattedArrivals);
-            setError(null);
-        } catch (err) {
-            console.error("Error processing arrivals:", err);
-            setError("Napaka pri obdelavi podatkov o prihodih.");
-        }
-    }, [stopArrivals]);
 
     useEffect(() => {
         const activeStationData = JSON.parse(
@@ -84,10 +25,18 @@ const ArrivalsTab = ({
 
     // Filtriranje ijpp prihodov
     const filteredArrivals = useMemo(() => {
-        return arrivals.filter((arrival) =>
-            arrival.routeName.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [arrivals, searchTerm]);
+        return ijppArrivals
+            .filter((arrival) =>
+                arrival?.tripName
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())
+            )
+            .filter(
+                (arrival) =>
+                    arrival?.operatorName !==
+                    "Ljubljanski potniški promet, d.o.o."
+            );
+    }, [ijppArrivals, searchTerm]);
 
     // Filtriranje sz prihodov
     const filteredSzArrivals = useMemo(() => {
@@ -167,15 +116,19 @@ const ArrivalsTab = ({
             <div className="arrival-list">
                 {!error &&
                     filteredArrivals.map((arrival, index) => (
-                        <div key={index} className="arrival-item">
-                            <h3>{arrival.routeName}</h3>
-                            <>
-                                Prihod: {formatArrivalTime(arrival.timeArrival)}{" "}
-                                ({formatRelativeTime(arrival.timeArrival)})
-                            </>
+                        <div
+                            key={index}
+                            className="arrival-item"
+                            style={{
+                                gridTemplateColumns: "1fr 1fr 1fr",
+                                padding: "10px 0",
+                            }}
+                        >
+                            <h3>{arrival.tripName}</h3>
+                            <p>Prihod: {arrival.realtimeArrival}</p>
                             <p>
                                 Prevoznik:{" "}
-                                {shortenOperatorName(arrival.operator)}
+                                {shortenOperatorName(arrival.operatorName)}
                             </p>
                         </div>
                     ))}
@@ -202,9 +155,6 @@ const ArrivalsTab = ({
                             <p>LPP</p>
                         </div>
                     ))}
-                {!stationSelected && (
-                    <p>Ni prihajajočih prihodov za izbrano postajo.</p>
-                )}
                 {filteredSzArrivals?.map((arrival, index) => (
                     <div
                         key={index}

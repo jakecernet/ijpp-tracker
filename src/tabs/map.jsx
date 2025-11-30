@@ -341,11 +341,13 @@ function renderIjppPopup(properties) {
         properties.title ||
         properties.routeId ||
         "Vozilo";
-    const relation = summarizeStops(properties.stops);
-    const rows =
-        createRow("Prevoznik", properties.operator) +
-        createRow("Relacija", relation);
-    const stopsSection = renderStopsList(properties.stops);
+    const operator = createRow("Prevoznik", properties.operator);
+    const stop = createRow(
+        properties.stopStatus === "STOPPED_AT"
+            ? "Na postaji: "
+            : "Naslednja postaja: ",
+        properties.stop
+    );
     const extra = renderExtraFields(properties, [
         "lineName",
         "title",
@@ -354,6 +356,10 @@ function renderIjppPopup(properties) {
         "stops",
         "journeyPatternId",
         "tripId",
+        "heading",
+        "vehicleId",
+        "stop",
+        "stopStatus",
     ]);
 
     return (
@@ -361,8 +367,8 @@ function renderIjppPopup(properties) {
         `<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
             String(heading)
         )}</div>` +
-        rows +
-        stopsSection +
+        operator +
+        stop +
         '<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
         extra +
         `</div>`
@@ -820,20 +826,9 @@ function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
                                 lineName: properties.lineName || null,
                                 operator: properties.operator || null,
                                 tripId: properties.tripId || null,
-                                routeId: properties.routeId || null,
-                                journeyPatternId:
-                                    properties.journeyPatternId || null,
-                                stops,
-                                vehicleRef:
-                                    properties.vehicleRef ||
-                                    properties.vehicleId ||
-                                    null,
-                                destination:
-                                    properties.lineDestination ||
-                                    properties.destination ||
-                                    null,
-                                origin: properties.origin || null,
-                                lastKnown: Date.now(),
+                                vehicleId: properties.vehicleId || null,
+                                stop: properties.stop || null,
+                                stopStatus: properties.stopStatus || null,
                             });
                             onNavigateRoute();
                             popup.remove();
@@ -870,7 +865,11 @@ function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
     );
 }
 
-function createBusStopPopup({ name, id, ref_id }, coordinates, onSelect) {
+function createBusStopPopup(
+    { name, id, ref_id, gtfs_id },
+    coordinates,
+    onSelect
+) {
     const wrapper = document.createElement("div");
     const title = document.createElement("h3");
     title.textContent = name || "";
@@ -886,6 +885,7 @@ function createBusStopPopup({ name, id, ref_id }, coordinates, onSelect) {
             name,
             gpsLocation: coordinates,
             ref_id: ref_id ?? null,
+            gtfs_id: gtfs_id ?? null,
         });
     });
 
@@ -1045,6 +1045,7 @@ const Map = React.memo(function Map({
                         name: stop?.name,
                         icon: "bus-stop",
                         ref_id: stop?.ref_id ?? stop?.refID ?? null,
+                        gtfs_id: stop?.gtfs_id ?? null,
                     };
                 }
             ),
@@ -1165,15 +1166,16 @@ const Map = React.memo(function Map({
             configureBusStopPopup({
                 map,
                 onSelectStop: (stop) => {
-                    const {
-                        setActiveStation: applyActive,
-                    } = handlersRef.current;
+                    const { setActiveStation: applyActive } =
+                        handlersRef.current;
 
                     const payload = {
                         name: stop.name,
                         coordinates: stop.gpsLocation,
                         id: stop.id,
                         ref_id: stop.ref_id,
+                        gtfs_id: stop.gtfs_id,
+                        type: "bus-stop",
                     };
 
                     applyActive(payload);
@@ -1189,9 +1191,8 @@ const Map = React.memo(function Map({
             configureTrainStopPopup({
                 map,
                 onSelectStop: (stop) => {
-                    const {
-                        setActiveStation: applyActive,
-                    } = handlersRef.current;
+                    const { setActiveStation: applyActive } =
+                        handlersRef.current;
 
                     const coordinates = Array.isArray(stop?.gpsLocation)
                         ? stop.gpsLocation

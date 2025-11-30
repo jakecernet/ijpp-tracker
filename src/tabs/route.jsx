@@ -1,9 +1,4 @@
-const RouteTab = ({
-    selectedVehicle,
-    lppRoute,
-    szRoute,
-    setActiveStation,
-}) => {
+const RouteTab = ({ selectedVehicle, lppRoute, szRoute, ijppTrip, setActiveStation }) => {
     const isLPP = selectedVehicle?.lineNumber != null;
     const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
     const szTrip = isSZ && Array.isArray(szRoute) ? szRoute[0] : null;
@@ -83,10 +78,25 @@ const RouteTab = ({
                         </ul>
                     ) : (
                         <ul>
-                            {selectedVehicle?.stops?.map((stop, key) => (
-                                <li key={key}>
-                                    <h3>{stop.stop_name}</h3>
-                                    <p>{stop.arrival_time.slice(0, -3)}</p>
+                            {(ijppTrip?.stops || []).map((stop, key) => (
+                                <li
+                                    key={stop.gtfsId || key}
+                                    onClick={() => {
+                                        const payload = {
+                                            name: stop.name,
+                                            coordinates: stop.gpsLocation,
+                                            id: stop.gtfsId || stop.name,
+                                        };
+                                        setActiveStation(payload);
+                                        localStorage.setItem(
+                                            "activeStation",
+                                            JSON.stringify(payload)
+                                        );
+                                        window.location.hash = "/arrivals";
+                                    }}
+                                >
+                                    <h3>{stop.name}</h3>
+                                    <p>{stop.departure.slice(0, -3)}</p>
                                 </li>
                             ))}
                         </ul>

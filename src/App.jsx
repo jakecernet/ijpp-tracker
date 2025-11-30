@@ -14,6 +14,7 @@ import {
     fetchSzStops,
     fetchSzTrip,
     fetchSzArrivals,
+    fetchIJPPTrip,
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -55,6 +56,7 @@ function App() {
 
     const [lppRoute, setLppRoute] = useState([]);
     const [szRoute, setSzRoute] = useState([]);
+    const [ijppTrip, setIjppTrip] = useState(null);
 
     // Redirecta na zemljevid, če ni izbrane postaje
     useEffect(() => {
@@ -164,7 +166,7 @@ function App() {
     // IJPP prihodi
     useEffect(() => {
         const load = async () => {
-            const ijppId = activeStation?.ijpp_id;
+            const ijppId = activeStation?.gtfs_id;
             if (!ijppId) {
                 setIjppArrivals([]);
                 return;
@@ -269,6 +271,35 @@ function App() {
         load();
     }, [selectedVehicle]);
 
+    // Fetcha IJPP trip stops when selected vehicle is IJPP (not LPP/SZ)
+    useEffect(() => {
+        if (!selectedVehicle) return;
+        const isLPP = selectedVehicle?.lineNumber != null;
+        const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
+        if (isLPP || isSZ) {
+            setIjppTrip(null);
+            return;
+        }
+        const tripId = selectedVehicle?.tripId;
+        if (!tripId) {
+            setIjppTrip(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const trip = await fetchIJPPTrip(tripId);
+                if (!cancelled) setIjppTrip(trip);
+                console.log("IJPP trip loaded:", trip);
+            } catch (err) {
+                if (!cancelled) setIjppTrip(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedVehicle]);
+
     return (
         <Router>
             <div className="container">
@@ -310,7 +341,7 @@ function App() {
                                 element={
                                     <ArrivalsTab
                                         activeStation={activeStation}
-                                        stopArrivals={ijppArrivals}
+                                        ijppArrivals={ijppArrivals}
                                         lppArrivals={lppArrivals}
                                         szArrivals={szArrivals}
                                         getSzTripFromId={getSzTripFromId}
@@ -338,6 +369,7 @@ function App() {
                                         selectedVehicle={selectedVehicle}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
+                                        ijppTrip={ijppTrip}
                                         setActiveStation={setActiveStation}
                                     />
                                 }
