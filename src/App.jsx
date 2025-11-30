@@ -241,6 +241,18 @@ function App() {
         }
     };
 
+    // Dobi IJPP trip iz prihodov
+    const setIjppRouteFromArrival = (arrival) => {
+        if (!arrival?.tripId) return;
+        const vehicle = {
+            tripId: arrival.tripId,
+            lineName: arrival.tripName,
+            operator: arrival.operatorName,
+        };
+        setSelectedVehicle(vehicle);
+        localStorage.setItem("selectedBusRoute", JSON.stringify(vehicle));
+    };
+
     // Fetcha SZ postaje ob zagonu
     useEffect(() => {
         const load = async () => {
@@ -347,6 +359,9 @@ function App() {
                                         getSzTripFromId={getSzTripFromId}
                                         setLppRouteFromArrival={
                                             setLppRouteArrival
+                                        }
+                                        setIjppRouteFromArrival={
+                                            setIjppRouteFromArrival
                                         }
                                     />
                                 }

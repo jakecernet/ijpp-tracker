@@ -86,6 +86,8 @@ const RouteTab = ({ selectedVehicle, lppRoute, szRoute, ijppTrip, setActiveStati
                                             name: stop.name,
                                             coordinates: stop.gpsLocation,
                                             id: stop.gtfsId || stop.name,
+                                            gtfs_id: stop.gtfsId,
+                                            gtfsId: stop.gtfsId, 
                                         };
                                         setActiveStation(payload);
                                         localStorage.setItem(

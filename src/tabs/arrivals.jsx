@@ -9,6 +9,7 @@ const ArrivalsTab = ({
     szArrivals,
     getSzTripFromId,
     setLppRouteFromArrival,
+    setIjppRouteFromArrival,
 }) => {
     const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -123,9 +124,13 @@ const ArrivalsTab = ({
                                 gridTemplateColumns: "1fr 1fr 1fr",
                                 padding: "10px 0",
                             }}
+                            onClick={() => {
+                                setIjppRouteFromArrival(arrival);
+                                window.location.hash = "/route";
+                            }}
                         >
                             <h3>{arrival.tripName}</h3>
-                            <p>Prihod: {arrival.realtimeArrival}</p>
+                            <p>Prihod: {(arrival.realtimeArrival).slice(0, -3)}</p>
                             <p>
                                 Prevoznik:{" "}
                                 {shortenOperatorName(arrival.operatorName)}
