@@ -236,6 +236,7 @@ const fetchIJPPTrip = async (tripId) => {
         const raw = await fetchJson(
             ijppRouteLink + tripId + `?date=${dateString}`
         );
+        const pointsResponse = await fetchJson(ijppRouteLink + tripId + "/geometry");
         const trip = {
             tripName: raw?.trip_headsign || "",
             tripId: raw?.gtfs_id || "",
@@ -250,6 +251,7 @@ const fetchIJPPTrip = async (tripId) => {
                       gpsLocation: [stop.stop.lat || 0, stop.stop.lon || 0],
                   }))
                 : [],
+            geometry: pointsResponse.coordinates || [],
         };
         return trip;
     } catch (error) {

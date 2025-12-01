@@ -12,6 +12,7 @@ import busStopPNG from "../img/busStop.png";
 import trainStopPNG from "../img/trainStop.png";
 import szPNG from "../img/sz.png";
 import locationPNG from "../img/location.png";
+import routeStop from "../img/routeStop.png";
 
 // --- Map style configuration -------------------------------------------------
 
@@ -50,6 +51,7 @@ const ICON_SOURCES = [
     { id: "murska", image: murskaPNG },
     { id: "bus-generic", image: locationPNG },
     { id: "train-generic", image: locationPNG },
+    { id: "route-stop", image: routeStop },
 ];
 
 const CLUSTER_CONFIG = {
@@ -112,6 +114,19 @@ const ICON_SIZE_BY_LAYER = {
         16,
         0.48,
     ],
+    routeStops: [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        8,
+        0.24,
+        12,
+        0.32,
+        14,
+        0.4,
+        16,
+        0.48,
+    ],
 };
 
 const ICON_ANCHOR_BY_LAYER = {
@@ -134,8 +149,8 @@ const operatorToIcon = {
     "Javno podjetje Ljubljanski potniški promet d.o.o.": "lpp",
     "Nomago d.o.o.": "nomago",
     "Arriva d.o.o.": "arriva",
-    "Javno podjetje za mestni potniški promet Marprom, d.o.o.": "marprom",
-    "Avtobusni promet Murska Sobota d.d.": "murska",
+    Marprom: "marprom",
+    "AP Murska Sobota, d.d.": "murska",
 };
 
 const HALO_RADIUS = [
@@ -830,7 +845,7 @@ function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
                                 stop: properties.stop || null,
                                 stopStatus: properties.stopStatus || null,
                             });
-                            onNavigateRoute();
+                            /* onNavigateRoute(); */
                             popup.remove();
                         },
                         { once: true }
@@ -967,6 +982,7 @@ const Map = React.memo(function Map({
     userLocation,
     trainPositions,
     setSelectedVehicle,
+    ijppTrip,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -1163,6 +1179,120 @@ const Map = React.memo(function Map({
                 trainStops: trainStopsGeoJSON,
             });
 
+            // Ensure empty IJPP trip sources/layers are present
+            if (!map.getSource("ijpp-trip-line-src")) {
+                map.addSource("ijpp-trip-line-src", {
+                    type: "geojson",
+                    data: {
+                        type: "Feature",
+                        geometry: { type: "LineString", coordinates: [] },
+                        properties: {},
+                    },
+                });
+            }
+            if (!map.getLayer("ijpp-trip-line")) {
+                map.addLayer({
+                    id: "ijpp-trip-line",
+                    type: "line",
+                    source: "ijpp-trip-line-src",
+                    paint: {
+                        "line-color": "#1976d2",
+                        "line-width": [
+                            "interpolate",
+                            ["linear"],
+                            ["zoom"],
+                            10,
+                            3,
+                            14,
+                            5,
+                            16,
+                            7,
+                        ],
+                        "line-opacity": 0.9,
+                    },
+                    layout: { "line-cap": "round", "line-join": "round" },
+                });
+            }
+
+            if (!map.getSource("ijpp-trip-stops-src")) {
+                map.addSource("ijpp-trip-stops-src", {
+                    type: "geojson",
+                    data: { type: "FeatureCollection", features: [] },
+                });
+            }
+            if (!map.getLayer("ijpp-trip-stops-points")) {
+                map.addLayer({
+                    id: "ijpp-trip-stops-points",
+                    type: "symbol",
+                    source: "ijpp-trip-stops-src",
+                    layout: {
+                        "icon-image": "route-stop",
+                        "icon-size": [
+                            "interpolate",
+                            ["linear"],
+                            ["zoom"],
+                            8,
+                            0.22,
+                            12,
+                            0.3,
+                            14,
+                            0.38,
+                            16,
+                            0.46,
+                        ],
+                        "icon-anchor": "bottom",
+                        "icon-allow-overlap": true,
+                    },
+                });
+            }
+
+            // Restore persisted IJPP trip overlay if available
+            try {
+                const persisted = JSON.parse(
+                    localStorage.getItem("ijppTripOverlay") || "null"
+                );
+                if (persisted && typeof persisted === "object") {
+                    const lineSource = map.getSource("ijpp-trip-line-src");
+                    const stopsSource = map.getSource("ijpp-trip-stops-src");
+                    if (lineSource && lineSource.setData && persisted.line) {
+                        lineSource.setData(persisted.line);
+                    }
+                    if (stopsSource && stopsSource.setData && persisted.stops) {
+                        stopsSource.setData(persisted.stops);
+                    }
+                }
+            } catch {}
+
+            // Popup for IJPP trip stops
+            map.on("click", "ijpp-trip-stops-points", (event) => {
+                const feature = event.features?.[0];
+                if (!feature) return;
+                const props = feature.properties || {};
+                const [lng, lat] = feature.geometry.coordinates || [];
+                const container = document.createElement("div");
+                const title = document.createElement("h3");
+                title.textContent = props.name || "Postaja";
+                const btn = document.createElement("button");
+                btn.className = "popup-button";
+                btn.textContent = "Go to route";
+                btn.addEventListener("click", () => {
+                    window.location.hash = "/route";
+                });
+                container.appendChild(title);
+                container.appendChild(btn);
+                new maplibregl.Popup({ closeButton: false })
+                    .setLngLat([lng, lat])
+                    .setDOMContent(container)
+                    .addTo(map);
+            });
+
+            map.on("mouseenter", "ijpp-trip-stops-points", () => {
+                map.getCanvas().style.cursor = "pointer";
+            });
+            map.on("mouseleave", "ijpp-trip-stops-points", () => {
+                map.getCanvas().style.cursor = "";
+            });
+
             configureBusStopPopup({
                 map,
                 onSelectStop: (stop) => {
@@ -1276,6 +1406,71 @@ const Map = React.memo(function Map({
         trainPositionsGeoJSON,
         trainStopsGeoJSON,
     ]);
+
+    // Update IJPP trip overlays when ijppTrip changes
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        const lineSource = map.getSource("ijpp-trip-line-src");
+        const stopsSource = map.getSource("ijpp-trip-stops-src");
+
+        const lineData = ijppTrip?.geometry?.length
+            ? {
+                  type: "Feature",
+                  geometry: {
+                      type: "LineString",
+                      // Assume geometry is [lon, lat] pairs as per GeoJSON conventions
+                      coordinates: ijppTrip.geometry.filter(
+                          (c) => Array.isArray(c) && c.length >= 2
+                      ),
+                  },
+                  properties: {},
+              }
+            : {
+                  type: "Feature",
+                  geometry: { type: "LineString", coordinates: [] },
+                  properties: {},
+              };
+
+        const stopsData = {
+            type: "FeatureCollection",
+            features: Array.isArray(ijppTrip?.stops)
+                ? ijppTrip.stops
+                      .map((s) => {
+                          const coord = Array.isArray(s?.gpsLocation)
+                              ? s.gpsLocation
+                              : null;
+                          if (
+                              !coord ||
+                              !Number.isFinite(coord[0]) ||
+                              !Number.isFinite(coord[1])
+                          )
+                              return null;
+                          return {
+                              type: "Feature",
+                              geometry: {
+                                  type: "Point",
+                                  coordinates: [coord[1], coord[0]],
+                              },
+                              properties: { name: s?.name || "" },
+                          };
+                      })
+                      .filter(Boolean)
+                : [],
+        };
+
+        if (lineSource && lineSource.setData) lineSource.setData(lineData);
+        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
+
+        // Persist overlay so it can be restored after tab switches
+        try {
+            localStorage.setItem(
+                "ijppTripOverlay",
+                JSON.stringify({ line: lineData, stops: stopsData })
+            );
+        } catch {}
+    }, [ijppTrip]);
 
     useEffect(() => {
         const map = mapInstanceRef.current;

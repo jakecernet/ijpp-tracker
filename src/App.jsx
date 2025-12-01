@@ -330,6 +330,7 @@ function App() {
                                         userLocation={userLocation}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
+                                        ijppTrip={ijppTrip}
                                     />
                                 }
                             />
@@ -345,6 +346,7 @@ function App() {
                                         userLocation={userLocation}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
+                                        ijppTrip={ijppTrip}
                                     />
                                 }
                             />
