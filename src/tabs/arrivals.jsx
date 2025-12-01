@@ -35,7 +35,7 @@ const ArrivalsTab = ({
             .filter(
                 (arrival) =>
                     arrival?.operatorName !==
-                    "Ljubljanski potniški promet, d.o.o."
+                    "Ljubljanski Potniški Promet"
             );
     }, [ijppArrivals, searchTerm]);
 
