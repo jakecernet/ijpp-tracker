@@ -41,7 +41,6 @@ body {
             justify-content: center;
             padding: 10px 0;
             border-top: 4px solid transparent;
-            color: #fff;
 
             button {
                 width: 100%;
@@ -52,6 +51,7 @@ body {
                 justify-content: center;
                 flex-direction: row;
                 gap: 20px;
+                color: #fff;
             }
         }
 
