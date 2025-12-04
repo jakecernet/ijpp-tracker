@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { Layers } from "lucide-react";
 
 import arrivaPNG from "../img/arriva.png";
 import lppPNG from "../img/lpp.png";
@@ -987,6 +988,21 @@ const Map = React.memo(function Map({
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
+    const [showFilter, setShowFilter] = useState(false);
+    const [visibility, setVisibility] = useState({
+        buses: true,
+        busStops: true,
+        trainStops: true,
+        trainPositions: true,
+    });
+    const [busOperators, setBusOperators] = useState({
+        arriva: true,
+        lpp: true,
+        nomago: true,
+        marprom: true,
+        murska: true,
+        generic: true, // other/unknown operators
+    });
     const initialCenterRef = useRef(
         userLocation || activeStation?.coordinates || DEFAULT_CENTER
     );
@@ -1007,42 +1023,43 @@ const Map = React.memo(function Map({
         [activeStation, userLocation]
     );
 
-    const busesGeoJSON = useMemo(
-        () =>
-            toGeoJSONPoints(
-                gpsPositions,
-                (position) => position?.gpsLocation,
-                (position) => {
-                    const props = { ...position };
-                    delete props.gpsLocation;
+    const busesGeoJSON = useMemo(() => {
+        const filtered = (gpsPositions || []).filter((position) => {
+            const brandKey = operatorToIcon[position?.operator] || "generic";
+            return !!busOperators[brandKey];
+        });
+        return toGeoJSONPoints(
+            filtered,
+            (position) => position?.gpsLocation,
+            (position) => {
+                const props = { ...position };
+                delete props.gpsLocation;
 
-                    if (props.title === undefined && position?.route) {
-                        props.title = position.route;
-                    }
-                    if (!props.lineName && position?.lineName) {
-                        props.lineName = position.lineName;
-                    }
-
-                    const isLpp =
-                        (typeof position?.operator === "string" &&
-                            position.operator
-                                .toLowerCase()
-                                .includes("ljubljanski potniški promet")) ||
-                        position?.lineNumber !== undefined ||
-                        position?.lineId !== undefined;
-
-                    props.sourceType = isLpp ? "lpp" : "ijpp";
-                    props.icon =
-                        operatorToIcon[position?.operator] || "bus-generic";
-                    props.brand =
-                        operatorToIcon[position?.operator] || "generic";
-                    props.operator = position?.operator || props.operator || "";
-
-                    return props;
+                if (props.title === undefined && position?.route) {
+                    props.title = position.route;
                 }
-            ),
-        [gpsPositions]
-    );
+                if (!props.lineName && position?.lineName) {
+                    props.lineName = position.lineName;
+                }
+
+                const isLpp =
+                    (typeof position?.operator === "string" &&
+                        position.operator
+                            .toLowerCase()
+                            .includes("ljubljanski potniški promet")) ||
+                    position?.lineNumber !== undefined ||
+                    position?.lineId !== undefined;
+
+                props.sourceType = isLpp ? "lpp" : "ijpp";
+                props.icon =
+                    operatorToIcon[position?.operator] || "bus-generic";
+                props.brand = operatorToIcon[position?.operator] || "generic";
+                props.operator = position?.operator || props.operator || "";
+
+                return props;
+            }
+        );
+    }, [gpsPositions, busOperators]);
 
     const busStopsGeoJSON = useMemo(
         () =>
@@ -1407,6 +1424,36 @@ const Map = React.memo(function Map({
         trainStopsGeoJSON,
     ]);
 
+    // Apply layer visibility based on filter toggles
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        const setPrefixVisible = (prefix, visible) => {
+            const vis = visible ? "visible" : "none";
+            const layers = [
+                `${prefix}-points`,
+                `${prefix}-clusters`,
+                `${prefix}-cluster-count`,
+            ];
+            layers.forEach((layerId) => {
+                if (map.getLayer(layerId)) {
+                    map.setLayoutProperty(layerId, "visibility", vis);
+                }
+            });
+            // Halo layer uses `${prefix}-halo`
+            const haloId = `${prefix}-halo`;
+            if (map.getLayer(haloId)) {
+                map.setLayoutProperty(haloId, "visibility", vis);
+            }
+        };
+
+        setPrefixVisible("buses", visibility.buses);
+        setPrefixVisible("busStops", visibility.busStops);
+        setPrefixVisible("trainStops", visibility.trainStops);
+        setPrefixVisible("trainPositions", visibility.trainPositions);
+    }, [visibility]);
+
     // Update IJPP trip overlays when ijppTrip changes
     useEffect(() => {
         const map = mapInstanceRef.current;
@@ -1505,8 +1552,217 @@ const Map = React.memo(function Map({
 
     return (
         <div>
-            <div className="map-container">
+            <div className="map-container" style={{ position: "relative" }}>
                 <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+                <div className="layer-selector">
+                    <div
+                        style={{
+                            height: showFilter ? "auto" : 0,
+                            width: showFilter ? "auto" : 0,
+                            padding: showFilter ? "10px" : 0,
+                        }}
+                    >
+                        <div>
+                            <h3>Aktivni markerji</h3>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={visibility.buses}
+                                    onChange={(e) =>
+                                        setVisibility((v) => ({
+                                            ...v,
+                                            buses: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Avtobusi
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={visibility.busStops}
+                                    onChange={(e) =>
+                                        setVisibility((v) => ({
+                                            ...v,
+                                            busStops: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Avtobusne postaje
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={visibility.trainPositions}
+                                    onChange={(e) =>
+                                        setVisibility((v) => ({
+                                            ...v,
+                                            trainPositions: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Vlaki
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={visibility.trainStops}
+                                    onChange={(e) =>
+                                        setVisibility((v) => ({
+                                            ...v,
+                                            trainStops: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Železniške postaje
+                            </label>
+                        </div>
+                        <div>
+                            <h3>Operaterji</h3>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={busOperators.arriva}
+                                    onChange={(e) =>
+                                        setBusOperators((v) => ({
+                                            ...v,
+                                            arriva: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Arriva
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={busOperators.lpp}
+                                    onChange={(e) =>
+                                        setBusOperators((v) => ({
+                                            ...v,
+                                            lpp: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                LPP
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={busOperators.nomago}
+                                    onChange={(e) =>
+                                        setBusOperators((v) => ({
+                                            ...v,
+                                            nomago: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Nomago
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={busOperators.marprom}
+                                    onChange={(e) =>
+                                        setBusOperators((v) => ({
+                                            ...v,
+                                            marprom: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Marprom
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={busOperators.murska}
+                                    onChange={(e) =>
+                                        setBusOperators((v) => ({
+                                            ...v,
+                                            murska: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                AP Murska Sobota
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={busOperators.generic}
+                                    onChange={(e) =>
+                                        setBusOperators((v) => ({
+                                            ...v,
+                                            generic: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Drugi
+                            </label>
+                        </div>
+                    </div>
+                    <button onClick={() => setShowFilter((v) => !v)}>
+                        <Layers />
+                    </button>
+                </div>
             </div>
         </div>
     );
