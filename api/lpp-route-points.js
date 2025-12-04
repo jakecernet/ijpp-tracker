@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     );
     const routeId =
         requestUrl.searchParams.get("routeId") ||
-        requestUrl.searchParams.get("trip-id");
+        requestUrl.searchParams.get("route-id");
 
     if (!routeId) {
         res.status(400).json({ error: "Missing routeId query parameter" });
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     try {
         const upstream = await fetch(
-            `${IJPP_URL}${encodeURIComponent(tripId)}`
+            `${IJPP_URL}${encodeURIComponent(routeId)}`
         );
         if (!upstream.ok) {
             res.status(upstream.status).json({
