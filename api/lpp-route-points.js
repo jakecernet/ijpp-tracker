@@ -1,4 +1,4 @@
-const IJPP_URL = "https://data.lpp.si/api/route/routes";
+const IJPP_URL = "https://data.lpp.si/api/route/routes?route-id=";
 
 export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
