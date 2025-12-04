@@ -15,6 +15,7 @@ import {
     fetchSzTrip,
     fetchSzArrivals,
     fetchIJPPTrip,
+    fetchLppPoints,
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -212,6 +213,21 @@ function App() {
                 setLppRoute(route);
             } catch (error) {
                 console.error("Error loading LPP route:", error);
+            }
+        };
+        load();
+    }, [selectedVehicle]);
+
+    //LPP točke na poti
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const points = await fetchLppPoints(
+                    "34F06AFF-2BDD-4000-B948-44607883BEE9"
+                );
+                console.log("LPP points loaded:", points);
+            } catch (error) {
+                console.error("Error loading LPP points:", error);
             }
         };
         load();

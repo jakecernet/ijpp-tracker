@@ -17,6 +17,7 @@ const ijppArrivalsLink = "https://api.beta.brezavta.si/stops/";
 const lppArrivalsLink =
     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
+const lppRoutePointsLink = "https://tracker.cernetic.cc/api/lpp-route-points?route-id=";
 const ijppRouteLink = "https://api.beta.brezavta.si/trips/";
 const szRouteLink =
     "https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
@@ -382,6 +383,18 @@ const fetchLppRoute = async (tripId) => {
     }
 };
 
+const fetchLppPoints = async (routeId) => {
+    if (!routeId) return null;
+    try {
+        const raw = await fetchJson(lppRoutePointsLink + routeId + "&shape=1");
+        console.log(raw);
+        return raw?.data ?? null;
+    } catch (error) {
+        console.error("Error fetching LPP route points:", error);
+        return null;
+    }
+};
+
 /**
  * Fetcha pot SZ linije
  * @param {string} tripId - ID poti
@@ -470,6 +483,6 @@ const fetchSzArrivals = async (stationCode) => {
 };
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
-export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
+export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip, fetchLppPoints };
 export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };
