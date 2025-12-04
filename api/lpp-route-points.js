@@ -22,12 +22,12 @@ export default async function handler(req, res) {
         req.url,
         `http://${req.headers.host || "localhost"}`
     );
-    const tripId =
-        requestUrl.searchParams.get("tripId") ||
+    const routeId =
+        requestUrl.searchParams.get("routeId") ||
         requestUrl.searchParams.get("trip-id");
 
-    if (!tripId) {
-        res.status(400).json({ error: "Missing tripId query parameter" });
+    if (!routeId) {
+        res.status(400).json({ error: "Missing routeId query parameter" });
         return;
     }
 
