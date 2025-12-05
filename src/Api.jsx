@@ -317,7 +317,6 @@ const fetchIjppArrivals = async (ijppId) => {
             ijppArrivalsLink + ijppId + "?current=true"
         );
         const list = Array.isArray(raw?.arrivals) ? raw.arrivals : [];
-        console.log(list);
         const arrivals = list.map((arrival) => {
             const computeRelative = (rt) => {
                 if (rt == null) return null;
@@ -359,7 +358,6 @@ const fetchIjppArrivals = async (ijppId) => {
                 ).toFixed(0),
             };
         });
-        console.log("Fetched IJPP arrivals:", arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching IJPP arrivals:", error);
@@ -388,7 +386,10 @@ const fetchLppPoints = async (routeId) => {
     try {
         const raw = await fetchJson(lppRoutePointsLink + routeId + "&shape=1");
         console.log(raw);
-        return raw?.data ?? null;
+        const points = {
+
+        }
+        return points?.data ?? null;
     } catch (error) {
         console.error("Error fetching LPP route points:", error);
         return null;

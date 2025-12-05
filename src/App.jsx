@@ -223,7 +223,9 @@ function App() {
         const load = async () => {
             try {
                 const points = await fetchLppPoints(
-                    "34F06AFF-2BDD-4000-B948-44607883BEE9"
+                    selectedVehicle.routeId ||
+                        JSON.parse(localStorage.getItem("selectedBusRoute"))
+                            ?.routeId
                 );
                 console.log("LPP points loaded:", points);
             } catch (error) {
@@ -242,6 +244,8 @@ function App() {
                 tripId: arrival.tripId,
                 lineNumber: arrival.routeName,
                 lineName: arrival.tripName,
+                routeId: arrival.routeId,
+                routeName: arrival.routeName,
                 operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
             });
             localStorage.setItem(
@@ -250,6 +254,9 @@ function App() {
                     tripId: arrival.tripId,
                     tripName: arrival.tripName,
                     routeName: arrival.routeName,
+                    routeId: arrival.routeId,
+                    operator:
+                        "Javno podjetje Ljubljanski potniški promet d.o.o.",
                 })
             );
         } catch (error) {

@@ -989,12 +989,6 @@ const Map = React.memo(function Map({
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
     const [showFilter, setShowFilter] = useState(false);
-    const [visibility, setVisibility] = useState({
-        buses: true,
-        busStops: true,
-        trainStops: true,
-        trainPositions: true,
-    });
     const [busOperators, setBusOperators] = useState({
         arriva: true,
         lpp: true,
@@ -1011,6 +1005,24 @@ const Map = React.memo(function Map({
         setSelectedVehicle,
     });
 
+    const [filterByRoute, setFilterByRoute] = useState(false);
+
+    // Declare visibility and setVisibility
+    const [visibility, setVisibility] = useState({
+        buses: true,
+        busStops: true,
+        trainPositions: true,
+        trainStops: true,
+    });
+
+    // Declare applyUrl
+    const applyUrl = (path) => {
+        // This function is a placeholder. In a real application, it would handle
+        // updating the URL or route based on the provided path.
+        // For this example, we'll just log it.
+        console.log("Navigating to:", path);
+    };
+
     useEffect(() => {
         handlersRef.current = {
             setActiveStation,
@@ -1024,10 +1036,51 @@ const Map = React.memo(function Map({
     );
 
     const busesGeoJSON = useMemo(() => {
+        let currentRouteInfo = null;
+        try {
+            const stored = localStorage.getItem("selectedBusRoute");
+            if (stored) {
+                currentRouteInfo = JSON.parse(stored);
+            }
+        } catch (error) {
+            console.log("[v0] Error reading route from localStorage:", error);
+        }
+
         const filtered = (gpsPositions || []).filter((position) => {
             const brandKey = operatorToIcon[position?.operator] || "generic";
-            return !!busOperators[brandKey];
+            if (!busOperators[brandKey]) return false;
+
+            if (filterByRoute && currentRouteInfo) {
+                // For LPP buses, check lineNumber or lineId
+                if (
+                    position.lineNumber !== undefined ||
+                    position.lineId !== undefined
+                ) {
+                    const routeMatch =
+                        (currentRouteInfo.lineNumber &&
+                            position.lineNumber ===
+                                currentRouteInfo.lineNumber) ||
+                        (currentRouteInfo.routeName &&
+                            position.lineNumber ===
+                                currentRouteInfo.routeName) ||
+                        (currentRouteInfo.tripId &&
+                            position.tripId === currentRouteInfo.tripId);
+                    if (!routeMatch) return false;
+                }
+                // For IJPP buses, check tripId or lineName
+                else if (position.tripId !== undefined) {
+                    if (
+                        currentRouteInfo.tripId &&
+                        position.tripId !== currentRouteInfo.tripId
+                    ) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         });
+
         return toGeoJSONPoints(
             filtered,
             (position) => position?.gpsLocation,
@@ -1059,7 +1112,7 @@ const Map = React.memo(function Map({
                 return props;
             }
         );
-    }, [gpsPositions, busOperators]);
+    }, [gpsPositions, busOperators, filterByRoute]);
 
     const busStopsGeoJSON = useMemo(
         () =>
@@ -1306,7 +1359,7 @@ const Map = React.memo(function Map({
             map.on("mouseenter", "ijpp-trip-stops-points", () => {
                 map.getCanvas().style.cursor = "pointer";
             });
-            map.on("mouseleave", "ijpp-trip-stops-points", () => {
+            map.on("mouseleave", "ijpp-trip-trip-stops-points", () => {
                 map.getCanvas().style.cursor = "";
             });
 
@@ -1642,7 +1695,7 @@ const Map = React.memo(function Map({
                             </label>
                         </div>
                         <div>
-                            <h3>Operaterji</h3>
+                            <h3>Filtriranje</h3>
                             <label
                                 style={{
                                     display: "flex",
@@ -1652,16 +1705,16 @@ const Map = React.memo(function Map({
                             >
                                 <input
                                     type="checkbox"
-                                    checked={busOperators.arriva}
+                                    checked={filterByRoute}
                                     onChange={(e) =>
-                                        setBusOperators((v) => ({
-                                            ...v,
-                                            arriva: e.target.checked,
-                                        }))
+                                        setFilterByRoute(e.target.checked)
                                     }
                                 />
-                                Arriva
+                                Samo izbrana linija
                             </label>
+                        </div>
+                        <div style={{ marginTop: "12px" }}>
+                            <h3>Prevozniki</h3>
                             <label
                                 style={{
                                     display: "flex",
@@ -1673,8 +1726,8 @@ const Map = React.memo(function Map({
                                     type="checkbox"
                                     checked={busOperators.lpp}
                                     onChange={(e) =>
-                                        setBusOperators((v) => ({
-                                            ...v,
+                                        setBusOperators((prev) => ({
+                                            ...prev,
                                             lpp: e.target.checked,
                                         }))
                                     }
@@ -1690,10 +1743,29 @@ const Map = React.memo(function Map({
                             >
                                 <input
                                     type="checkbox"
+                                    checked={busOperators.arriva}
+                                    onChange={(e) =>
+                                        setBusOperators((prev) => ({
+                                            ...prev,
+                                            arriva: e.target.checked,
+                                        }))
+                                    }
+                                />
+                                Arriva
+                            </label>
+                            <label
+                                style={{
+                                    display: "flex",
+                                    gap: 8,
+                                    alignItems: "center",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
                                     checked={busOperators.nomago}
                                     onChange={(e) =>
-                                        setBusOperators((v) => ({
-                                            ...v,
+                                        setBusOperators((prev) => ({
+                                            ...prev,
                                             nomago: e.target.checked,
                                         }))
                                     }
@@ -1711,8 +1783,8 @@ const Map = React.memo(function Map({
                                     type="checkbox"
                                     checked={busOperators.marprom}
                                     onChange={(e) =>
-                                        setBusOperators((v) => ({
-                                            ...v,
+                                        setBusOperators((prev) => ({
+                                            ...prev,
                                             marprom: e.target.checked,
                                         }))
                                     }
@@ -1730,13 +1802,13 @@ const Map = React.memo(function Map({
                                     type="checkbox"
                                     checked={busOperators.murska}
                                     onChange={(e) =>
-                                        setBusOperators((v) => ({
-                                            ...v,
+                                        setBusOperators((prev) => ({
+                                            ...prev,
                                             murska: e.target.checked,
                                         }))
                                     }
                                 />
-                                AP Murska Sobota
+                                Murska Sobota
                             </label>
                             <label
                                 style={{
@@ -1749,13 +1821,13 @@ const Map = React.memo(function Map({
                                     type="checkbox"
                                     checked={busOperators.generic}
                                     onChange={(e) =>
-                                        setBusOperators((v) => ({
-                                            ...v,
+                                        setBusOperators((prev) => ({
+                                            ...prev,
                                             generic: e.target.checked,
                                         }))
                                     }
                                 />
-                                Drugi
+                                Ostali
                             </label>
                         </div>
                     </div>
