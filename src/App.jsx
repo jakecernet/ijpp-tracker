@@ -66,24 +66,6 @@ function App() {
         }
     }, [activeStation]);
 
-    // Za fetchanje SZ tripov iz prihodov
-    const getSzTripFromId = async (tripId) => {
-        try {
-            const route = await fetchSzTrip(tripId);
-            setSzRoute(route ?? []);
-            localStorage.setItem(
-                "selectedBusRoute",
-                JSON.stringify({
-                    tripId: tripId,
-                    tripName: route[0]?.tripName,
-                    shortName: route[0]?.shortName,
-                })
-            );
-        } catch (error) {
-            console.error("Error loading SZ trip from ID:", error);
-        }
-    };
-
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
         const loadBusStops = async () => {
@@ -96,6 +78,19 @@ function App() {
             }
         };
         loadBusStops();
+    }, []);
+
+    // Fetcha SZ postaje ob zagonu
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const stops = await fetchSzStops();
+                setSzStops(stops);
+            } catch (error) {
+                console.error("Error loading SZ stops:", error);
+            }
+        };
+        load();
     }, []);
 
     // Na 15 sekund fetcha pozicije vlakov + busov
@@ -175,7 +170,6 @@ function App() {
             try {
                 const arrivals = await fetchIjppArrivals(ijppId);
                 setIjppArrivals(arrivals);
-                console.log("IJPP arrivals loaded:", arrivals);
             } catch (error) {
                 console.error("Error loading IJPP arrivals:", error);
                 setIjppArrivals([]);
@@ -191,7 +185,6 @@ function App() {
             try {
                 const arrivals = await fetchSzArrivals(szId);
                 setSzArrivals(arrivals);
-                console.log("SZ arrivals loaded:", arrivals);
             } catch (error) {
                 console.error("Error loading SZ arrivals:", error);
                 setSzArrivals([]);
@@ -209,7 +202,6 @@ function App() {
                         JSON.parse(localStorage.getItem("selectedBusRoute"))
                             ?.tripId
                 );
-                console.log("LPP route loaded:", route);
                 setLppRoute(route);
             } catch (error) {
                 console.error("Error loading LPP route:", error);
@@ -223,17 +215,38 @@ function App() {
         const load = async () => {
             try {
                 const points = await fetchLppPoints(
-                    selectedVehicle.routeId ||
+                    selectedVehicle.lineId ||
+                        selectedVehicle.routeId ||
+                        JSON.parse(localStorage.getItem("selectedBusRoute"))
+                            ?.lineId ||
                         JSON.parse(localStorage.getItem("selectedBusRoute"))
                             ?.routeId
                 );
-                console.log("LPP points loaded:", points);
+                console.log("LPP points:", points);
             } catch (error) {
                 console.error("Error loading LPP points:", error);
             }
         };
         load();
     }, [selectedVehicle]);
+
+    // Za fetchanje SZ tripov iz prihodov
+    const getSzTripFromId = async (tripId) => {
+        try {
+            const route = await fetchSzTrip(tripId);
+            setSzRoute(route ?? []);
+            localStorage.setItem(
+                "selectedBusRoute",
+                JSON.stringify({
+                    tripId: tripId,
+                    tripName: route[0]?.tripName,
+                    shortName: route[0]?.shortName,
+                })
+            );
+        } catch (error) {
+            console.error("Error loading SZ trip from ID:", error);
+        }
+    };
 
     // Dobi LPP routo iz prihodov (na isto foro kot SZ)
     const setLppRouteArrival = async (arrival) => {
@@ -276,20 +289,6 @@ function App() {
         localStorage.setItem("selectedBusRoute", JSON.stringify(vehicle));
     };
 
-    // Fetcha SZ postaje ob zagonu
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const stops = await fetchSzStops();
-                setSzStops(stops);
-                console.log("SZ stops loaded:", stops);
-            } catch (error) {
-                console.error("Error loading SZ stops:", error);
-            }
-        };
-        load();
-    }, []);
-
     // Fetcha SZ routo
     useEffect(() => {
         const load = async () => {
@@ -297,7 +296,6 @@ function App() {
             try {
                 const route = await fetchSzTrip(selectedVehicle.tripId);
                 setSzRoute(route ?? []);
-                console.log("SZ route loaded:", route);
             } catch (error) {
                 console.error("Error loading SZ route:", error);
                 setSzRoute([]);
@@ -306,7 +304,7 @@ function App() {
         load();
     }, [selectedVehicle]);
 
-    // Fetcha IJPP trip stops when selected vehicle is IJPP (not LPP/SZ)
+    // Fetcha IJPP pot
     useEffect(() => {
         if (!selectedVehicle) return;
         const isLPP = selectedVehicle?.lineNumber != null;
@@ -325,7 +323,6 @@ function App() {
             try {
                 const trip = await fetchIJPPTrip(tripId);
                 if (!cancelled) setIjppTrip(trip);
-                console.log("IJPP trip loaded:", trip);
             } catch (err) {
                 if (!cancelled) setIjppTrip(null);
             }

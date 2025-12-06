@@ -1,4 +1,4 @@
-const IJPP_URL = "https://data.lpp.si/api/route/routes?route-id=";
+const IJPP_URL = "https://data.lpp.si/api/route/routes";
 
 export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -25,6 +25,8 @@ export default async function handler(req, res) {
     const routeId =
         requestUrl.searchParams.get("routeId") ||
         requestUrl.searchParams.get("route-id");
+    // Optional shape flag (defaults to 1 to include geometry)
+    const shape = "1";
 
     if (!routeId) {
         res.status(400).json({ error: "Missing routeId query parameter" });
@@ -32,9 +34,11 @@ export default async function handler(req, res) {
     }
 
     try {
-        const upstream = await fetch(
-            `${IJPP_URL}${encodeURIComponent(routeId)}`
-        );
+        const upstreamUrl = new URL(IJPP_URL);
+        upstreamUrl.searchParams.set("route-id", routeId);
+        if (shape != null) upstreamUrl.searchParams.set("shape", shape);
+
+        const upstream = await fetch(upstreamUrl.toString());
         if (!upstream.ok) {
             res.status(upstream.status).json({
                 error: `Upstream error: ${upstream.status}`,

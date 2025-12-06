@@ -17,7 +17,8 @@ const ijppArrivalsLink = "https://api.beta.brezavta.si/stops/";
 const lppArrivalsLink =
     "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
-const lppRoutePointsLink = "https://tracker.cernetic.cc/api/lpp-route-points?route-id=";
+const lppRoutePointsLink =
+    "https://tracker.cernetic.cc/api/lpp-route-points?route-id=";
 const ijppRouteLink = "https://api.beta.brezavta.si/trips/";
 const szRouteLink =
     "https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
@@ -237,7 +238,9 @@ const fetchIJPPTrip = async (tripId) => {
         const raw = await fetchJson(
             ijppRouteLink + tripId + `?date=${dateString}`
         );
-        const pointsResponse = await fetchJson(ijppRouteLink + tripId + "/geometry");
+        const pointsResponse = await fetchJson(
+            ijppRouteLink + tripId + "/geometry"
+        );
         const trip = {
             tripName: raw?.trip_headsign || "",
             tripId: raw?.gtfs_id || "",
@@ -381,15 +384,21 @@ const fetchLppRoute = async (tripId) => {
     }
 };
 
+/** Fetcha točke LPP route
+ * @param {string} routeId - ID route
+ * @returns Tabelo s točkami route
+ */
 const fetchLppPoints = async (routeId) => {
-    if (!routeId) return null;
+    /* if (!routeId) return null; */
     try {
-        const raw = await fetchJson(lppRoutePointsLink + routeId + "&shape=1");
-        console.log(raw);
-        const points = {
-
-        }
-        return points?.data ?? null;
+        const raw = await fetchJson(lppRoutePointsLink + routeId);
+        console.log("Raw LPP points:", raw);
+        const points = raw.data?.map((point) => ({
+            tripId: point.trip_id,
+            routeNumber: point.route_number,
+            routeName: point.route_name,
+        }));
+        return points ?? null;
     } catch (error) {
         console.error("Error fetching LPP route points:", error);
         return null;
@@ -484,6 +493,12 @@ const fetchSzArrivals = async (stationCode) => {
 };
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
-export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip, fetchLppPoints };
+export {
+    fetchLppArrivals,
+    fetchIjppArrivals,
+    fetchLppRoute,
+    fetchIJPPTrip,
+    fetchLppPoints,
+};
 export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };
