@@ -102,28 +102,31 @@ function App() {
 
     // Na 15 sekund fetcha pozicije vlakov + busov
     useEffect(() => {
-        setInterval(() => {
-            const fetchPositions = async () => {
-                try {
-                    const [lpp, ijpp, trains] = await Promise.all([
-                        fetchLPPPositions(),
-                        fetchIJPPPositions(),
-                        fetchTrainPositions(),
-                    ]);
+        const fetchPositions = async () => {
+            try {
+                const [lpp, ijpp, trains] = await Promise.all([
+                    fetchLPPPositions(),
+                    fetchIJPPPositions(),
+                    fetchTrainPositions(),
+                ]);
 
-                    const lppPositions = Array.isArray(lpp) ? lpp : [];
-                    const ijppPositions = Array.isArray(ijpp) ? ijpp : [];
-                    const trainPositions = Array.isArray(trains) ? trains : [];
+                const lppPositions = Array.isArray(lpp) ? lpp : [];
+                const ijppPositions = Array.isArray(ijpp) ? ijpp : [];
+                const trainPositions = Array.isArray(trains) ? trains : [];
 
-                    setGpsPositions([...lppPositions, ...ijppPositions]);
-                    setTrainPositions(trainPositions);
-                } catch (error) {
-                    console.error("Error fetching positions:", error);
-                }
-            };
+                setGpsPositions([...lppPositions, ...ijppPositions]);
+                setTrainPositions(trainPositions);
+            } catch (error) {
+                console.error("Error fetching positions:", error);
+            }
+        };
 
-            fetchPositions();
-        }, 15000);
+        //začetn fetch
+        fetchPositions();
+
+        // fetchanje vsakih 15 sekund
+        const intervalId = setInterval(fetchPositions, 15000);
+        return () => clearInterval(intervalId);
     }, []);
 
     // Dobi userjevo lokacijo
