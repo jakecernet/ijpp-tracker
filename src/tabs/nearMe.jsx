@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Bus, Train } from "lucide-react";
 
 const NearMe = ({
@@ -12,7 +12,11 @@ const NearMe = ({
         return degrees * (Math.PI / 180);
     };
 
+    const [distancesCalculated, setDistancesCalculated] = useState(false);
+
     useEffect(() => {
+        setDistancesCalculated(false);
+
         const calculateDistance = (userLocation, busStops, szStops) => {
             const earthRadius = 6371; // Radius of the Earth in kilometers
 
@@ -40,6 +44,8 @@ const NearMe = ({
 
             calculate(busStops);
             calculate(szStops);
+
+            setDistancesCalculated(true);
         };
 
         calculateDistance(userLocation, busStops, szStops);
@@ -68,22 +74,24 @@ const NearMe = ({
     const [searchTerm, setSearchTerm] = React.useState("");
 
     const filteredBusStops = useMemo(() => {
+        if (!distancesCalculated) return [];
         return busStops
             .filter((busStop) => busStop.distance <= 10 && busStop.distance > 0)
             .filter((busStop) =>
                 busStop.name.toLowerCase().includes(searchTerm.toLowerCase())
             )
             .sort((a, b) => a.distance - b.distance);
-    }, [busStops, searchTerm]);
+    }, [busStops, searchTerm, distancesCalculated]);
 
     const filteredSzStops = useMemo(() => {
+        if (!distancesCalculated) return [];
         return szStops
             .filter((szStop) => szStop.distance <= 30 && szStop.distance > 0)
             .filter((szStop) =>
                 szStop.name.toLowerCase().includes(searchTerm.toLowerCase())
             )
             .sort((a, b) => a.distance - b.distance);
-    }, [szStops, searchTerm]);
+    }, [szStops, searchTerm, distancesCalculated]);
 
     return (
         <div className="insideDiv">
