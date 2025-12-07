@@ -20,6 +20,7 @@ import {
     configureTrainStopPopup,
     configureTrainPopup,
     configureBusPopup,
+    configureLppTripStopsPopup,
 } from "./map/interactions";
 import LayerSelector from "./map/LayerSelector";
 
@@ -70,6 +71,7 @@ const Map = React.memo(function Map({
     trainPositions,
     setSelectedVehicle,
     ijppTrip,
+    lppRoute,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -365,6 +367,72 @@ const Map = React.memo(function Map({
                 });
             }
 
+            // Setup LPP trip overlay sources
+            if (!map.getSource("lpp-trip-line-src")) {
+                map.addSource("lpp-trip-line-src", {
+                    type: "geojson",
+                    data: {
+                        type: "Feature",
+                        geometry: { type: "LineString", coordinates: [] },
+                        properties: {},
+                    },
+                });
+            }
+            if (!map.getLayer("lpp-trip-line")) {
+                map.addLayer({
+                    id: "lpp-trip-line",
+                    type: "line",
+                    source: "lpp-trip-line-src",
+                    paint: {
+                        "line-color": "#2e7d32",
+                        "line-width": [
+                            "interpolate",
+                            ["linear"],
+                            ["zoom"],
+                            10,
+                            3,
+                            14,
+                            5,
+                            16,
+                            7,
+                        ],
+                        "line-opacity": 0.9,
+                    },
+                    layout: { "line-cap": "round", "line-join": "round" },
+                });
+            }
+            if (!map.getSource("lpp-trip-stops-src")) {
+                map.addSource("lpp-trip-stops-src", {
+                    type: "geojson",
+                    data: { type: "FeatureCollection", features: [] },
+                });
+            }
+            if (!map.getLayer("lpp-trip-stops-points")) {
+                map.addLayer({
+                    id: "lpp-trip-stops-points",
+                    type: "symbol",
+                    source: "lpp-trip-stops-src",
+                    layout: {
+                        "icon-image": "route-stop",
+                        "icon-size": [
+                            "interpolate",
+                            ["linear"],
+                            ["zoom"],
+                            8,
+                            0.22,
+                            12,
+                            0.3,
+                            14,
+                            0.38,
+                            16,
+                            0.46,
+                        ],
+                        "icon-anchor": "bottom",
+                        "icon-allow-overlap": true,
+                    },
+                });
+            }
+
             // Restore persisted IJPP trip overlay
             try {
                 const persisted = JSON.parse(
@@ -373,6 +441,21 @@ const Map = React.memo(function Map({
                 if (persisted && typeof persisted === "object") {
                     const lineSource = map.getSource("ijpp-trip-line-src");
                     const stopsSource = map.getSource("ijpp-trip-stops-src");
+                    if (lineSource && lineSource.setData && persisted.line)
+                        lineSource.setData(persisted.line);
+                    if (stopsSource && stopsSource.setData && persisted.stops)
+                        stopsSource.setData(persisted.stops);
+                }
+            } catch {}
+
+            // Restore persisted LPP trip overlay
+            try {
+                const persisted = JSON.parse(
+                    localStorage.getItem("lppTripOverlay") || "null"
+                );
+                if (persisted && typeof persisted === "object") {
+                    const lineSource = map.getSource("lpp-trip-line-src");
+                    const stopsSource = map.getSource("lpp-trip-stops-src");
                     if (lineSource && lineSource.setData && persisted.line)
                         lineSource.setData(persisted.line);
                     if (stopsSource && stopsSource.setData && persisted.stops)
@@ -464,6 +547,14 @@ const Map = React.memo(function Map({
                     }
                     handlersRef.current.setSelectedVehicle(vehicle);
                 },
+                onNavigateRoute: () => {
+                    window.location.hash = "/route";
+                },
+            });
+
+            // Add popup for LPP route stop markers
+            configureLppTripStopsPopup({
+                map,
                 onNavigateRoute: () => {
                     window.location.hash = "/route";
                 },
@@ -563,6 +654,99 @@ const Map = React.memo(function Map({
             );
         } catch {}
     }, [ijppTrip]);
+
+    // Update LPP trip overlays
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        const lineSource = map.getSource("lpp-trip-line-src");
+        const stopsSource = map.getSource("lpp-trip-stops-src");
+
+        const lineCoords = Array.isArray(lppRoute?.geometry?.[0]?.points)
+            ? lppRoute.geometry[0].points
+                  .filter((c) => Array.isArray(c) && c.length >= 2)
+                  .map((c) => [c[1], c[0]])
+            : [];
+
+        const lineData = {
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: lineCoords },
+            properties: {},
+        };
+
+        const stopsData = {
+            type: "FeatureCollection",
+            features: Array.isArray(lppRoute?.stops)
+                ? lppRoute.stops
+                      .map((s) => {
+                          let coord = null;
+                          if (Array.isArray(s?.stop_location)) {
+                              coord = [s.stop_location[0], s.stop_location[1]];
+                          } else if (
+                              s?.stop_location &&
+                              typeof s.stop_location === "object"
+                          ) {
+                              const lat = Number(
+                                  s.stop_location.lat ?? s.stop_location[0]
+                              );
+                              const lon = Number(
+                                  s.stop_location.lon ?? s.stop_location[1]
+                              );
+                              coord =
+                                  Number.isFinite(lat) && Number.isFinite(lon)
+                                      ? [lat, lon]
+                                      : null;
+                          } else if (Array.isArray(s?.gpsLocation)) {
+                              coord = s.gpsLocation;
+                          } else {
+                              const lat = Number(
+                                  s.latitude ?? s.lat ?? s.stop_lat ?? null
+                              );
+                              const lon = Number(
+                                  s.longitude ?? s.lon ?? s.stop_lon ?? null
+                              );
+                              coord =
+                                  Number.isFinite(lat) && Number.isFinite(lon)
+                                      ? [lat, lon]
+                                      : null;
+                          }
+                          if (
+                              !coord ||
+                              !Number.isFinite(coord[0]) ||
+                              !Number.isFinite(coord[1])
+                          )
+                              return null;
+                          return {
+                              type: "Feature",
+                              geometry: {
+                                  type: "Point",
+                                  coordinates: [coord[1], coord[0]],
+                              },
+                              properties: {
+                                  name:
+                                      s?.name ||
+                                      s?.stop_name ||
+                                      s?.station_name ||
+                                      s?.route_name ||
+                                      "",
+                              },
+                          };
+                      })
+                      .filter(Boolean)
+                : [],
+        };
+
+        if (lineSource && lineSource.setData) lineSource.setData(lineData);
+        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
+
+        try {
+            localStorage.setItem(
+                "lppTripOverlay",
+                JSON.stringify({ line: lineData, stops: stopsData })
+            );
+        } catch {}
+    }, [lppRoute]);
 
     // Update map center
     useEffect(() => {

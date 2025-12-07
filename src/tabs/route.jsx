@@ -36,7 +36,7 @@ const RouteTab = ({ selectedVehicle, lppRoute, szRoute, ijppTrip, setActiveStati
                 <div className="stops">
                     {isLPP ? (
                         <ul>
-                            {lppRoute?.map((stop) => (
+                            {lppRoute?.stops?.map((stop) => (
                                 <li
                                     key={stop.stop_id}
                                     onClick={() => {

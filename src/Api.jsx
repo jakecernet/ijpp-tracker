@@ -373,11 +373,15 @@ const fetchIjppArrivals = async (ijppId) => {
  * @param {string} tripId - ID tripa
  * @returns Postaje na poti in prihode na posamezne postaje
  */
-const fetchLppRoute = async (tripId) => {
+const fetchLppRoute = async (tripId, routeId) => {
     if (!tripId) return null;
     try {
         const raw = await fetchJson(lppRouteLink + tripId);
-        return raw?.data ?? null;
+        const geometry = await fetchLppPoints(routeId);
+        return {
+            stops: raw.data ?? null,
+            geometry: geometry,
+        };
     } catch (error) {
         console.error("Error fetching LPP route:", error);
         return null;
@@ -389,7 +393,7 @@ const fetchLppRoute = async (tripId) => {
  * @returns Tabelo s točkami route
  */
 const fetchLppPoints = async (routeId) => {
-    /* if (!routeId) return null; */
+    if (!routeId) return null;
     try {
         const raw = await fetchJson(lppRoutePointsLink + routeId);
         console.log("Raw LPP points:", raw);
@@ -397,6 +401,18 @@ const fetchLppPoints = async (routeId) => {
             tripId: point.trip_id,
             routeNumber: point.route_number,
             routeName: point.route_name,
+            points:
+                point.geojson_shape.type === "LineString"
+                    ? point.geojson_shape.coordinates.map((coord) => [
+                          coord[1],
+                          coord[0],
+                      ])
+                    : [
+                          point.geojson_shape.coordinates.flatMap((coord) => [
+                              coord[1],
+                              coord[0],
+                          ]),
+                      ],
         }));
         return points ?? null;
     } catch (error) {

@@ -200,31 +200,18 @@ function App() {
                 const route = await fetchLppRoute(
                     selectedVehicle.tripId ||
                         JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.tripId
+                            ?.tripId,
+
+                    selectedVehicle.routeId ||
+                        JSON.parse(localStorage.getItem("selectedBusRoute"))
+                            ?.routeId ||
+                        JSON.parse(localStorage.getItem("selectedBusRoute"))
+                            ?.lineId
                 );
                 setLppRoute(route);
+                console.log("Loaded LPP route:", route);
             } catch (error) {
                 console.error("Error loading LPP route:", error);
-            }
-        };
-        load();
-    }, [selectedVehicle]);
-
-    //LPP točke na poti
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const points = await fetchLppPoints(
-                    selectedVehicle.lineId ||
-                        selectedVehicle.routeId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.lineId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.routeId
-                );
-                console.log("LPP points:", points);
-            } catch (error) {
-                console.error("Error loading LPP points:", error);
             }
         };
         load();
@@ -351,6 +338,7 @@ function App() {
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                         ijppTrip={ijppTrip}
+                                        lppRoute={lppRoute}
                                     />
                                 }
                             />
@@ -367,6 +355,7 @@ function App() {
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                         ijppTrip={ijppTrip}
+                                        lppRoute={lppRoute}
                                     />
                                 }
                             />
