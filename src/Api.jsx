@@ -1,5 +1,3 @@
-import { de } from "date-fns/locale";
-
 const now = new Date();
 const later = new Date(now.getTime() + 60000); // 1 minuta
 
@@ -302,9 +300,9 @@ const fetchLppArrivals = async (stationCode) => {
  * @returns Čas v formatu HH:MM:SS
  */
 function seconds2time(seconds) {
-    let hour = `${Math.floor(seconds / 3600)}`.padStart(2, "0");
-    let minute = `${Math.floor((seconds % 3600) / 60)}`.padStart(2, "0");
-    let second = `${seconds % 60}`.padStart(2, "0");
+    const hour = `${Math.floor(seconds / 3600)}`.padStart(2, "0");
+    const minute = `${Math.floor((seconds % 3600) / 60)}`.padStart(2, "0");
+    const second = `${seconds % 60}`.padStart(2, "0");
     return `${hour}:${minute}:${second}`;
 }
 
@@ -336,7 +334,7 @@ const fetchIjppArrivals = async (ijppId) => {
                 const now = new Date();
                 const arrivalDate = new Date(now);
                 arrivalDate.setHours(hh, mm, ss, 0);
-                let diffSec = Math.round((arrivalDate - now) / 1000);
+                const diffSec = Math.round((arrivalDate - now) / 1000);
                 return diffSec;
             };
 
@@ -397,24 +395,41 @@ const fetchLppPoints = async (routeId) => {
     try {
         const raw = await fetchJson(lppRoutePointsLink + routeId);
         console.log("Raw LPP points:", raw);
-        const points = raw.data?.map((point) => ({
-            tripId: point.trip_id,
-            routeNumber: point.route_number,
-            routeName: point.route_name,
-            points:
-                point.geojson_shape.type === "LineString"
-                    ? point.geojson_shape.coordinates.map((coord) => [
-                          coord[1],
-                          coord[0],
-                      ])
-                    : [
-                          point.geojson_shape.coordinates.flatMap((coord) => [
-                              coord[1],
-                              coord[0],
-                          ]),
-                      ],
-        }));
-        return points ?? null;
+        const points = raw.data
+            ?.filter((point) => point.geojson_shape != null) // Filter out points with null geojson_shape
+            .map((point) => {
+                // Additional safety check for geojson_shape.type
+                if (!point.geojson_shape || !point.geojson_shape.type) {
+                    console.warn(
+                        "Skipping point with missing geojson_shape:",
+                        point
+                    );
+                    return null;
+                }
+
+                return {
+                    tripId: point.trip_id,
+                    routeNumber: point.route_number,
+                    routeName: point.route_name,
+                    points:
+                        point.geojson_shape.type === "LineString"
+                            ? point.geojson_shape.coordinates.map((coord) => [
+                                  coord[1],
+                                  coord[0],
+                              ])
+                            : point.geojson_shape.type === "MultiLineString"
+                            ? point.geojson_shape.coordinates.flatMap(
+                                  (lineString) =>
+                                      lineString.map((coord) => [
+                                          coord[1],
+                                          coord[0],
+                                      ])
+                              )
+                            : [],
+                };
+            })
+            .filter(Boolean); // Remove any null entries from the map
+        return points && points.length > 0 ? points : null;
     } catch (error) {
         console.error("Error fetching LPP route points:", error);
         return null;

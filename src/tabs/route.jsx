@@ -1,4 +1,10 @@
-const RouteTab = ({ selectedVehicle, lppRoute, szRoute, ijppTrip, setActiveStation }) => {
+const RouteTab = ({
+    selectedVehicle,
+    lppRoute,
+    szRoute,
+    ijppTrip,
+    setActiveStation,
+}) => {
     const isLPP = selectedVehicle?.lineNumber != null;
     const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
     const szTrip = isSZ && Array.isArray(szRoute) ? szRoute[0] : null;
@@ -87,7 +93,7 @@ const RouteTab = ({ selectedVehicle, lppRoute, szRoute, ijppTrip, setActiveStati
                                             coordinates: stop.gpsLocation,
                                             id: stop.gtfsId || stop.name,
                                             gtfs_id: stop.gtfsId,
-                                            gtfsId: stop.gtfsId, 
+                                            gtfsId: stop.gtfsId,
                                         };
                                         setActiveStation(payload);
                                         localStorage.setItem(
@@ -108,8 +114,7 @@ const RouteTab = ({ selectedVehicle, lppRoute, szRoute, ijppTrip, setActiveStati
             {isSZ && (
                 <div>
                     {szStops.length > 0 && (
-                        <div className="sz-stops stops">
-                            <h3>Postaje na poti:</h3>
+                        <div className="stops">
                             <ul>
                                 <li key="start">
                                     <h4>{szTrip.from.name}</h4>

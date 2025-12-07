@@ -15,13 +15,20 @@ import {
     fetchSzTrip,
     fetchSzArrivals,
     fetchIJPPTrip,
-    fetchLppPoints,
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
 const RouteTab = lazy(() => import("./tabs/route.jsx"));
+
+if (typeof window !== "undefined") {
+    // Preload components to avoid lag on first navigation
+    import("./tabs/map");
+    import("./tabs/arrivals");
+    import("./tabs/nearMe");
+    import("./tabs/route.jsx");
+}
 
 function App() {
     const [activeStation, setActiveStation] = useState(
@@ -323,7 +330,22 @@ function App() {
         <Router>
             <div className="container">
                 <div className="content">
-                    <Suspense fallback={<div>Loading...</div>}>
+                    <Suspense
+                        fallback={
+                            <div
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    height: "100%",
+                                    fontSize: "14px",
+                                    color: "#94a3b8",
+                                }}
+                            >
+                                Nalaganje...
+                            </div>
+                        }
+                    >
                         <Routes>
                             <Route
                                 path="/*"
