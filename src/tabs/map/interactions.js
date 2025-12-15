@@ -258,3 +258,37 @@ export function configureLppTripStopsPopup({ map, onNavigateRoute }) {
         }
     });
 }
+
+export function configureIjppTripStopsPopup({ map, onNavigateRoute }) {
+    map.on("click", "ijpp-trip-stops-points", (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const [lng, lat] = feature.geometry.coordinates;
+        const name = props?.name || "Postaja";
+        const html =
+            `<div style="min-width:220px">` +
+            `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>` +
+            `<button type="button" class="popup-button" data-role="goto-route" style="width:100%">Pojdi na linijo</button>` +
+            `</div>`;
+
+        const popup = new maplibregl.Popup({ closeButton: false })
+            .setLngLat([lng, lat])
+            .setHTML(html)
+            .addTo(map);
+        const container = popup.getElement();
+        const button = container?.querySelector('[data-role="goto-route"]');
+        if (button) {
+            button.addEventListener(
+                "click",
+                (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNavigateRoute?.();
+                    popup.remove();
+                },
+                { once: true }
+            );
+        }
+    });
+}

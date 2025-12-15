@@ -21,6 +21,7 @@ import {
     configureTrainPopup,
     configureBusPopup,
     configureLppTripStopsPopup,
+    configureIjppTripStopsPopup,
 } from "./map/interactions";
 import LayerSelector from "./map/LayerSelector";
 
@@ -547,6 +548,13 @@ const Map = React.memo(function Map({
                     }
                     handlersRef.current.setSelectedVehicle(vehicle);
                 },
+                onNavigateRoute: () => {
+                    window.location.hash = "/route";
+                },
+            });
+
+            configureIjppTripStopsPopup({
+                map,
                 onNavigateRoute: () => {
                     window.location.hash = "/route";
                 },
