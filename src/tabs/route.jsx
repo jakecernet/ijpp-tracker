@@ -116,7 +116,29 @@ const RouteTab = ({
                     {szStops.length > 0 && (
                         <div className="stops">
                             <ul>
-                                <li key="start">
+                                <li
+                                    key="start"
+                                    onClick={() => {
+                                        const stop = szTrip.from;
+                                        const coords = Array.isArray(
+                                            stop?.gpsLocation
+                                        )
+                                            ? stop.gpsLocation
+                                            : [stop?.lat, stop?.lon];
+                                        const payload = {
+                                            name: stop?.name,
+                                            coordinates: coords,
+                                            gpsLocation: coords,
+                                            stopId: stop?.stopId ?? null,
+                                            id: stop?.stopId || stop?.name,
+                                            lat: coords?.[0],
+                                            lon: coords?.[1],
+                                            type: "train-stop",
+                                        };
+                                        setActiveStation(payload);
+                                        window.location.hash = "/arrivals";
+                                    }}
+                                >
                                     <h4>{szTrip.from.name}</h4>
                                     <span
                                         style={{
@@ -161,7 +183,29 @@ const RouteTab = ({
                                         </span>
                                     </li>
                                 ))}
-                                <li key="end">
+                                <li
+                                    key="end"
+                                    onClick={() => {
+                                        const stop = szTrip.to;
+                                        const coords = Array.isArray(
+                                            stop?.gpsLocation
+                                        )
+                                            ? stop.gpsLocation
+                                            : [stop?.lat, stop?.lon];
+                                        const payload = {
+                                            name: stop?.name,
+                                            coordinates: coords,
+                                            gpsLocation: coords,
+                                            stopId: stop?.stopId ?? null,
+                                            id: stop?.stopId || stop?.name,
+                                            lat: coords?.[0],
+                                            lon: coords?.[1],
+                                            type: "train-stop",
+                                        };
+                                        setActiveStation(payload);
+                                        window.location.hash = "/arrivals";
+                                    }}
+                                >
                                     <h4>{szTrip.to.name}</h4>
                                     <span
                                         style={{
