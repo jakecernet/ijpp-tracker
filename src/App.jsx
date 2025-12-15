@@ -365,6 +365,7 @@ function App() {
                                         setSelectedVehicle={setSelectedVehicle}
                                         ijppTrip={ijppTrip}
                                         lppRoute={lppRoute}
+                                        szRoute={szRoute}
                                     />
                                 }
                             />
@@ -382,6 +383,7 @@ function App() {
                                         setSelectedVehicle={setSelectedVehicle}
                                         ijppTrip={ijppTrip}
                                         lppRoute={lppRoute}
+                                        szRoute={szRoute}
                                     />
                                 }
                             />

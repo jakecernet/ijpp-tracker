@@ -57,6 +57,15 @@ export function configureBusStopPopup({ map, onSelectStop }) {
 
 export function configureTrainStopPopup({ map, onSelectStop }) {
     map.on("click", "trainStops-points", (event) => {
+        // If SZ route stop is under cursor, prefer route-stop popup only
+        try {
+            const routeFeatures = map.queryRenderedFeatures(event.point, {
+                layers: ["sz-trip-stops-points"],
+            });
+            if (Array.isArray(routeFeatures) && routeFeatures.length > 0) {
+                return; // suppress normal train stop popup
+            }
+        } catch {}
         const feature = event.features?.[0];
         if (!feature) return;
         const props = feature.properties || {};
@@ -132,7 +141,6 @@ export function configureTrainPopup({ map, onSelectVehicle, onNavigateRoute }) {
                         from,
                         to,
                     });
-                    onNavigateRoute();
                     popup.remove();
                 },
                 { once: true }
@@ -261,6 +269,40 @@ export function configureLppTripStopsPopup({ map, onNavigateRoute }) {
 
 export function configureIjppTripStopsPopup({ map, onNavigateRoute }) {
     map.on("click", "ijpp-trip-stops-points", (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const props = feature.properties || {};
+        const [lng, lat] = feature.geometry.coordinates;
+        const name = props?.name || "Postaja";
+        const html =
+            `<div style="min-width:220px">` +
+            `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>` +
+            `<button type="button" class="popup-button" data-role="goto-route" style="width:100%">Pojdi na linijo</button>` +
+            `</div>`;
+
+        const popup = new maplibregl.Popup({ closeButton: false })
+            .setLngLat([lng, lat])
+            .setHTML(html)
+            .addTo(map);
+        const container = popup.getElement();
+        const button = container?.querySelector('[data-role="goto-route"]');
+        if (button) {
+            button.addEventListener(
+                "click",
+                (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNavigateRoute?.();
+                    popup.remove();
+                },
+                { once: true }
+            );
+        }
+    });
+}
+
+export function configureSzTripStopsPopup({ map, onNavigateRoute }) {
+    map.on("click", "sz-trip-stops-points", (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
         const props = feature.properties || {};

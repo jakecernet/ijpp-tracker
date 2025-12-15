@@ -22,6 +22,7 @@ import {
     configureBusPopup,
     configureLppTripStopsPopup,
     configureIjppTripStopsPopup,
+    configureSzTripStopsPopup,
 } from "./map/interactions";
 import LayerSelector from "./map/LayerSelector";
 
@@ -73,6 +74,7 @@ const Map = React.memo(function Map({
     setSelectedVehicle,
     ijppTrip,
     lppRoute,
+    szRoute,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -434,6 +436,72 @@ const Map = React.memo(function Map({
                 });
             }
 
+            // Setup SZ trip overlay sources
+            if (!map.getSource("sz-trip-line-src")) {
+                map.addSource("sz-trip-line-src", {
+                    type: "geojson",
+                    data: {
+                        type: "Feature",
+                        geometry: { type: "LineString", coordinates: [] },
+                        properties: {},
+                    },
+                });
+            }
+            if (!map.getLayer("sz-trip-line")) {
+                map.addLayer({
+                    id: "sz-trip-line",
+                    type: "line",
+                    source: "sz-trip-line-src",
+                    paint: {
+                        "line-color": "#29ace2",
+                        "line-width": [
+                            "interpolate",
+                            ["linear"],
+                            ["zoom"],
+                            10,
+                            3,
+                            14,
+                            5,
+                            16,
+                            7,
+                        ],
+                        "line-opacity": 0.9,
+                    },
+                    layout: { "line-cap": "round", "line-join": "round" },
+                });
+            }
+            if (!map.getSource("sz-trip-stops-src")) {
+                map.addSource("sz-trip-stops-src", {
+                    type: "geojson",
+                    data: { type: "FeatureCollection", features: [] },
+                });
+            }
+            if (!map.getLayer("sz-trip-stops-points")) {
+                map.addLayer({
+                    id: "sz-trip-stops-points",
+                    type: "symbol",
+                    source: "sz-trip-stops-src",
+                    layout: {
+                        "icon-image": "route-stop",
+                        "icon-size": [
+                            "interpolate",
+                            ["linear"],
+                            ["zoom"],
+                            8,
+                            0.22,
+                            12,
+                            0.3,
+                            14,
+                            0.38,
+                            16,
+                            0.46,
+                        ],
+                        "icon-anchor": "bottom",
+                        "icon-allow-overlap": true,
+                    },
+                });
+            }
+
             // Restore persisted IJPP trip overlay
             try {
                 const persisted = JSON.parse(
@@ -457,6 +525,21 @@ const Map = React.memo(function Map({
                 if (persisted && typeof persisted === "object") {
                     const lineSource = map.getSource("lpp-trip-line-src");
                     const stopsSource = map.getSource("lpp-trip-stops-src");
+                    if (lineSource && lineSource.setData && persisted.line)
+                        lineSource.setData(persisted.line);
+                    if (stopsSource && stopsSource.setData && persisted.stops)
+                        stopsSource.setData(persisted.stops);
+                }
+            } catch {}
+
+            // Restore persisted SZ trip overlay
+            try {
+                const persisted = JSON.parse(
+                    localStorage.getItem("szTripOverlay") || "null"
+                );
+                if (persisted && typeof persisted === "object") {
+                    const lineSource = map.getSource("sz-trip-line-src");
+                    const stopsSource = map.getSource("sz-trip-stops-src");
                     if (lineSource && lineSource.setData && persisted.line)
                         lineSource.setData(persisted.line);
                     if (stopsSource && stopsSource.setData && persisted.stops)
@@ -562,6 +645,14 @@ const Map = React.memo(function Map({
 
             // Add popup for LPP route stop markers
             configureLppTripStopsPopup({
+                map,
+                onNavigateRoute: () => {
+                    window.location.hash = "/route";
+                },
+            });
+
+            // Add popup for SZ route stop markers
+            configureSzTripStopsPopup({
                 map,
                 onNavigateRoute: () => {
                     window.location.hash = "/route";
@@ -755,6 +846,69 @@ const Map = React.memo(function Map({
             );
         } catch {}
     }, [lppRoute]);
+
+    // Update SZ trip overlays
+    useEffect(() => {
+        const map = mapInstanceRef.current;
+        if (!map) return;
+
+        const lineSource = map.getSource("sz-trip-line-src");
+        const stopsSource = map.getSource("sz-trip-stops-src");
+
+        const lineCoords = Array.isArray(szRoute?.geometry)
+            ? szRoute.geometry
+                  .filter((c) => Array.isArray(c) && c.length >= 2)
+                  // geometry already [lng, lat]
+                  .map((c) => [c[0], c[1]])
+            : [];
+
+        const lineData = {
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: lineCoords },
+            properties: {},
+        };
+
+        // Build features for start (from), intermediate stops, and end (to)
+        const features = [];
+
+        const pushStop = (s) => {
+            if (!s) return;
+            const coord = Array.isArray(s?.gpsLocation)
+                ? s.gpsLocation
+                : [s?.lat, s?.lon];
+            if (
+                !coord ||
+                !Number.isFinite(coord[0]) ||
+                !Number.isFinite(coord[1])
+            )
+                return;
+            features.push({
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [coord[1], coord[0]] },
+                properties: { name: s?.name || "" },
+            });
+        };
+
+        // include start and end stops
+        pushStop(szRoute?.from);
+        if (Array.isArray(szRoute?.stops)) szRoute.stops.forEach(pushStop);
+        pushStop(szRoute?.to);
+
+        const stopsData = {
+            type: "FeatureCollection",
+            features,
+        };
+
+        if (lineSource && lineSource.setData) lineSource.setData(lineData);
+        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
+
+        try {
+            localStorage.setItem(
+                "szTripOverlay",
+                JSON.stringify({ line: lineData, stops: stopsData })
+            );
+        } catch {}
+    }, [szRoute]);
 
     // Update map center
     useEffect(() => {
