@@ -7,7 +7,7 @@ const RouteTab = ({
 }) => {
     const isLPP = selectedVehicle?.lineNumber != null;
     const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
-    const szTrip = isSZ && Array.isArray(szRoute) ? szRoute[0] : null;
+    const szTrip = isSZ ? szRoute : null;
     const szStops = Array.isArray(szTrip?.stops) ? szTrip.stops : [];
 
     const printTime = (timeStr) => {
@@ -33,7 +33,7 @@ const RouteTab = ({
                 </p>
                 {isSZ && (
                     <h3>
-                        {szRoute[0]?.tripName} ({szRoute[0]?.shortName})
+                        {szRoute?.tripName} ({szRoute?.shortName})
                     </h3>
                 )}
                 {isSZ && <p>Slovenske železnice d.o.o.</p>}

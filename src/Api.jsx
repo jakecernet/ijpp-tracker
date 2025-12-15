@@ -447,51 +447,144 @@ const fetchSzTrip = async (tripId) => {
         const fetched = await fetchJson(szRouteLink + tripId);
         const raw = fetched?.legs || null;
         const data = Array.isArray(raw)
-            ? [
-                  {
-                      from: {
-                          name: raw[0]?.from?.name || "",
-                          stopId: raw[0]?.from?.stopId || "",
-                          gpsLocation: [
-                              raw[0]?.from?.lat || 0,
-                              raw[0]?.from?.lon || 0,
-                          ],
-                          departure: raw[0]?.from?.departure || "",
-                      },
+            ? {
+                  from: {
+                      name: raw[0]?.from?.name || "",
+                      stopId: raw[0]?.from?.stopId || "",
+                      gpsLocation: [
+                          raw[0]?.from?.lat || 0,
+                          raw[0]?.from?.lon || 0,
+                      ],
+                      departure: raw[0]?.from?.departure || "",
+                  },
 
-                      to: {
-                          name: raw[0]?.to?.name || "",
-                          stopId: raw[0]?.to?.stopId || "",
-                          gpsLocation: [
-                              raw[0]?.to?.lat || 0,
-                              raw[0]?.to?.lon || 0,
-                          ],
-                          arrival: raw[0]?.to?.arrival || "",
-                      },
+                  to: {
+                      name: raw[0]?.to?.name || "",
+                      stopId: raw[0]?.to?.stopId || "",
+                      gpsLocation: [raw[0]?.to?.lat || 0, raw[0]?.to?.lon || 0],
+                      arrival: raw[0]?.to?.arrival || "",
+                  },
 
-                      tripName: raw[0]?.headsign || "",
-                      duration: raw[0]?.duration || "",
-                      startTime: raw[0]?.startTime || "",
-                      endTime: raw[0]?.endTime || "",
-                      realTime: raw[0]?.realTime || false,
-                      tripId: raw[0]?.tripId || "",
-                      shortName: raw[0]?.routeShortName || "",
-                      stops: raw[0]?.intermediateStops.map((stop) => ({
+                  tripName: raw[0]?.headsign || "",
+                  duration: raw[0]?.duration || "",
+                  startTime: raw[0]?.startTime || "",
+                  endTime: raw[0]?.endTime || "",
+                  realTime: raw[0]?.realTime || false,
+                  tripId: raw[0]?.tripId || "",
+                  shortName: raw[0]?.routeShortName || "",
+                  stops:
+                      raw[0]?.intermediateStops?.map((stop) => ({
                           name: stop?.name || "",
                           stopId: stop?.stopId || "",
                           gpsLocation: [stop?.lat || 0, stop?.lon || 0],
                           arrival: stop?.arrival || "",
                           departure: stop?.departure || "",
-                      })),
-                  },
-              ]
+                      })) || [],
+                  geometry: raw[0]?.legGeometry
+                      ? decodePolylineToPoints(
+                            raw[0]?.legGeometry?.points || "",
+                            6
+                        )
+                      : [],
+              }
             : null;
+        console.log("Fetched SZ trip data:", data);
         return data;
     } catch (error) {
         console.error("Error fetching SZ trip:", error);
         return null;
     }
 };
+
+/**
+ * Fetcha točke poti za pot vlaka
+ * @param {*} routeId
+ * @returns Tabelo točk poti
+ */
+const szRoutePoints = async (routeId) => {
+    {
+        if (!routeId) return [];
+        try {
+            const response = await fetchJson(
+                szRouteLink + routeId + "&joinInterlinedLegs=false&language=en"
+            );
+
+            console.log(response);
+            return response;
+        } catch (error) {
+            console.error("Error fetching SZ route points:", error);
+            return [];
+        }
+    }
+};
+
+/**
+ *  Helper za dekodirat routo vlaka iz polylina
+ * @param {string} polyline - Polyline tekst
+ * @param {Array} points - Tabelo točk
+ */
+function decodePolylineOnce(str, precision) {
+    const factor = Math.pow(10, precision);
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+    const pts = [];
+    while (index < str.length) {
+        let result = 0;
+        let shift = 0;
+        let byte;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+        lat += dlat;
+
+        result = 0;
+        shift = 0;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+        lng += dlng;
+
+        const latitude = lat / factor;
+        const longitude = lng / factor;
+        pts.push([longitude, latitude]);
+    }
+    return pts;
+}
+
+/**
+ * Še en helper
+ */
+function isValidCoord([lon, lat]) {
+    return (
+        Number.isFinite(lat) &&
+        Number.isFinite(lon) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lon) <= 180
+    );
+}
+
+/**
+ * Dejanska helper funkcija za dekodiranje polylina
+ **/
+export function decodePolylineToPoints(str, precision) {
+    if (!str || typeof str !== "string") return [];
+    let pts = decodePolylineOnce(str, precision);
+    // If decoded points look implausible (e.g., 3 digits before decimal), try precision+1 (common 1e6 factor)
+    const first = pts[0];
+    if (!first || !isValidCoord(first)) {
+        const alt = decodePolylineOnce(str, precision + 1);
+        if (alt[0] && isValidCoord(alt[0])) pts = alt;
+    }
+    // Filter to valid coordinate range just in case
+    return pts.filter(isValidCoord);
+}
 
 /**
  * Fetcha postaje vlakov
@@ -531,5 +624,5 @@ export {
     fetchIJPPTrip,
     fetchLppPoints,
 };
-export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
+export { fetchSzStops, fetchSzTrip, fetchSzArrivals, szRoutePoints };
 export { fetchAllBusStops };
