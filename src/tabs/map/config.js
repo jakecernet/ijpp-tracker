@@ -13,7 +13,26 @@ import routeStop from "../../img/routeStop2.png";
 export const DEFAULT_CENTER = [46.0569, 14.5058];
 export const DEFAULT_ZOOM = 13;
 
-export const OSM_RASTER_STYLE = {
+export const OSM_RASTER_STYLE_DARK = {
+    version: 8,
+    sources: {
+        osm: {
+            type: "raster",
+            tiles: [
+                "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+                "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+                "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+            ],
+            tileSize: 256,
+            attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        },
+    },
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    layers: [{ id: "osm", type: "raster", source: "osm" }],
+};
+
+export const OSM_RASTER_STYLE_LIGHT = {
     version: 8,
     sources: {
         osm: {
@@ -25,7 +44,7 @@ export const OSM_RASTER_STYLE = {
             ],
             tileSize: 256,
             attribution:
-                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         },
     },
     glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",

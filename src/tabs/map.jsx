@@ -5,9 +5,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import {
     DEFAULT_CENTER,
     DEFAULT_ZOOM,
-    OSM_RASTER_STYLE,
     ICON_SOURCES,
     operatorToIcon,
+    OSM_RASTER_STYLE_DARK,
+    OSM_RASTER_STYLE_LIGHT,
 } from "./map/config";
 import { toGeoJSONPoints, ensureIcons } from "./map/utils";
 import {
@@ -31,8 +32,8 @@ import locationPNG from "../img/location.png";
 
 const STYLE =
     typeof window !== "undefined"
-        ? localStorage.getItem("mapStyleUrl") || OSM_RASTER_STYLE
-        : OSM_RASTER_STYLE;
+        ? localStorage.getItem("mapStyleUrl") || OSM_RASTER_STYLE_DARK
+        : OSM_RASTER_STYLE_DARK;
 
 function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
     if (markersRef.current[key]) {
