@@ -14,7 +14,6 @@ import {
     fetchSzStops,
     fetchSzTrip,
     fetchSzArrivals,
-    szRoutePoints,
     fetchIJPPTrip,
 } from "./Api.jsx";
 
@@ -42,6 +41,16 @@ function App() {
             ? JSON.parse(localStorage.getItem("userLocation"))
             : [46.056, 14.5058]
     );
+
+    const [theme, setTheme] = useState(
+        localStorage.getItem("theme") || "light"
+    );
+
+    useEffect(() => {
+        localStorage.getItem("theme")
+            ? setTheme(localStorage.getItem("theme"))
+            : localStorage.setItem("theme", "light");
+    }, [theme]);
 
     const [gpsPositions, setGpsPositions] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
@@ -366,6 +375,8 @@ function App() {
                                         ijppTrip={ijppTrip}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
+                                        theme={theme}
+                                        setTheme={setTheme}
                                     />
                                 }
                             />
@@ -384,6 +395,8 @@ function App() {
                                         ijppTrip={ijppTrip}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
+                                        theme={theme}
+                                        setTheme={setTheme}
                                     />
                                 }
                             />

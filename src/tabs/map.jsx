@@ -32,8 +32,10 @@ import locationPNG from "../img/location.png";
 
 const STYLE =
     typeof window !== "undefined"
-        ? localStorage.getItem("mapStyleUrl") || OSM_RASTER_STYLE_DARK
-        : OSM_RASTER_STYLE_DARK;
+        ? localStorage.getItem("theme") === "dark"
+            ? OSM_RASTER_STYLE_DARK
+            : OSM_RASTER_STYLE_LIGHT
+        : OSM_RASTER_STYLE_LIGHT;
 
 function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
     if (markersRef.current[key]) {
@@ -76,6 +78,8 @@ const Map = React.memo(function Map({
     ijppTrip,
     lppRoute,
     szRoute,
+    theme,
+    setTheme,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -957,6 +961,7 @@ const Map = React.memo(function Map({
                     setFilterByRoute={setFilterByRoute}
                     busOperators={busOperators}
                     setBusOperators={setBusOperators}
+                    setTheme={setTheme}
                 />
             </div>
         </div>
