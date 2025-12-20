@@ -5,8 +5,6 @@ export default function LayerSelector({
     setShowFilter,
     visibility,
     setVisibility,
-    filterByRoute,
-    setFilterByRoute,
     busOperators,
     setBusOperators,
     setTheme,
@@ -103,30 +101,6 @@ export default function LayerSelector({
                         Železniške postaje
                     </label>
                 </div>
-
-                <div
-                    style={{
-                        marginTop: "16px",
-                        paddingTop: "12px",
-                        borderTop: "1px solid rgba(128,128,128,0.3)",
-                    }}
-                >
-                    <h3>Filtriranje</h3>
-                    <label
-                        style={{
-                            display: "flex",
-                            gap: 8,
-                            alignItems: "center",
-                        }}
-                    >
-                        <input
-                            type="checkbox"
-                            checked={filterByRoute}
-                            onChange={(e) => setFilterByRoute(e.target.checked)}
-                        />
-                        Samo izbrana linija
-                    </label>
-                </div>
                 <div style={{ marginTop: "12px" }}>
                     <h3>Prevozniki</h3>
                     {Object.entries({
@@ -179,7 +153,7 @@ export default function LayerSelector({
                             setTheme(next);
                             try {
                                 localStorage.setItem("theme", next);
-                            } catch {};
+                            } catch {}
                             window.location.reload();
                         }}
                         style={{

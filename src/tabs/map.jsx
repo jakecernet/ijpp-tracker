@@ -105,10 +105,40 @@ const Map = React.memo(function Map({
         murska: true,
         generic: true,
     });
+    const prevVisibilityRef = useRef(null);
 
     useEffect(() => {
         handlersRef.current = { setActiveStation, setSelectedVehicle };
     }, [setActiveStation, setSelectedVehicle]);
+
+    // Restore persisted layer settings (visibility, operators, filter)
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem("mapLayerSettings");
+            if (!raw) return;
+            const settings = JSON.parse(raw);
+            if (settings && typeof settings === "object") {
+                if (
+                    settings.visibility &&
+                    typeof settings.visibility === "object"
+                ) {
+                    setVisibility((v) => ({ ...v, ...settings.visibility }));
+                }
+                if (
+                    settings.busOperators &&
+                    typeof settings.busOperators === "object"
+                ) {
+                    setBusOperators((b) => ({
+                        ...b,
+                        ...settings.busOperators,
+                    }));
+                }
+                if (typeof settings.filterByRoute === "boolean") {
+                    setFilterByRoute(settings.filterByRoute);
+                }
+            }
+        } catch {}
+    }, []);
 
     const center = useMemo(
         () => activeStation?.coordinates || userLocation || DEFAULT_CENTER,
@@ -245,41 +275,52 @@ const Map = React.memo(function Map({
         [trainStops]
     );
 
-    const trainPositionsGeoJSON = useMemo(
-        () =>
-            toGeoJSONPoints(
-                trainPositions,
-                (train) => {
-                    const coord = train?.gpsLocation;
-                    if (!coord) return null;
-                    const [lng, lat] = String(coord)
-                        .split(",")
-                        .map((value) => Number(value.trim()))
-                        .slice(0, 2);
-                    return Number.isFinite(lat) && Number.isFinite(lng)
-                        ? [lat, lng]
-                        : null;
-                },
-                (train) => ({
-                    id: train?.tripId,
-                    relation: [train?.from?.name, train?.to?.name]
-                        .filter(Boolean)
-                        .join(" - "),
-                    fromStation: train?.from?.name,
-                    toStation: train?.to?.name,
-                    departure: train?.departure,
-                    arrival: train?.arrival,
-                    icon: "train",
-                    brand: "sz",
-                    tripId: train?.tripId ?? null,
-                    tripShort: train?.tripShort ?? null,
-                    realTime: train?.realtime ?? false,
-                    from: JSON.stringify(train?.from ?? null),
-                    to: JSON.stringify(train?.to ?? null),
-                })
-            ),
-        [trainPositions]
-    );
+    const trainPositionsGeoJSON = useMemo(() => {
+        let currentRouteInfo = null;
+        try {
+            const stored = localStorage.getItem("selectedBusRoute");
+            if (stored) currentRouteInfo = JSON.parse(stored);
+        } catch {}
+
+        const filtered = (trainPositions || []).filter((train) => {
+            if (filterByRoute && currentRouteInfo?.tripId) {
+                return train.tripId === currentRouteInfo.tripId;
+            }
+            return true;
+        });
+
+        return toGeoJSONPoints(
+            filtered,
+            (train) => {
+                const coord = train?.gpsLocation;
+                if (!coord) return null;
+                const [lng, lat] = String(coord)
+                    .split(",")
+                    .map((value) => Number(value.trim()))
+                    .slice(0, 2);
+                return Number.isFinite(lat) && Number.isFinite(lng)
+                    ? [lat, lng]
+                    : null;
+            },
+            (train) => ({
+                id: train?.tripId,
+                relation: [train?.from?.name, train?.to?.name]
+                    .filter(Boolean)
+                    .join(" - "),
+                fromStation: train?.from?.name,
+                toStation: train?.to?.name,
+                departure: train?.departure,
+                arrival: train?.arrival,
+                icon: "train",
+                brand: "sz",
+                tripId: train?.tripId ?? null,
+                tripShort: train?.tripShort ?? null,
+                realTime: train?.realtime ?? false,
+                from: JSON.stringify(train?.from ?? null),
+                to: JSON.stringify(train?.to ?? null),
+            })
+        );
+    }, [trainPositions, filterByRoute]);
 
     useEffect(() => {
         if (mapInstanceRef.current) return;
@@ -617,6 +658,15 @@ const Map = React.memo(function Map({
                         console.warn("Shranjevanje ni uspelo:", err);
                     }
                     handlersRef.current.setSelectedVehicle(vehicle);
+                    // Enable route-only SZ view and hide buses & stations
+                    prevVisibilityRef.current = visibility;
+                    setFilterByRoute(true);
+                    setVisibility({
+                        buses: false,
+                        busStops: false,
+                        trainPositions: true,
+                        trainStops: false,
+                    });
                 },
                 onNavigateRoute: () => {
                     window.location.hash = "/route";
@@ -635,6 +685,15 @@ const Map = React.memo(function Map({
                         console.warn("Shranjevanje ni uspelo:", err);
                     }
                     handlersRef.current.setSelectedVehicle(vehicle);
+                    // Enable route-only bus view and hide stations & SZ markers
+                    prevVisibilityRef.current = visibility;
+                    setFilterByRoute(true);
+                    setVisibility({
+                        buses: true,
+                        busStops: false,
+                        trainPositions: false,
+                        trainStops: false,
+                    });
                 },
                 onNavigateRoute: () => {
                     window.location.hash = "/route";
@@ -644,6 +703,15 @@ const Map = React.memo(function Map({
             configureIjppTripStopsPopup({
                 map,
                 onNavigateRoute: () => {
+                    // Enable route-only bus view when navigating from IJPP route stops
+                    prevVisibilityRef.current = visibility;
+                    setFilterByRoute(true);
+                    setVisibility({
+                        buses: true,
+                        busStops: false,
+                        trainPositions: false,
+                        trainStops: false,
+                    });
                     window.location.hash = "/route";
                 },
             });
@@ -652,6 +720,15 @@ const Map = React.memo(function Map({
             configureLppTripStopsPopup({
                 map,
                 onNavigateRoute: () => {
+                    // Enable route-only bus view when navigating from LPP route stops
+                    prevVisibilityRef.current = visibility;
+                    setFilterByRoute(true);
+                    setVisibility({
+                        buses: true,
+                        busStops: false,
+                        trainPositions: false,
+                        trainStops: false,
+                    });
                     window.location.hash = "/route";
                 },
             });
@@ -660,6 +737,15 @@ const Map = React.memo(function Map({
             configureSzTripStopsPopup({
                 map,
                 onNavigateRoute: () => {
+                    // Enable route-only SZ view when navigating from SZ route stops
+                    prevVisibilityRef.current = visibility;
+                    setFilterByRoute(true);
+                    setVisibility({
+                        buses: false,
+                        busStops: false,
+                        trainPositions: true,
+                        trainStops: false,
+                    });
                     window.location.hash = "/route";
                 },
             });
@@ -695,6 +781,18 @@ const Map = React.memo(function Map({
         setPrefixVisible(map, "trainStops", visibility.trainStops);
         setPrefixVisible(map, "trainPositions", visibility.trainPositions);
     }, [visibility]);
+
+    // Persist layer settings as a single localStorage item
+    useEffect(() => {
+        try {
+            const payload = {
+                visibility,
+                busOperators,
+                filterByRoute,
+            };
+            localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
+        } catch {}
+    }, [visibility, busOperators, filterByRoute]);
 
     // Update IJPP trip overlays
     useEffect(() => {
@@ -957,12 +1055,62 @@ const Map = React.memo(function Map({
                     setShowFilter={setShowFilter}
                     visibility={visibility}
                     setVisibility={setVisibility}
-                    filterByRoute={filterByRoute}
-                    setFilterByRoute={setFilterByRoute}
                     busOperators={busOperators}
                     setBusOperators={setBusOperators}
                     setTheme={setTheme}
                 />
+                {filterByRoute && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: 12,
+                            left: 12,
+                            background: "rgba(0,0,0,0.6)",
+                            color: "#fff",
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            zIndex: 10,
+                            boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+                        }}
+                        aria-live="polite"
+                    >
+                        <span style={{ fontSize: 13 }}>
+                            Samo izbrana linija
+                        </span>
+                        <button
+                            type="button"
+                            aria-label="Izklopi filter linije"
+                            onClick={() => {
+                                setFilterByRoute(false);
+                                const prev = prevVisibilityRef.current;
+                                if (prev && typeof prev === "object") {
+                                    setVisibility(prev);
+                                } else {
+                                    setVisibility({
+                                        buses: true,
+                                        busStops: true,
+                                        trainPositions: true,
+                                        trainStops: true,
+                                    });
+                                }
+                            }}
+                            style={{
+                                background: "transparent",
+                                color: "#fff",
+                                border: "1px solid rgba(255,255,255,0.6)",
+                                borderRadius: 6,
+                                padding: "2px 6px",
+                                cursor: "pointer",
+                                fontSize: 12,
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
