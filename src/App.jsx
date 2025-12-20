@@ -341,7 +341,7 @@ function App() {
 
     return (
         <Router>
-            <div className="container">
+            <div className={`container ${theme}`}>
                 <div className="content">
                     <Suspense
                         fallback={

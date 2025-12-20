@@ -53,11 +53,11 @@ const NearMe = ({
 
     const StationItem = React.memo(({ busStop, onSelect }) => (
         <div className="station-item" onClick={onSelect}>
-            <Bus size={24} />
             <div>
+                <Bus size={24} />
                 <h3>{busStop.name}</h3>
-                <p>{busStop.distance?.toFixed(1)} km</p>
             </div>
+            <p>{busStop.distance?.toFixed(1)} km</p>
         </div>
     ));
 

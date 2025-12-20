@@ -1,3 +1,45 @@
+.dark {
+    --nav-bg: rgba(15, 23, 42, 0.95);
+    --content-bg: linear-gradient(
+        135deg,
+        #0f172a 0%,
+        #1e293b 50%,
+        #0f172a 100%
+    );
+    --text-color: #e2e8f0;
+    --active-color: #60a5fa;
+    --hover-color: #94a3b8;
+    --selector-border: rgba(96, 165, 250, 0.3);
+    --circle-bg: linear-gradient(
+        135deg,
+        rgba(51, 65, 85, 0.6),
+        rgba(71, 85, 105, 0.4)
+    );
+    --button-bg: rgba(30, 41, 59, 0.9);
+    --popup-bg: rgba(30, 41, 59, 0.95);
+}
+
+.light {
+    --nav-bg: rgba(243, 244, 246, 0.95);
+    --content-bg: linear-gradient(
+        135deg,
+        #f3f4f6 0%,
+        #e5e7eb 50%,
+        #f3f4f6 100%
+    );
+    --text-color: #1e293b;
+    --active-color: #2563eb;
+    --hover-color: #475569;
+    --selector-border: rgba(37, 99, 235, 0.3);
+    --circle-bg: linear-gradient(
+        135deg,
+        rgba(203, 213, 225, 0.6),
+        rgba(148, 163, 184, 0.4)
+    );
+    --button-bg: rgba(243, 244, 246, 0.9);
+    --popup-bg: rgba(243, 244, 246, 0.95);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -19,7 +61,7 @@
 body {
     font-family: "Proxima Nova", Inter, system-ui, Avenir, Helvetica, Arial,
         sans-serif;
-    color: #e2e8f0;
+    color: var(--text-color);
 }
 
 .container {
@@ -33,7 +75,7 @@ body {
         width: 100%;
         display: grid;
         grid-template-columns: 1fr 1fr 1fr 1fr;
-        background: rgba(15, 23, 42, 0.95);
+        background: var(--nav-bg);
         backdrop-filter: blur(12px);
         height: 80px;
 
@@ -54,32 +96,27 @@ body {
                 justify-content: center;
                 flex-direction: row;
                 gap: 20px;
-                color: #94a3b8;
+                color: var(--hover-color);
                 transition: color 0.3s ease;
             }
 
             &:hover button {
-                color: #e2e8f0;
+                color: var(--active-color);
             }
         }
 
         a.active {
-            border-top: 4px solid #60a5fa;
+            border-top: 4px solid var(--active-color);
 
             button {
-                color: #60a5fa;
+                color: var(--active-color);
             }
         }
     }
 
     .content {
         height: calc(100vh - 80px);
-        background: linear-gradient(
-            135deg,
-            #0f172a 0%,
-            #1e293b 50%,
-            #0f172a 100%
-        );
+        background: var(--content-bg);
 
         .map-container {
             overflow: hidden;
@@ -93,17 +130,17 @@ body {
                 flex-direction: column;
                 justify-content: center;
                 z-index: 2;
-                color: #e2e8f0;
+                color: var(--text-color);
                 transition: 0.3s ease;
 
                 button {
                     padding: 6px 10px;
-                    border: 1px solid rgba(148, 163, 184, 0.2);
-                    background: rgba(30, 41, 59, 0.9);
+                    border: 1px solid var(--selector-border);
+                    background: var(--button-bg);
                     backdrop-filter: blur(8px);
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
                     cursor: pointer;
-                    color: #e2e8f0;
+                    color: var(--text-color);
                     width: fit-content;
                     margin-top: 6px;
                     border-radius: 6px;
@@ -111,17 +148,17 @@ body {
 
                     &:hover {
                         background: rgba(51, 65, 85, 0.95);
-                        border-color: #60a5fa;
+                        border-color: var(--active-color);
                     }
                 }
 
                 div {
                     overflow: hidden;
                     padding: 10px;
-                    background: rgba(30, 41, 59, 0.95);
+                    background: var(--content-bg);
                     backdrop-filter: blur(8px);
                     border-radius: 8px;
-                    border: 1px solid rgba(148, 163, 184, 0.1);
+                    border: 1px solid var(--selector-border);
                 }
             }
         }
@@ -133,7 +170,7 @@ body {
             h2 {
                 text-align: center;
                 padding: 10px 0;
-                color: #f1f5f9;
+                color: var(--text-color);
             }
 
             .arrival-list {
@@ -144,9 +181,10 @@ body {
                     display: grid;
                     grid-template-columns: 1fr 1fr 1fr 1fr;
                     align-items: center;
-                    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+                    border-bottom: 1px solid var(--selector-border);
                     text-align: center;
                     transition: background 0.2s ease;
+                    color: var(--text-color);
 
                     &:hover {
                         background: rgba(51, 65, 85, 0.3);
@@ -158,7 +196,6 @@ body {
 
                     p {
                         padding: 10px;
-                        color: #cbd5e1;
                     }
                 }
 
@@ -182,17 +219,13 @@ body {
                         border-radius: 50%;
                         height: 4rem;
                         width: 4rem;
-                        background: linear-gradient(
-                            135deg,
-                            rgba(51, 65, 85, 0.6),
-                            rgba(71, 85, 105, 0.4)
-                        );
-                        border: 1px solid rgba(148, 163, 184, 0.2);
+                        background: var(--circle-bg);
+                        border: 1px solid var(--selector-border);
                         font-size: 1.5rem;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        color: #60a5fa;
+                        color: var(--active-color);
                         font-weight: 600;
                     }
                 }
@@ -205,15 +238,23 @@ body {
                 max-height: calc(100vh - 190px);
                 overflow-y: auto;
                 margin-top: 10px;
+                color: var(--text-color);
 
                 .station-item {
                     padding: 10px;
-                    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+                    border-bottom: 1px solid var(--selector-border);
                     display: flex;
                     flex-direction: row;
                     align-items: center;
+                    justify-content: space-between;
                     gap: 12px;
                     transition: background 0.2s ease;
+
+                    div{
+                        display: flex;
+                        flex-direction: row;
+                        gap: 10px;
+                    }
 
                     &:hover {
                         background: rgba(51, 65, 85, 0.3);
@@ -226,10 +267,10 @@ body {
                 border-radius: 0;
                 height: 3rem;
                 outline: none;
-                border: 1px solid rgba(148, 163, 184, 0.2);
+                border: 1px solid var(--selector-border);
                 padding: 10px;
-                background: rgba(30, 41, 59, 0.5);
-                color: #e2e8f0;
+                background: var(--content-bg);
+                color: var(--text-color);
                 transition: all 0.3s ease;
 
                 &::placeholder {
@@ -238,18 +279,19 @@ body {
 
                 &:focus {
                     background: rgba(30, 41, 59, 0.8);
-                    border-color: #60a5fa;
+                    border-color: var(--active-color);
                 }
             }
         }
 
         .route {
             .data {
-                background: rgba(30, 41, 59, 0.6);
+                background: var(--content-bg);
                 backdrop-filter: blur(8px);
                 padding: 14px 16px;
                 text-align: center;
-                border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+                color: var(--text-color);
+                border-bottom: 1px solid var(--selector-border);
             }
 
             .stops {
@@ -260,12 +302,13 @@ body {
                     flex-direction: column;
                     max-height: calc(100vh - 190px);
                     overflow-y: auto;
+                    color: var(--text-color);
 
                     li {
                         display: flex;
                         align-items: center;
                         justify-content: space-between;
-                        border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+                        border-bottom: 1px solid var(--selector-border);
                         padding: 10px 5px 10px 10px;
                         transition: background 0.2s ease;
 
@@ -301,28 +344,28 @@ body {
 }
 
 .maplibregl-popup-content {
-    background: rgba(30, 41, 59, 0.95) !important;
+    background: var(--popup-bg) !important;
     backdrop-filter: blur(12px) !important;
-    color: #e2e8f0 !important;
-    border: 1px solid rgba(148, 163, 184, 0.2);
+    color: var(--text-color) !important;
+    border: 1px solid var(--selector-border);
     max-width: none;
     width: fit-content;
     border-radius: 8px;
 }
 .maplibregl-popup-tip {
-    border-top-color: rgba(30, 41, 59, 0.95) !important;
-    border-bottom-color: rgba(30, 41, 59, 0.95) !important;
+    border-top-color: var(--popup-bg) !important;
+    border-bottom-color: var(--popup-bg) !important;
 }
 .maplibregl-popup-content h3 {
     font-size: 15px;
     margin: 8px 0 6px;
-    color: #f1f5f9;
+    color: var(--text-color);
 }
 .maplibregl-popup-content button,
 .maplibregl-popup-content .popup-button {
     background: rgba(96, 165, 250, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: var(--active-color);
+    border: 1px solid var(--selector-border);
     padding: 8px 10px;
     border-radius: 8px;
     font-size: 12px;
@@ -331,6 +374,6 @@ body {
 
     &:hover {
         background: rgba(96, 165, 250, 0.25);
-        border-color: #60a5fa;
+        border-color: var(--active-color);
     }
 }
