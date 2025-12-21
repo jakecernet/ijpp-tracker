@@ -782,7 +782,6 @@ const Map = React.memo(function Map({
         setPrefixVisible(map, "trainPositions", visibility.trainPositions);
     }, [visibility]);
 
-    // Persist layer settings as a single localStorage item
     useEffect(() => {
         try {
             const payload = {
@@ -1046,6 +1045,7 @@ const Map = React.memo(function Map({
         });
     }, [userLocation, activeStation]);
 
+    //zbriše črto in postaje na poti iz zemljevida
     const clearPathOverlays = () => {
         const map = mapInstanceRef.current;
         if (map) {
@@ -1098,6 +1098,30 @@ const Map = React.memo(function Map({
         }
     };
 
+    //čekira če obstajajo elementi v localstoragu s točkami poti
+    const checkForPaths = () => {
+        if (typeof localStorage === "undefined") return false;
+        const keys = ["ijppTripOverlay", "lppTripOverlay", "szTripOverlay"];
+        for (const k of keys) {
+            const raw = localStorage.getItem(k);
+            if (!raw) continue;
+            const obj = JSON.parse(raw);
+            if (!obj) continue;
+            if (
+                (obj.line &&
+                    obj.line.geometry &&
+                    Array.isArray(obj.line.geometry.coordinates) &&
+                    obj.line.geometry.coordinates.length > 0) ||
+                (obj.stops &&
+                    obj.stops.features &&
+                    Array.isArray(obj.stops.features) &&
+                    obj.stops.features.length > 0)
+            ) {
+                return true;
+            }
+        }
+    };
+
     return (
         <div>
             <div className="map-container" style={{ position: "relative" }}>
@@ -1113,79 +1137,46 @@ const Map = React.memo(function Map({
                 />
                 {(() => {
                     try {
-                        if (typeof localStorage === "undefined") return false;
-                        const keys = [
-                            "ijppTripOverlay",
-                            "lppTripOverlay",
-                            "szTripOverlay",
-                        ];
-                        for (const k of keys) {
-                            const raw = localStorage.getItem(k);
-                            if (!raw) continue;
-                            const obj = JSON.parse(raw);
-                            if (!obj) continue;
-                            if (
-                                (obj.line &&
-                                    obj.line.geometry &&
-                                    Array.isArray(
-                                        obj.line.geometry.coordinates
-                                    ) &&
-                                    obj.line.geometry.coordinates.length > 0) ||
-                                (obj.stops &&
-                                    obj.stops.features &&
-                                    Array.isArray(obj.stops.features) &&
-                                    obj.stops.features.length > 0)
-                            ) {
-                                return true;
-                            }
-                        }
+                        return checkForPaths();
                     } catch {}
                     return false;
                 })() && (
-                    <div
+                    <button
+                        type="button"
+                        aria-label="Izklopi filter linije"
+                        onClick={() => {
+                            setFilterByRoute(false);
+                            const prev = prevVisibilityRef.current;
+                            if (prev && typeof prev === "object") {
+                                setVisibility(prev);
+                            } else {
+                                setVisibility({
+                                    buses: true,
+                                    busStops: true,
+                                    trainPositions: true,
+                                    trainStops: true,
+                                });
+                            }
+                            clearPathOverlays();
+                        }}
                         style={{
                             position: "absolute",
                             bottom: 12,
                             right: 12,
-                            background: "var(--x-bg)",
                             padding: "5px",
                             borderRadius: 8,
                             zIndex: 10,
-                            display: "flex",
-                            alignItems: "center",
+                            background: "var(--x-bg)",
+                            color: "var(--text-color)",
+                            border: "1px solid var(--text-color)",
+                            cursor: "pointer",
+                            fontSize: 16,
+                            width: 30,
+                            height: 30,
                         }}
                     >
-                        <button
-                            type="button"
-                            aria-label="Izklopi filter linije"
-                            onClick={() => {
-                                setFilterByRoute(false);
-                                const prev = prevVisibilityRef.current;
-                                if (prev && typeof prev === "object") {
-                                    setVisibility(prev);
-                                } else {
-                                    setVisibility({
-                                        buses: true,
-                                        busStops: true,
-                                        trainPositions: true,
-                                        trainStops: true,
-                                    });
-                                }
-                                clearPathOverlays();
-                            }}
-                            style={{
-                                background: "transparent",
-                                color: "var(--text-color)",
-                                border: "1px solid var(--text-color)",
-                                borderRadius: 6,
-                                padding: "2px 6px",
-                                cursor: "pointer",
-                                fontSize: 12,
-                            }}
-                        >
-                            ×
-                        </button>
-                    </div>
+                        ×
+                    </button>
                 )}
             </div>
         </div>
