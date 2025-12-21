@@ -17,6 +17,7 @@
     );
     --button-bg: rgba(30, 41, 59, 0.9);
     --popup-bg: rgba(30, 41, 59, 0.95);
+    --x-bg: rgba(0, 0, 0, 0.6);
 }
 
 .light {
@@ -38,6 +39,7 @@
     );
     --button-bg: rgba(243, 244, 246, 0.9);
     --popup-bg: rgba(243, 244, 246, 0.95);
+    --x-bg: rgba(255, 255, 255, 0.6);
 }
 
 * {
@@ -250,7 +252,7 @@ body {
                     gap: 12px;
                     transition: background 0.2s ease;
 
-                    div{
+                    div {
                         display: flex;
                         flex-direction: row;
                         gap: 10px;

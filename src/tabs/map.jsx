@@ -1046,6 +1046,58 @@ const Map = React.memo(function Map({
         });
     }, [userLocation, activeStation]);
 
+    const clearPathOverlays = () => {
+        const map = mapInstanceRef.current;
+        if (map) {
+            const clearLine = {
+                type: "Feature",
+                geometry: {
+                    type: "LineString",
+                    coordinates: [],
+                },
+                properties: {},
+            };
+            const clearStops = {
+                type: "FeatureCollection",
+                features: [],
+            };
+            [
+                {
+                    line: "ijpp-trip-line-src",
+                    stops: "ijpp-trip-stops-src",
+                    storage: "ijppTripOverlay",
+                },
+                {
+                    line: "lpp-trip-line-src",
+                    stops: "lpp-trip-stops-src",
+                    storage: "lppTripOverlay",
+                },
+                {
+                    line: "sz-trip-line-src",
+                    stops: "sz-trip-stops-src",
+                    storage: "szTripOverlay",
+                },
+            ].forEach(({ line, stops, storage }) => {
+                try {
+                    const lineSrc = map.getSource(line);
+                    const stopsSrc = map.getSource(stops);
+                    if (lineSrc && lineSrc.setData) lineSrc.setData(clearLine);
+                    if (stopsSrc && stopsSrc.setData)
+                        stopsSrc.setData(clearStops);
+                    try {
+                        localStorage.setItem(
+                            storage,
+                            JSON.stringify({
+                                line: clearLine,
+                                stops: clearStops,
+                            })
+                        );
+                    } catch {}
+                } catch {}
+            });
+        }
+    };
+
     return (
         <div>
             <div className="map-container" style={{ position: "relative" }}>
@@ -1059,27 +1111,50 @@ const Map = React.memo(function Map({
                     setBusOperators={setBusOperators}
                     setTheme={setTheme}
                 />
-                {filterByRoute && (
+                {(() => {
+                    try {
+                        if (typeof localStorage === "undefined") return false;
+                        const keys = [
+                            "ijppTripOverlay",
+                            "lppTripOverlay",
+                            "szTripOverlay",
+                        ];
+                        for (const k of keys) {
+                            const raw = localStorage.getItem(k);
+                            if (!raw) continue;
+                            const obj = JSON.parse(raw);
+                            if (!obj) continue;
+                            if (
+                                (obj.line &&
+                                    obj.line.geometry &&
+                                    Array.isArray(
+                                        obj.line.geometry.coordinates
+                                    ) &&
+                                    obj.line.geometry.coordinates.length > 0) ||
+                                (obj.stops &&
+                                    obj.stops.features &&
+                                    Array.isArray(obj.stops.features) &&
+                                    obj.stops.features.length > 0)
+                            ) {
+                                return true;
+                            }
+                        }
+                    } catch {}
+                    return false;
+                })() && (
                     <div
                         style={{
                             position: "absolute",
-                            top: 12,
-                            left: 12,
-                            background: "rgba(0,0,0,0.6)",
-                            color: "#fff",
-                            padding: "6px 10px",
+                            bottom: 12,
+                            right: 12,
+                            background: "var(--x-bg)",
+                            padding: "5px",
                             borderRadius: 8,
+                            zIndex: 10,
                             display: "flex",
                             alignItems: "center",
-                            gap: 10,
-                            zIndex: 10,
-                            boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
                         }}
-                        aria-live="polite"
                     >
-                        <span style={{ fontSize: 13 }}>
-                            Samo izbrana linija
-                        </span>
                         <button
                             type="button"
                             aria-label="Izklopi filter linije"
@@ -1096,11 +1171,12 @@ const Map = React.memo(function Map({
                                         trainStops: true,
                                     });
                                 }
+                                clearPathOverlays();
                             }}
                             style={{
                                 background: "transparent",
-                                color: "#fff",
-                                border: "1px solid rgba(255,255,255,0.6)",
+                                color: "var(--text-color)",
+                                border: "1px solid var(--text-color)",
                                 borderRadius: 6,
                                 padding: "2px 6px",
                                 cursor: "pointer",
