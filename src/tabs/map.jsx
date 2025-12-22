@@ -80,7 +80,6 @@ const Map = React.memo(function Map({
     ijppTrip,
     lppRoute,
     szRoute,
-    theme,
     setTheme,
 }) {
     const mapRef = useRef(null);
@@ -1289,6 +1288,11 @@ const Map = React.memo(function Map({
                                 szRoute={szRoute}
                                 ijppTrip={ijppTrip}
                                 setActiveStation={setActiveStation}
+                                onDragPointerDown={onRouteDrawerPointerDown}
+                                onDragPointerMove={onRouteDrawerPointerMove}
+                                onDragPointerUpOrCancel={
+                                    onRouteDrawerPointerUpOrCancel
+                                }
                             />
                         ) : (
                             <div style={{ padding: 12 }}>

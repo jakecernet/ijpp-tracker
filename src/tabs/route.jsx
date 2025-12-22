@@ -4,11 +4,13 @@ const RouteTab = ({
     szRoute,
     ijppTrip,
     setActiveStation,
+    onDragPointerDown,
+    onDragPointerMove,
+    onDragPointerUpOrCancel,
 }) => {
     const isLPP = selectedVehicle?.lineNumber != null;
-    const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
-    const szTrip = isSZ ? szRoute : null;
-    const szStops = Array.isArray(szTrip?.stops) ? szTrip.stops : [];
+    const isSZ = Boolean(szRoute?.from && szRoute?.to);
+    const szStops = Array.isArray(szRoute?.stops) ? szRoute.stops : [];
 
     const printTime = (timeStr) => {
         const date = new Date(timeStr);
@@ -19,24 +21,28 @@ const RouteTab = ({
         });
     };
 
+    const dataText = {
+        lineName:
+            (isLPP ? selectedVehicle?.lineNumber + " | " : "") +
+                selectedVehicle?.lineName || (isSZ ? szRoute?.tripName : ""),
+        operator: isLPP
+            ? "Javno podjetje Ljubljanski potniški promet d.o.o."
+            : selectedVehicle?.operator == null
+            ? "Slovenske železnice"
+            : selectedVehicle?.operator,
+    };
+
     return (
         <div className="route">
-            <div className="data">
-                <h3>
-                    {isLPP ? selectedVehicle?.lineNumber + " | " : ""}
-                    {selectedVehicle?.lineName}
-                </h3>
-                <p>
-                    {isLPP
-                        ? "Javno podjetje Ljubljanski potniški promet d.o.o."
-                        : selectedVehicle?.operator}
-                </p>
-                {isSZ && (
-                    <h3>
-                        {szRoute?.tripName} ({szRoute?.shortName})
-                    </h3>
-                )}
-                {isSZ && <p>Slovenske železnice d.o.o.</p>}
+            <div
+                className="data"
+                onPointerDown={onDragPointerDown}
+                onPointerMove={onDragPointerMove}
+                onPointerUp={onDragPointerUpOrCancel}
+                onPointerCancel={onDragPointerUpOrCancel}
+            >
+                <h3>{dataText.lineName || "Neznana linija"}</h3>
+                <p>Operater: {dataText.operator}</p>
             </div>
             {!isSZ && (
                 <div className="stops">
@@ -119,7 +125,7 @@ const RouteTab = ({
                                 <li
                                     key="start"
                                     onClick={() => {
-                                        const stop = szTrip.from;
+                                        const stop = szRoute.from;
                                         const coords = Array.isArray(
                                             stop?.gpsLocation
                                         )
@@ -139,7 +145,7 @@ const RouteTab = ({
                                         window.location.hash = "/arrivals";
                                     }}
                                 >
-                                    <h4>{szTrip.from.name}</h4>
+                                    <h4>{szRoute.from.name}</h4>
                                     <span
                                         style={{
                                             display: "flex",
@@ -148,7 +154,7 @@ const RouteTab = ({
                                     >
                                         <p>
                                             Odhod:{" "}
-                                            {printTime(szTrip.from.departure)}
+                                            {printTime(szRoute.from.departure)}
                                         </p>
                                     </span>
                                 </li>
@@ -186,7 +192,7 @@ const RouteTab = ({
                                 <li
                                     key="end"
                                     onClick={() => {
-                                        const stop = szTrip.to;
+                                        const stop = szRoute.to;
                                         const coords = Array.isArray(
                                             stop?.gpsLocation
                                         )
@@ -206,7 +212,7 @@ const RouteTab = ({
                                         window.location.hash = "/arrivals";
                                     }}
                                 >
-                                    <h4>{szTrip.to.name}</h4>
+                                    <h4>{szRoute.to.name}</h4>
                                     <span
                                         style={{
                                             display: "flex",
@@ -215,7 +221,7 @@ const RouteTab = ({
                                     >
                                         <p>
                                             Prihod:{" "}
-                                            {printTime(szTrip.to.arrival)}
+                                            {printTime(szRoute.to.arrival)}
                                         </p>
                                     </span>
                                 </li>

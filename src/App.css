@@ -365,6 +365,8 @@ body {
                 text-align: center;
                 color: var(--text-color);
                 border-bottom: 1px solid var(--selector-border);
+                cursor: grab;
+                touch-action: none;
             }
 
             .stops {

@@ -394,7 +394,6 @@ const fetchLppPoints = async (routeId) => {
     if (!routeId) return null;
     try {
         const raw = await fetchJson(lppRoutePointsLink + routeId);
-        console.log("Raw LPP points:", raw);
         const points = raw.data
             ?.filter((point) => point.geojson_shape != null) // Filter out points with null geojson_shape
             .map((point) => {
@@ -488,7 +487,6 @@ const fetchSzTrip = async (tripId) => {
                       : [],
               }
             : null;
-        console.log("Fetched SZ trip data:", data);
         return data;
     } catch (error) {
         console.error("Error fetching SZ trip:", error);
@@ -508,8 +506,6 @@ const szRoutePoints = async (routeId) => {
             const response = await fetchJson(
                 szRouteLink + routeId + "&joinInterlinedLegs=false&language=en"
             );
-
-            console.log(response);
             return response;
         } catch (error) {
             console.error("Error fetching SZ route points:", error);

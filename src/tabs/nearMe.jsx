@@ -6,7 +6,6 @@ const NearMe = ({
     setActiveStation,
     busStops,
     szStops,
-    setCurentUrl,
 }) => {
     const toRadians = (degrees) => {
         return degrees * (Math.PI / 180);
@@ -114,7 +113,6 @@ const NearMe = ({
                                 "activeStation",
                                 JSON.stringify(busStop)
                             );
-                            setCurentUrl("/arrivals");
                         }}
                     />
                 ))}
@@ -129,7 +127,6 @@ const NearMe = ({
                                 "activeStation",
                                 JSON.stringify(szStop)
                             );
-                            setCurentUrl("/arrivals");
                         }}
                     />
                 ))}
