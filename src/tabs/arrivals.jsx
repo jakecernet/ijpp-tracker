@@ -34,8 +34,7 @@ const ArrivalsTab = ({
             )
             .filter(
                 (arrival) =>
-                    arrival?.operatorName !==
-                    "Ljubljanski Potniški Promet"
+                    arrival?.operatorName !== "Ljubljanski Potniški Promet"
             );
     }, [ijppArrivals, searchTerm]);
 
@@ -126,11 +125,19 @@ const ArrivalsTab = ({
                             }}
                             onClick={() => {
                                 setIjppRouteFromArrival(arrival);
-                                window.location.hash = "/route";
+                                try {
+                                    sessionStorage.setItem(
+                                        "openRouteDrawer",
+                                        "1"
+                                    );
+                                } catch {}
+                                window.location.hash = "/map";
                             }}
                         >
                             <h3>{arrival.tripName}</h3>
-                            <p>Prihod: {(arrival.realtimeArrival).slice(0, -3)}</p>
+                            <p>
+                                Prihod: {arrival.realtimeArrival.slice(0, -3)}
+                            </p>
                             <p>
                                 Prevoznik:{" "}
                                 {shortenOperatorName(arrival.operatorName)}
@@ -147,7 +154,13 @@ const ArrivalsTab = ({
                             className="lpp-arrival-item arrival-item"
                             onClick={() => {
                                 setLppRouteFromArrival(arrival);
-                                window.location.hash = "/route";
+                                try {
+                                    sessionStorage.setItem(
+                                        "openRouteDrawer",
+                                        "1"
+                                    );
+                                } catch {}
+                                window.location.hash = "/map";
                             }}
                         >
                             <div className="left">
@@ -166,7 +179,10 @@ const ArrivalsTab = ({
                         className="sz-arrival-item arrival-item"
                         onClick={() => {
                             getSzTripFromId(arrival.tripId);
-                            window.location.hash = "/route";
+                            try {
+                                sessionStorage.setItem("openRouteDrawer", "1");
+                            } catch {}
+                            window.location.hash = "/map";
                         }}
                     >
                         <h2>{arrival.headsign}</h2>

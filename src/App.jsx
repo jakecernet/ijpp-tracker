@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin, ArrowRightLeft } from "lucide-react";
+import { Map, Clock, MapPin } from "lucide-react";
 import "./App.css";
 
 import {
@@ -20,14 +20,12 @@ import {
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
-const RouteTab = lazy(() => import("./tabs/route.jsx"));
 
 if (typeof window !== "undefined") {
     // Preload components to avoid lag on first navigation
     import("./tabs/map");
     import("./tabs/arrivals");
     import("./tabs/nearMe");
-    import("./tabs/route.jsx");
 }
 
 function App() {
@@ -54,16 +52,7 @@ function App() {
 
     const [gpsPositions, setGpsPositions] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
-    const [selectedVehicle, setSelectedVehicle] = useState(() => {
-        if (typeof window === "undefined") return null;
-        try {
-            const raw = window.localStorage.getItem("selectedBusRoute");
-            return raw ? JSON.parse(raw) : null;
-        } catch (error) {
-            console.warn("Neveljavni podatki o izbranem vozilu:", error);
-            return null;
-        }
-    });
+    const [selectedVehicle, setSelectedVehicle] = useState(null);
 
     const [busStops, setBusStops] = useState([]);
     const [szStops, setSzStops] = useState([]);
@@ -216,22 +205,20 @@ function App() {
     // LPP route
     useEffect(() => {
         const load = async () => {
+            if (!selectedVehicle?.tripId) {
+                setLppRoute([]);
+                return;
+            }
             try {
                 const route = await fetchLppRoute(
-                    selectedVehicle.tripId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.tripId,
-
-                    selectedVehicle.routeId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.routeId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.lineId
+                    selectedVehicle.tripId,
+                    selectedVehicle.routeId ?? selectedVehicle.lineId ?? null
                 );
-                setLppRoute(route);
+                setLppRoute(route ?? []);
                 console.log("Loaded LPP route:", route);
             } catch (error) {
                 console.error("Error loading LPP route:", error);
+                setLppRoute([]);
             }
         };
         load();
@@ -242,14 +229,13 @@ function App() {
         try {
             const route = await fetchSzTrip(tripId);
             setSzRoute(route ?? []);
-            localStorage.setItem(
-                "selectedBusRoute",
-                JSON.stringify({
-                    tripId: tripId,
-                    tripName: route[0]?.tripName,
-                    shortName: route[0]?.shortName,
-                })
-            );
+            setSelectedVehicle({
+                tripId: tripId,
+                lineName: route?.tripName ?? route?.shortName ?? "",
+                operator: "Slovenske železnice d.o.o.",
+                from: route?.from ?? {},
+                to: route?.to ?? {},
+            });
         } catch (error) {
             console.error("Error loading SZ trip from ID:", error);
         }
@@ -268,17 +254,6 @@ function App() {
                 routeName: arrival.routeName,
                 operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
             });
-            localStorage.setItem(
-                "selectedBusRoute",
-                JSON.stringify({
-                    tripId: arrival.tripId,
-                    tripName: arrival.tripName,
-                    routeName: arrival.routeName,
-                    routeId: arrival.routeId,
-                    operator:
-                        "Javno podjetje Ljubljanski potniški promet d.o.o.",
-                })
-            );
         } catch (error) {
             console.error("Error loading LPP route:", error);
         }
@@ -293,13 +268,15 @@ function App() {
             operator: arrival.operatorName,
         };
         setSelectedVehicle(vehicle);
-        localStorage.setItem("selectedBusRoute", JSON.stringify(vehicle));
     };
 
     // Fetcha SZ routo
     useEffect(() => {
         const load = async () => {
-            if (!selectedVehicle) return;
+            if (!selectedVehicle) {
+                setSzRoute([]);
+                return;
+            }
             try {
                 const route = await fetchSzTrip(selectedVehicle.tripId);
                 setSzRoute(route ?? []);
@@ -313,7 +290,10 @@ function App() {
 
     // Fetcha IJPP pot
     useEffect(() => {
-        if (!selectedVehicle) return;
+        if (!selectedVehicle) {
+            setIjppTrip(null);
+            return;
+        }
         const isLPP = selectedVehicle?.lineNumber != null;
         const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
         if (isLPP || isSZ) {
@@ -372,6 +352,7 @@ function App() {
                                         userLocation={userLocation}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
+                                        selectedVehicle={selectedVehicle}
                                         ijppTrip={ijppTrip}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
@@ -392,6 +373,7 @@ function App() {
                                         userLocation={userLocation}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
+                                        selectedVehicle={selectedVehicle}
                                         ijppTrip={ijppTrip}
                                         lppRoute={lppRoute}
                                         szRoute={szRoute}
@@ -429,18 +411,6 @@ function App() {
                                     />
                                 }
                             />
-                            <Route
-                                path="/route"
-                                element={
-                                    <RouteTab
-                                        selectedVehicle={selectedVehicle}
-                                        lppRoute={lppRoute}
-                                        szRoute={szRoute}
-                                        ijppTrip={ijppTrip}
-                                        setActiveStation={setActiveStation}
-                                    />
-                                }
-                            />
                         </Routes>
                     </Suspense>
                 </div>
@@ -461,12 +431,6 @@ function App() {
                         <button>
                             <MapPin size={24} />
                             <h3>V bližini</h3>
-                        </button>
-                    </NavLink>
-                    <NavLink to="/route">
-                        <button>
-                            <ArrowRightLeft size={24} />
-                            <h3>Pot</h3>
                         </button>
                     </NavLink>
                 </nav>

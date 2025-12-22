@@ -76,7 +76,7 @@ body {
         bottom: 0;
         width: 100%;
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         background: var(--nav-bg);
         backdrop-filter: blur(12px);
         height: 80px;
@@ -123,6 +123,77 @@ body {
         .map-container {
             overflow: hidden;
             height: calc(100vh - 80px);
+
+            .route-drawer {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 9;
+                display: flex;
+                flex-direction: column;
+                transform: translateY(100%);
+                transition: transform 0.25s ease;
+                background: var(--nav-bg);
+                border-top: 1px solid var(--selector-border);
+            }
+
+            .route-drawer--open {
+                transform: translateY(0);
+            }
+
+            .route-drawer__header {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 10px 12px;
+                border-bottom: 1px solid var(--selector-border);
+                color: var(--text-color);
+                cursor: grab;
+                touch-action: none;
+                position: relative;
+                height: 40px;
+            }
+
+            .route-drawer__close {
+                position: absolute;
+                right: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                border: none;
+                background: transparent;
+                color: var(--text-color);
+                font-size: 22px;
+                line-height: 1;
+                padding: 4px 8px;
+                cursor: pointer;
+                touch-action: manipulation;
+            }
+
+            .route-drawer__close:hover {
+                background: var(--button-bg);
+                border-radius: 8px;
+            }
+
+            .route-drawer__header:active {
+                cursor: grabbing;
+            }
+
+            .route-drawer__grab {
+                position: absolute;
+                top: 18px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 44px;
+                height: 5px;
+                border-radius: 999px;
+                background: var(--selector-border);
+            }
+
+            .route-drawer__content {
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
 
             .layer-selector {
                 position: absolute;

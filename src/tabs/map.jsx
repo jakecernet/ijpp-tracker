@@ -26,6 +26,7 @@ import {
     configureSzTripStopsPopup,
 } from "./map/interactions";
 import LayerSelector from "./map/LayerSelector";
+import RouteTab from "./route.jsx";
 
 import userPNG from "../img/user.png";
 import locationPNG from "../img/location.png";
@@ -75,6 +76,7 @@ const Map = React.memo(function Map({
     userLocation,
     trainPositions,
     setSelectedVehicle,
+    selectedVehicle,
     ijppTrip,
     lppRoute,
     szRoute,
@@ -85,12 +87,17 @@ const Map = React.memo(function Map({
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
     const handlersRef = useRef({ setActiveStation, setSelectedVehicle });
+    const routeDrawerRef = useRef(null);
     const initialCenterRef = useRef(
         userLocation || activeStation?.coordinates || DEFAULT_CENTER
     );
 
     const [showFilter, setShowFilter] = useState(false);
     const [filterByRoute, setFilterByRoute] = useState(false);
+    const [routeDrawerOpen, setRouteDrawerOpen] = useState(false);
+    const [routeDrawerSnap, setRouteDrawerSnap] = useState("peek");
+    const [routeDrawerHeight, setRouteDrawerHeight] = useState(0);
+    const [routeDrawerTranslateY, setRouteDrawerTranslateY] = useState(null);
     const [visibility, setVisibility] = useState({
         buses: true,
         busStops: true,
@@ -111,7 +118,201 @@ const Map = React.memo(function Map({
         handlersRef.current = { setActiveStation, setSelectedVehicle };
     }, [setActiveStation, setSelectedVehicle]);
 
-    // Restore persisted layer settings (visibility, operators, filter)
+    useEffect(() => {
+        try {
+            const requested = sessionStorage.getItem("openRouteDrawer") === "1";
+            if (!requested) return;
+            sessionStorage.removeItem("openRouteDrawer");
+            setRouteDrawerOpen(true);
+            setRouteDrawerSnap("peek");
+        } catch {}
+    }, []);
+
+    const selectedVehicleKey = useMemo(() => {
+        if (!selectedVehicle) return null;
+
+        if (selectedVehicle.tripId != null) {
+            return String(selectedVehicle.tripId);
+        }
+
+        return JSON.stringify({
+            lineNumber: selectedVehicle.lineNumber ?? null,
+            lineId: selectedVehicle.lineId ?? null,
+            routeId: selectedVehicle.routeId ?? null,
+            vehicleId: selectedVehicle.vehicleId ?? null,
+            from:
+                selectedVehicle.from?.stopId ??
+                selectedVehicle.from?.name ??
+                null,
+            to: selectedVehicle.to?.stopId ?? selectedVehicle.to?.name ?? null,
+        });
+    }, [selectedVehicle]);
+
+    const didMountRef = useRef(false);
+    const lastSelectedVehicleKeyRef = useRef(null);
+
+    // Auto-open
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            lastSelectedVehicleKeyRef.current = selectedVehicleKey;
+            return;
+        }
+
+        if (!selectedVehicleKey) {
+            lastSelectedVehicleKeyRef.current = null;
+            return;
+        }
+
+        if (lastSelectedVehicleKeyRef.current !== selectedVehicleKey) {
+            lastSelectedVehicleKeyRef.current = selectedVehicleKey;
+            setRouteDrawerOpen(true);
+            setRouteDrawerSnap("peek");
+        }
+    }, [selectedVehicleKey]);
+    // When the drawer is open for a selected route, show only the route path + route stops overlays.
+    // (Arrivals selection bypasses map popups that normally set this up.)
+    useEffect(() => {
+        if (!routeDrawerOpen) return;
+        if (!selectedVehicle) return;
+
+        const operatorText =
+            typeof selectedVehicle?.operator === "string"
+                ? selectedVehicle.operator.toLowerCase()
+                : "";
+        const isTrainRoute =
+            selectedVehicle?.brand === "sz" ||
+            operatorText.includes("sž") ||
+            operatorText.includes("slovenske železnice") ||
+            (selectedVehicle?.tripShort != null &&
+                selectedVehicle?.lineNumber == null &&
+                selectedVehicle?.lineId == null);
+
+        setFilterByRoute(true);
+        setVisibility((current) => {
+            const target = {
+                buses: !isTrainRoute,
+                busStops: false,
+                trainPositions: isTrainRoute,
+                trainStops: false,
+            };
+
+            const isAlreadyFocused =
+                current &&
+                current.buses === target.buses &&
+                current.busStops === target.busStops &&
+                current.trainPositions === target.trainPositions &&
+                current.trainStops === target.trainStops;
+
+            if (!isAlreadyFocused) {
+                prevVisibilityRef.current = current;
+            }
+
+            return target;
+        });
+    }, [routeDrawerOpen, selectedVehicleKey, selectedVehicle]);
+
+    // Measure drawer height
+    useEffect(() => {
+        const el = routeDrawerRef.current;
+        if (!el) return;
+
+        const update = () => {
+            const next = Math.round(el.getBoundingClientRect().height);
+            if (Number.isFinite(next) && next > 0) setRouteDrawerHeight(next);
+        };
+
+        update();
+
+        if (typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(() => update());
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    const routeDrawerPeekHeight = 140;
+    const routeDrawerPeekTranslateY = useMemo(() => {
+        if (!routeDrawerHeight) return 0;
+        return Math.max(0, routeDrawerHeight - routeDrawerPeekHeight);
+    }, [routeDrawerHeight]);
+
+    // Apply snap when opening/closing or when height changes.
+    useEffect(() => {
+        if (!routeDrawerOpen) {
+            setRouteDrawerTranslateY(null);
+            return;
+        }
+
+        if (routeDrawerSnap === "full") {
+            setRouteDrawerTranslateY(0);
+            return;
+        }
+
+        setRouteDrawerTranslateY(routeDrawerPeekTranslateY);
+    }, [routeDrawerOpen, routeDrawerSnap, routeDrawerPeekTranslateY]);
+
+    const dragStateRef = useRef({
+        dragging: false,
+        startY: 0,
+        startTranslateY: 0,
+    });
+
+    const prevRouteDrawerOpenRef = useRef(false);
+
+    const onRouteDrawerPointerDown = (e) => {
+        if (!routeDrawerOpen) return;
+        if (e.button != null && e.button !== 0) return;
+
+        const startTranslate =
+            routeDrawerTranslateY != null
+                ? routeDrawerTranslateY
+                : routeDrawerSnap === "full"
+                ? 0
+                : routeDrawerPeekTranslateY;
+
+        dragStateRef.current = {
+            dragging: true,
+            startY: e.clientY,
+            startTranslateY: startTranslate,
+        };
+
+        try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
+    };
+
+    const onRouteDrawerPointerMove = (e) => {
+        if (!dragStateRef.current.dragging) return;
+
+        const delta = e.clientY - dragStateRef.current.startY;
+        const next = dragStateRef.current.startTranslateY + delta;
+
+        const maxY = routeDrawerHeight || routeDrawerPeekTranslateY;
+        const clamped = Math.min(maxY, Math.max(0, next));
+        setRouteDrawerTranslateY(clamped);
+    };
+
+    const onRouteDrawerPointerUpOrCancel = () => {
+        if (!dragStateRef.current.dragging) return;
+        dragStateRef.current.dragging = false;
+
+        const y =
+            routeDrawerTranslateY != null
+                ? routeDrawerTranslateY
+                : routeDrawerPeekTranslateY;
+
+        const dismissThreshold = routeDrawerPeekTranslateY + 60;
+        if (y >= dismissThreshold) {
+            resetRouteView();
+            setRouteDrawerOpen(false);
+            return;
+        }
+
+        const threshold = routeDrawerPeekTranslateY / 2;
+        if (y <= threshold) setRouteDrawerSnap("full");
+        else setRouteDrawerSnap("peek");
+    };
+
     useEffect(() => {
         try {
             const raw = localStorage.getItem("mapLayerSettings");
@@ -133,9 +334,6 @@ const Map = React.memo(function Map({
                         ...settings.busOperators,
                     }));
                 }
-                if (typeof settings.filterByRoute === "boolean") {
-                    setFilterByRoute(settings.filterByRoute);
-                }
             }
         } catch {}
     }, []);
@@ -146,13 +344,7 @@ const Map = React.memo(function Map({
     );
 
     const busesGeoJSON = useMemo(() => {
-        let currentRouteInfo = null;
-        try {
-            const stored = localStorage.getItem("selectedBusRoute");
-            if (stored) currentRouteInfo = JSON.parse(stored);
-        } catch (error) {
-            console.log("[v0] Error reading route from localStorage:", error);
-        }
+        const currentRouteInfo = selectedVehicle;
 
         const filtered = (gpsPositions || []).filter((position) => {
             const brandKey = operatorToIcon[position?.operator] || "generic";
@@ -209,7 +401,7 @@ const Map = React.memo(function Map({
                 return props;
             }
         );
-    }, [gpsPositions, busOperators, filterByRoute]);
+    }, [gpsPositions, busOperators, filterByRoute, selectedVehicle]);
 
     const busStopsGeoJSON = useMemo(
         () =>
@@ -276,11 +468,7 @@ const Map = React.memo(function Map({
     );
 
     const trainPositionsGeoJSON = useMemo(() => {
-        let currentRouteInfo = null;
-        try {
-            const stored = localStorage.getItem("selectedBusRoute");
-            if (stored) currentRouteInfo = JSON.parse(stored);
-        } catch {}
+        const currentRouteInfo = selectedVehicle;
 
         const filtered = (trainPositions || []).filter((train) => {
             if (filterByRoute && currentRouteInfo?.tripId) {
@@ -320,7 +508,7 @@ const Map = React.memo(function Map({
                 to: JSON.stringify(train?.to ?? null),
             })
         );
-    }, [trainPositions, filterByRoute]);
+    }, [trainPositions, filterByRoute, selectedVehicleKey]);
 
     useEffect(() => {
         if (mapInstanceRef.current) return;
@@ -548,51 +736,6 @@ const Map = React.memo(function Map({
                 });
             }
 
-            // Restore persisted IJPP trip overlay
-            try {
-                const persisted = JSON.parse(
-                    localStorage.getItem("ijppTripOverlay") || "null"
-                );
-                if (persisted && typeof persisted === "object") {
-                    const lineSource = map.getSource("ijpp-trip-line-src");
-                    const stopsSource = map.getSource("ijpp-trip-stops-src");
-                    if (lineSource && lineSource.setData && persisted.line)
-                        lineSource.setData(persisted.line);
-                    if (stopsSource && stopsSource.setData && persisted.stops)
-                        stopsSource.setData(persisted.stops);
-                }
-            } catch {}
-
-            // Restore persisted LPP trip overlay
-            try {
-                const persisted = JSON.parse(
-                    localStorage.getItem("lppTripOverlay") || "null"
-                );
-                if (persisted && typeof persisted === "object") {
-                    const lineSource = map.getSource("lpp-trip-line-src");
-                    const stopsSource = map.getSource("lpp-trip-stops-src");
-                    if (lineSource && lineSource.setData && persisted.line)
-                        lineSource.setData(persisted.line);
-                    if (stopsSource && stopsSource.setData && persisted.stops)
-                        stopsSource.setData(persisted.stops);
-                }
-            } catch {}
-
-            // Restore persisted SZ trip overlay
-            try {
-                const persisted = JSON.parse(
-                    localStorage.getItem("szTripOverlay") || "null"
-                );
-                if (persisted && typeof persisted === "object") {
-                    const lineSource = map.getSource("sz-trip-line-src");
-                    const stopsSource = map.getSource("sz-trip-stops-src");
-                    if (lineSource && lineSource.setData && persisted.line)
-                        lineSource.setData(persisted.line);
-                    if (stopsSource && stopsSource.setData && persisted.stops)
-                        stopsSource.setData(persisted.stops);
-                }
-            } catch {}
-
             // Configure all popups
             configureBusStopPopup({
                 map,
@@ -649,14 +792,6 @@ const Map = React.memo(function Map({
             configureTrainPopup({
                 map,
                 onSelectVehicle: (vehicle) => {
-                    try {
-                        localStorage.setItem(
-                            "selectedBusRoute",
-                            JSON.stringify(vehicle)
-                        );
-                    } catch (err) {
-                        console.warn("Shranjevanje ni uspelo:", err);
-                    }
                     handlersRef.current.setSelectedVehicle(vehicle);
                     // Enable route-only SZ view and hide buses & stations
                     prevVisibilityRef.current = visibility;
@@ -669,21 +804,14 @@ const Map = React.memo(function Map({
                     });
                 },
                 onNavigateRoute: () => {
-                    window.location.hash = "/route";
+                    setRouteDrawerOpen(true);
+                    window.location.hash = "/map";
                 },
             });
 
             configureBusPopup({
                 map,
                 onSelectVehicle: (vehicle) => {
-                    try {
-                        localStorage.setItem(
-                            "selectedBusRoute",
-                            JSON.stringify(vehicle)
-                        );
-                    } catch (err) {
-                        console.warn("Shranjevanje ni uspelo:", err);
-                    }
                     handlersRef.current.setSelectedVehicle(vehicle);
                     // Enable route-only bus view and hide stations & SZ markers
                     prevVisibilityRef.current = visibility;
@@ -696,7 +824,8 @@ const Map = React.memo(function Map({
                     });
                 },
                 onNavigateRoute: () => {
-                    window.location.hash = "/route";
+                    setRouteDrawerOpen(true);
+                    window.location.hash = "/map";
                 },
             });
 
@@ -712,7 +841,8 @@ const Map = React.memo(function Map({
                         trainPositions: false,
                         trainStops: false,
                     });
-                    window.location.hash = "/route";
+                    setRouteDrawerOpen(true);
+                    window.location.hash = "/map";
                 },
             });
 
@@ -729,7 +859,8 @@ const Map = React.memo(function Map({
                         trainPositions: false,
                         trainStops: false,
                     });
-                    window.location.hash = "/route";
+                    setRouteDrawerOpen(true);
+                    window.location.hash = "/map";
                 },
             });
 
@@ -746,7 +877,8 @@ const Map = React.memo(function Map({
                         trainPositions: true,
                         trainStops: false,
                     });
-                    window.location.hash = "/route";
+                    setRouteDrawerOpen(true);
+                    window.location.hash = "/map";
                 },
             });
         });
@@ -787,7 +919,6 @@ const Map = React.memo(function Map({
             const payload = {
                 visibility,
                 busOperators,
-                filterByRoute,
             };
             localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
         } catch {}
@@ -847,13 +978,6 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-
-        try {
-            localStorage.setItem(
-                "ijppTripOverlay",
-                JSON.stringify({ line: lineData, stops: stopsData })
-            );
-        } catch {}
     }, [ijppTrip]);
 
     // Update LPP trip overlays
@@ -940,13 +1064,6 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-
-        try {
-            localStorage.setItem(
-                "lppTripOverlay",
-                JSON.stringify({ line: lineData, stops: stopsData })
-            );
-        } catch {}
     }, [lppRoute]);
 
     // Update SZ trip overlays
@@ -1003,13 +1120,6 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-
-        try {
-            localStorage.setItem(
-                "szTripOverlay",
-                JSON.stringify({ line: lineData, stops: stopsData })
-            );
-        } catch {}
     }, [szRoute]);
 
     // Update map center
@@ -1065,62 +1175,51 @@ const Map = React.memo(function Map({
                 {
                     line: "ijpp-trip-line-src",
                     stops: "ijpp-trip-stops-src",
-                    storage: "ijppTripOverlay",
                 },
                 {
                     line: "lpp-trip-line-src",
                     stops: "lpp-trip-stops-src",
-                    storage: "lppTripOverlay",
                 },
                 {
                     line: "sz-trip-line-src",
                     stops: "sz-trip-stops-src",
-                    storage: "szTripOverlay",
                 },
-            ].forEach(({ line, stops, storage }) => {
+            ].forEach(({ line, stops }) => {
                 try {
                     const lineSrc = map.getSource(line);
                     const stopsSrc = map.getSource(stops);
                     if (lineSrc && lineSrc.setData) lineSrc.setData(clearLine);
                     if (stopsSrc && stopsSrc.setData)
                         stopsSrc.setData(clearStops);
-                    try {
-                        localStorage.setItem(
-                            storage,
-                            JSON.stringify({
-                                line: clearLine,
-                                stops: clearStops,
-                            })
-                        );
-                    } catch {}
                 } catch {}
             });
         }
     };
 
-    //čekira če obstajajo elementi v localstoragu s točkami poti
-    const checkForPaths = () => {
-        if (typeof localStorage === "undefined") return false;
-        const keys = ["ijppTripOverlay", "lppTripOverlay", "szTripOverlay"];
-        for (const k of keys) {
-            const raw = localStorage.getItem(k);
-            if (!raw) continue;
-            const obj = JSON.parse(raw);
-            if (!obj) continue;
-            if (
-                (obj.line &&
-                    obj.line.geometry &&
-                    Array.isArray(obj.line.geometry.coordinates) &&
-                    obj.line.geometry.coordinates.length > 0) ||
-                (obj.stops &&
-                    obj.stops.features &&
-                    Array.isArray(obj.stops.features) &&
-                    obj.stops.features.length > 0)
-            ) {
-                return true;
-            }
+    const resetRouteView = () => {
+        setFilterByRoute(false);
+        const prev = prevVisibilityRef.current;
+        if (prev && typeof prev === "object") {
+            setVisibility(prev);
+        } else {
+            setVisibility({
+                buses: true,
+                busStops: true,
+                trainPositions: true,
+                trainStops: true,
+            });
         }
+        clearPathOverlays();
+        setSelectedVehicle(null);
     };
+
+    useEffect(() => {
+        const wasOpen = prevRouteDrawerOpenRef.current;
+        prevRouteDrawerOpenRef.current = routeDrawerOpen;
+        if (wasOpen && !routeDrawerOpen) {
+            resetRouteView();
+        }
+    }, [routeDrawerOpen]);
 
     return (
         <div>
@@ -1135,49 +1234,69 @@ const Map = React.memo(function Map({
                     setBusOperators={setBusOperators}
                     setTheme={setTheme}
                 />
-                {(() => {
-                    try {
-                        return checkForPaths();
-                    } catch {}
-                    return false;
-                })() && (
-                    <button
-                        type="button"
-                        aria-label="Izklopi filter linije"
-                        onClick={() => {
-                            setFilterByRoute(false);
-                            const prev = prevVisibilityRef.current;
-                            if (prev && typeof prev === "object") {
-                                setVisibility(prev);
-                            } else {
-                                setVisibility({
-                                    buses: true,
-                                    busStops: true,
-                                    trainPositions: true,
-                                    trainStops: true,
-                                });
-                            }
-                            clearPathOverlays();
-                        }}
-                        style={{
-                            position: "absolute",
-                            bottom: 12,
-                            right: 12,
-                            padding: "5px",
-                            borderRadius: 8,
-                            zIndex: 10,
-                            background: "var(--x-bg)",
-                            color: "var(--text-color)",
-                            border: "1px solid var(--text-color)",
-                            cursor: "pointer",
-                            fontSize: 16,
-                            width: 30,
-                            height: 30,
-                        }}
+                <div
+                    className={
+                        routeDrawerOpen
+                            ? "route-drawer route-drawer--open"
+                            : "route-drawer"
+                    }
+                    ref={routeDrawerRef}
+                    style={
+                        routeDrawerOpen
+                            ? {
+                                  transform: `translateY(${
+                                      routeDrawerTranslateY ??
+                                      routeDrawerPeekTranslateY
+                                  }px)`,
+                              }
+                            : undefined
+                    }
+                    role="dialog"
+                    aria-label="Pot"
+                >
+                    <div
+                        className="route-drawer__header"
+                        onPointerDown={onRouteDrawerPointerDown}
+                        onPointerMove={onRouteDrawerPointerMove}
+                        onPointerUp={onRouteDrawerPointerUpOrCancel}
+                        onPointerCancel={onRouteDrawerPointerUpOrCancel}
                     >
-                        ×
-                    </button>
-                )}
+                        <div
+                            className="route-drawer__grab"
+                            aria-hidden="true"
+                        />
+                        <button
+                            type="button"
+                            className="route-drawer__close"
+                            aria-label="Zapri"
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                resetRouteView();
+                                setRouteDrawerOpen(false);
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <div className="route-drawer__content">
+                        {selectedVehicle ? (
+                            <RouteTab
+                                selectedVehicle={selectedVehicle}
+                                lppRoute={lppRoute}
+                                szRoute={szRoute}
+                                ijppTrip={ijppTrip}
+                                setActiveStation={setActiveStation}
+                            />
+                        ) : (
+                            <div style={{ padding: 12 }}>
+                                <p>Ni izbrane linije.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
