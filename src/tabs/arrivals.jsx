@@ -7,9 +7,7 @@ const ArrivalsTab = ({
     ijppArrivals,
     lppArrivals,
     szArrivals,
-    getSzTripFromId,
-    setLppRouteFromArrival,
-    setIjppRouteFromArrival,
+    getTripFromId,
 }) => {
     const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -124,7 +122,7 @@ const ArrivalsTab = ({
                                 padding: "10px 0",
                             }}
                             onClick={() => {
-                                setIjppRouteFromArrival(arrival);
+                                getTripFromId(arrival.tripId, "IJPP");
                                 try {
                                     sessionStorage.setItem(
                                         "openRouteDrawer",
@@ -153,7 +151,7 @@ const ArrivalsTab = ({
                             key={index}
                             className="lpp-arrival-item arrival-item"
                             onClick={() => {
-                                setLppRouteFromArrival(arrival);
+                                getTripFromId(arrival.tripId, "LPP");
                                 try {
                                     sessionStorage.setItem(
                                         "openRouteDrawer",
@@ -178,7 +176,7 @@ const ArrivalsTab = ({
                         key={index}
                         className="sz-arrival-item arrival-item"
                         onClick={() => {
-                            getSzTripFromId(arrival.tripId);
+                            getTripFromId(arrival.tripId, "SZ");
                             try {
                                 sessionStorage.setItem("openRouteDrawer", "1");
                             } catch {}

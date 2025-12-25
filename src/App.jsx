@@ -64,13 +64,7 @@ function App() {
     const [lppRoute, setLppRoute] = useState([]);
     const [szRoute, setSzRoute] = useState([]);
     const [ijppTrip, setIjppTrip] = useState(null);
-
-    // Redirecta na zemljevid, če ni izbrane postaje
-    useEffect(() => {
-        if (!activeStation || activeStation.length === 0) {
-            document.location.href = "/#/map";
-        }
-    }, [activeStation]);
+    const [route, setRoute] = useState(null);
 
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
@@ -202,122 +196,27 @@ function App() {
         load();
     }, [activeStation]);
 
-    // LPP route
-    useEffect(() => {
-        const load = async () => {
-            if (!selectedVehicle?.tripId) {
-                setLppRoute([]);
+    // Za fetchanje tripa iz ID-ja
+    const getTripFromId = async (tripId, type) => {
+        try {
+            if (type === "LPP") {
+                const route = await fetchLppRoute(tripId);
+                setSelectedVehicle(route);
                 return;
             }
-            try {
-                const route = await fetchLppRoute(
-                    selectedVehicle.tripId,
-                    selectedVehicle.routeId ?? selectedVehicle.lineId ?? null
-                );
-                setLppRoute(route ?? []);
-                console.log("Loaded LPP route:", route);
-            } catch (error) {
-                console.error("Error loading LPP route:", error);
-                setLppRoute([]);
+            if (type === "IJPP") {
+                const trip = await fetchIJPPTrip(tripId);
+                setSelectedVehicle(trip);
+                return;
             }
-        };
-        load();
-    }, [selectedVehicle]);
-
-    // Za fetchanje SZ tripov iz prihodov
-    const getSzTripFromId = async (tripId) => {
-        try {
-            const route = await fetchSzTrip(tripId);
-            setSzRoute(route ?? []);
-            setSelectedVehicle({
-                tripId: tripId,
-                lineName: route?.tripName ?? route?.shortName ?? "",
-                operator: "Slovenske železnice d.o.o.",
-                from: route?.from ?? {},
-                to: route?.to ?? {},
-            });
+            if (type === "SZ") {
+                const route = await fetchSzTrip(tripId);
+                setSelectedVehicle(route);
+            }
         } catch (error) {
             console.error("Error loading SZ trip from ID:", error);
         }
     };
-
-    // Dobi LPP routo iz prihodov (na isto foro kot SZ)
-    const setLppRouteArrival = async (arrival) => {
-        try {
-            const route = await fetchLppRoute(arrival.tripId);
-            setLppRoute(route);
-            setSelectedVehicle({
-                tripId: arrival.tripId,
-                lineNumber: arrival.routeName,
-                lineName: arrival.tripName,
-                routeId: arrival.routeId,
-                routeName: arrival.routeName,
-                operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
-            });
-        } catch (error) {
-            console.error("Error loading LPP route:", error);
-        }
-    };
-
-    // Dobi IJPP trip iz prihodov
-    const setIjppRouteFromArrival = (arrival) => {
-        if (!arrival?.tripId) return;
-        const vehicle = {
-            tripId: arrival.tripId,
-            lineName: arrival.tripName,
-            operator: arrival.operatorName,
-        };
-        setSelectedVehicle(vehicle);
-    };
-
-    // Fetcha SZ routo
-    useEffect(() => {
-        const load = async () => {
-            if (!selectedVehicle) {
-                setSzRoute([]);
-                return;
-            }
-            try {
-                const route = await fetchSzTrip(selectedVehicle.tripId);
-                setSzRoute(route ?? []);
-            } catch (error) {
-                console.error("Error loading SZ route:", error);
-                setSzRoute([]);
-            }
-        };
-        load();
-    }, [selectedVehicle]);
-
-    // Fetcha IJPP pot
-    useEffect(() => {
-        if (!selectedVehicle) {
-            setIjppTrip(null);
-            return;
-        }
-        const isLPP = selectedVehicle?.lineNumber != null;
-        const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
-        if (isLPP || isSZ) {
-            setIjppTrip(null);
-            return;
-        }
-        const tripId = selectedVehicle?.tripId;
-        if (!tripId) {
-            setIjppTrip(null);
-            return;
-        }
-        let cancelled = false;
-        (async () => {
-            try {
-                const trip = await fetchIJPPTrip(tripId);
-                if (!cancelled) setIjppTrip(trip);
-            } catch (err) {
-                if (!cancelled) setIjppTrip(null);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [selectedVehicle]);
 
     return (
         <Router>
@@ -353,9 +252,6 @@ function App() {
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                         selectedVehicle={selectedVehicle}
-                                        ijppTrip={ijppTrip}
-                                        lppRoute={lppRoute}
-                                        szRoute={szRoute}
                                         theme={theme}
                                         setTheme={setTheme}
                                     />
@@ -374,9 +270,6 @@ function App() {
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                         selectedVehicle={selectedVehicle}
-                                        ijppTrip={ijppTrip}
-                                        lppRoute={lppRoute}
-                                        szRoute={szRoute}
                                         theme={theme}
                                         setTheme={setTheme}
                                     />
@@ -390,13 +283,7 @@ function App() {
                                         ijppArrivals={ijppArrivals}
                                         lppArrivals={lppArrivals}
                                         szArrivals={szArrivals}
-                                        getSzTripFromId={getSzTripFromId}
-                                        setLppRouteFromArrival={
-                                            setLppRouteArrival
-                                        }
-                                        setIjppRouteFromArrival={
-                                            setIjppRouteFromArrival
-                                        }
+                                        getTripFromId={getTripFromId}
                                     />
                                 }
                             />

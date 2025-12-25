@@ -1,18 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Bus, Train } from "lucide-react";
 
-const NearMe = ({
-    userLocation,
-    setActiveStation,
-    busStops,
-    szStops,
-}) => {
+const NearMe = ({ userLocation, setActiveStation, busStops, szStops }) => {
     const toRadians = (degrees) => {
         return degrees * (Math.PI / 180);
     };
 
     const [distancesCalculated, setDistancesCalculated] = useState(false);
-
     useEffect(() => {
         setDistancesCalculated(false);
 
@@ -50,11 +44,39 @@ const NearMe = ({
         calculateDistance(userLocation, busStops, szStops);
     }, [userLocation, busStops, szStops]);
 
+    const [searchTerm, setSearchTerm] = React.useState("");
+    const joinedStops = useMemo(() => {
+        return [
+            ...busStops.map((stop) => ({ ...stop, type: "bus" })),
+            ...szStops.map((stop) => ({ ...stop, type: "sz" })),
+        ];
+    }, [busStops, szStops]);
+
+    const filteredStops = useMemo(() => {
+        if (!distancesCalculated) return [];
+        return joinedStops
+            .filter((stop) => {
+                const maxDistance = stop.type === "bus" ? 30 : 50;
+                return stop.distance <= maxDistance && stop.distance > 0;
+            })
+            .filter((stop) =>
+                stop.name.toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .sort((a, b) => a.distance - b.distance);
+    }, [joinedStops, searchTerm, distancesCalculated]);
+
     const StationItem = React.memo(({ busStop, onSelect }) => (
         <div className="station-item" onClick={onSelect}>
             <div>
                 <Bus size={24} />
                 <h3>{busStop.name}</h3>
+                <ul>
+                    {busStop.routes_on_stop.map((route, index) => (
+                        <li key={index}>
+                            <p>{route}</p>
+                        </li>
+                    ))}
+                </ul>
             </div>
             <p>{busStop.distance?.toFixed(1)} km</p>
         </div>
@@ -62,35 +84,13 @@ const NearMe = ({
 
     const SzStationItem = React.memo(({ szStop, onSelect }) => (
         <div className="station-item" onClick={onSelect}>
-            <Train size={24} />
             <div>
+                <Train size={24} />
                 <h3>{szStop.name}</h3>
-                <p>{szStop.distance?.toFixed(1)} km</p>
             </div>
+            <p>{szStop.distance?.toFixed(1)} km</p>
         </div>
     ));
-
-    const [searchTerm, setSearchTerm] = React.useState("");
-
-    const filteredBusStops = useMemo(() => {
-        if (!distancesCalculated) return [];
-        return busStops
-            .filter((busStop) => busStop.distance <= 10 && busStop.distance > 0)
-            .filter((busStop) =>
-                busStop.name.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            .sort((a, b) => a.distance - b.distance);
-    }, [busStops, searchTerm, distancesCalculated]);
-
-    const filteredSzStops = useMemo(() => {
-        if (!distancesCalculated) return [];
-        return szStops
-            .filter((szStop) => szStop.distance <= 30 && szStop.distance > 0)
-            .filter((szStop) =>
-                szStop.name.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            .sort((a, b) => a.distance - b.distance);
-    }, [szStops, searchTerm, distancesCalculated]);
 
     return (
         <div className="insideDiv">
@@ -102,34 +102,35 @@ const NearMe = ({
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
             <div className="station-list">
-                {filteredBusStops.map((busStop, index) => (
-                    <StationItem
-                        key={index}
-                        busStop={busStop}
-                        onSelect={() => {
-                            setActiveStation(busStop);
-                            window.location.href = "/#/arrivals";
-                            localStorage.setItem(
-                                "activeStation",
-                                JSON.stringify(busStop)
-                            );
-                        }}
-                    />
-                ))}
-                {filteredSzStops.map((szStop, index) => (
-                    <SzStationItem
-                        key={index}
-                        szStop={szStop}
-                        onSelect={() => {
-                            setActiveStation(szStop);
-                            window.location.href = "/#/arrivals";
-                            localStorage.setItem(
-                                "activeStation",
-                                JSON.stringify(szStop)
-                            );
-                        }}
-                    />
-                ))}
+                {filteredStops.map((stop, index) =>
+                    stop.type === "bus" ? (
+                        <StationItem
+                            key={index}
+                            busStop={stop}
+                            onSelect={() => {
+                                setActiveStation(stop);
+                                window.location.href = "/#/arrivals";
+                                localStorage.setItem(
+                                    "activeStation",
+                                    JSON.stringify(stop)
+                                );
+                            }}
+                        />
+                    ) : (
+                        <SzStationItem
+                            key={index}
+                            szStop={stop}
+                            onSelect={() => {
+                                setActiveStation(stop);
+                                window.location.href = "/#/arrivals";
+                                localStorage.setItem(
+                                    "activeStation",
+                                    JSON.stringify(stop)
+                                );
+                            }}
+                        />
+                    )
+                )}
             </div>
         </div>
     );

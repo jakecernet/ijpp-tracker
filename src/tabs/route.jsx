@@ -42,7 +42,7 @@ const RouteTab = ({
                 onPointerCancel={onDragPointerUpOrCancel}
             >
                 <h3>{dataText.lineName || "Neznana linija"}</h3>
-                <p>Operater: {dataText.operator}</p>
+                <p>{dataText.operator}</p>
             </div>
             {!isSZ && (
                 <div className="stops">
