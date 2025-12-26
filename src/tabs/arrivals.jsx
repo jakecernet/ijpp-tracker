@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { format, formatDistanceToNow, set } from "date-fns";
-import { sl } from "date-fns/locale";
+import { ar, sl } from "date-fns/locale";
 
 const ArrivalsTab = ({
     activeStation,
@@ -38,7 +38,7 @@ const ArrivalsTab = ({
 
     // Filtriranje sz prihodov
     const filteredSzArrivals = useMemo(() => {
-        return szArrivals?.stopTimes?.filter((arrival) =>
+        return szArrivals?.filter((arrival) =>
             arrival.headsign.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [szArrivals, searchTerm]);
@@ -84,21 +84,33 @@ const ArrivalsTab = ({
         return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
     };
 
-    // Uradna imena --> normalna imena
-    const shortenOperatorName = (operator) => {
-        switch (operator) {
-            case "Javno podjetje Ljubljanski potniški promet d.o.o.":
-                return "LPP";
-            case "Arriva d.o.o.":
-                return "Arriva";
-            case "Nomago d.o.o.":
-                return "Nomago";
-            case "Avtobusni promet Murska Sobota d.d.":
-                return "AP Murska Sobota";
-            default:
-                return operator;
-        }
-    };
+    const allArrivals = [
+        ...filteredArrivals.map((arrival) => ({ ...arrival, type: "IJPP" })),
+        ...filteredLPPArrivals.map((arrival) => ({
+            ...arrival,
+            type: "LPP",
+        })),
+        ...(filteredSzArrivals?.map((arrival) => ({
+            ...arrival,
+            type: "SZ",
+        })) ?? []),
+    ];
+
+    const bgColorMap = (arrival) =>
+        ({
+            LPP: "var(--lpp-color)",
+            SZ: "var(--sz-color)",
+            IJPP:
+                arrival?.operator === "Nomago"
+                    ? "var(--nomago-color)"
+                    : arrival?.operator === "Marprom"
+                    ? "var(--marprom-color)"
+                    : arrival?.operator === "Arriva"
+                    ? "var(--arriva-color)"
+                    : arrival?.operator === "Murska"
+                    ? "var(--murska-color)"
+                    : "var(--default-color)",
+        }[arrival.type]);
 
     return (
         <div className="insideDiv">
@@ -113,45 +125,14 @@ const ArrivalsTab = ({
             {error && <p>{error}</p>}
             <div className="arrival-list">
                 {!error &&
-                    filteredArrivals.map((arrival, index) => (
+                    allArrivals.map((arrival, index) => (
                         <div
                             key={index}
-                            className="arrival-item"
-                            style={{
-                                gridTemplateColumns: "1fr 1fr 1fr",
-                                padding: "10px 0",
-                            }}
+                            className={`arrival-item ${
+                                arrival.type === "LPP" ? "lpp-arrival-item" : ""
+                            } `}
                             onClick={() => {
-                                getTripFromId(arrival.tripId, "IJPP");
-                                try {
-                                    sessionStorage.setItem(
-                                        "openRouteDrawer",
-                                        "1"
-                                    );
-                                } catch {}
-                                window.location.hash = "/map";
-                            }}
-                        >
-                            <h3>{arrival.tripName}</h3>
-                            <p>
-                                Prihod: {arrival.realtimeArrival.slice(0, -3)}
-                            </p>
-                            <p>
-                                Prevoznik:{" "}
-                                {shortenOperatorName(arrival.operatorName)}
-                            </p>
-                        </div>
-                    ))}
-                {!stationSelected && (
-                    <p>Ni izbrane postaje. Izberi postajo na zemljevidu.</p>
-                )}
-                {!error &&
-                    filteredLPPArrivals.map((arrival, index) => (
-                        <div
-                            key={index}
-                            className="lpp-arrival-item arrival-item"
-                            onClick={() => {
-                                getTripFromId(arrival.tripId, "LPP");
+                                getTripFromId(arrival.tripId, arrival.type);
                                 try {
                                     sessionStorage.setItem(
                                         "openRouteDrawer",
@@ -162,42 +143,46 @@ const ArrivalsTab = ({
                             }}
                         >
                             <div className="left">
-                                <div className="circle">
-                                    {arrival.routeName}
+                                <div
+                                    className="circle"
+                                    style={{
+                                        background: bgColorMap(arrival),
+                                    }}
+                                >
+                                    <h2
+                                        style={{
+                                            fontSize:
+                                                arrival.type === "SZ" ? 16 : 20,
+                                            fontWeight: "bold",
+                                        }}
+                                    >
+                                        {arrival.routeName ||
+                                            arrival.routeShortName ||
+                                            arrival.tripName}
+                                    </h2>
                                 </div>
-                                <h3>{arrival.tripName}</h3>
+                                <h3>{arrival.tripName || arrival.headsign}</h3>
                             </div>
-                            <h3>{arrival.etaMinutes} min</h3>
-                            <p>LPP</p>
+                            <p>
+                                {arrival.arrivalTime
+                                    ? arrival.arrivalTime
+                                    : arrival.etaMinutes
+                                    ? arrival.etaMinutes + " min"
+                                    : formatArrivalTime(
+                                          arrival?.actualDeparture ||
+                                              arrival.scheduledDeparture
+                                      )}
+                            </p>
+                            <p>
+                                {arrival.type === "SZ" &&
+                                    "Zamuda: " +
+                                        formatDelay(
+                                            arrival.scheduledDeparture,
+                                            arrival.actualDeparture
+                                        )}
+                            </p>
                         </div>
                     ))}
-                {filteredSzArrivals?.map((arrival, index) => (
-                    <div
-                        key={index}
-                        className="sz-arrival-item arrival-item"
-                        onClick={() => {
-                            getTripFromId(arrival.tripId, "SZ");
-                            try {
-                                sessionStorage.setItem("openRouteDrawer", "1");
-                            } catch {}
-                            window.location.hash = "/map";
-                        }}
-                    >
-                        <h2>{arrival.headsign}</h2>
-                        <h2>
-                            {formatArrivalTime(arrival.place.departure)} (
-                            {formatRelativeTime(arrival.place.departure)})
-                        </h2>
-                        <p>
-                            Zamuda:
-                            {formatDelay(
-                                arrival.place.scheduledDeparture,
-                                arrival.place.departure
-                            )}
-                        </p>
-                        <p>SŽ - Potniški promet d.o.o.</p>
-                    </div>
-                ))}
             </div>
         </div>
     );

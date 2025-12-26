@@ -1,3 +1,5 @@
+import { act } from "react";
+
 const now = new Date();
 const later = new Date(now.getTime() + 60000); // 1 minuta
 
@@ -374,6 +376,7 @@ const fetchIJPPTrip = async (tripId) => {
             isLPP: false,
             isSZ: false,
         };
+        console.log("Fetched IJPP trip:", selectedRoute);
         return selectedRoute;
     } catch (error) {
         console.error("Error fetching IJPP trip:", error);
@@ -479,6 +482,8 @@ const fetchSzTrip = async (tripId) => {
     try {
         const fetched = await fetchJson(szRouteLink + tripId);
         const raw = fetched?.legs || null;
+        const startStop = raw && raw[0] ? raw[0].from : null;
+        const endStop = raw && raw[0] ? raw[0].to : null;
         selectedRoute = Array.isArray(raw)
             ? {
                   from: {
@@ -504,13 +509,17 @@ const fetchSzTrip = async (tripId) => {
                   tripId: raw[0]?.tripId || "",
                   shortName: raw[0]?.routeShortName || "",
                   stops:
-                      raw[0]?.intermediateStops?.map((stop) => ({
-                          name: stop?.name || "",
-                          stopId: stop?.stopId || "",
-                          gpsLocation: [stop?.lat || 0, stop?.lon || 0],
-                          arrival: stop?.arrival || "",
-                          departure: stop?.departure || "",
-                      })) || [],
+                      [
+                          startStop,
+                          ...raw[0]?.intermediateStops?.map((stop) => ({
+                              name: stop?.name || "",
+                              stopId: stop?.stopId || "",
+                              gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+                              arrival: stop?.arrival || "",
+                              departure: stop?.departure || "",
+                          })),
+                          endStop,
+                      ] || [],
                   geometry: raw[0]?.legGeometry
                       ? decodePolylineToPoints(
                             raw[0]?.legGeometry?.points || "",
@@ -526,26 +535,6 @@ const fetchSzTrip = async (tripId) => {
     } catch (error) {
         console.error("Error fetching SZ trip:", error);
         return null;
-    }
-};
-
-/**
- * Fetcha točke poti za pot vlaka
- * @param {*} routeId
- * @returns Tabelo točk poti
- */
-const szRoutePoints = async (routeId) => {
-    {
-        if (!routeId) return [];
-        try {
-            const response = await fetchJson(
-                szRouteLink + routeId + "&joinInterlinedLegs=false&language=en"
-            );
-            return response;
-        } catch (error) {
-            console.error("Error fetching SZ route points:", error);
-            return [];
-        }
     }
 };
 
@@ -571,8 +560,6 @@ const fetchLppArrivals = async (stationCode) => {
                 vehicleId: arrival.vehicle_id,
                 type: arrival.type,
                 depot: arrival.depot,
-                from: arrival.stations?.departure,
-                to: arrival.stations?.arrival,
             }))
             .sort((a, b) => a.etaMinutes - b.etaMinutes);
         return arrivals;
@@ -651,7 +638,16 @@ const fetchSzArrivals = async (stationCode) => {
     try {
         const url = szArrivalsLink + `${encodeURIComponent(stationCode)}&n=100`;
         const raw = await fetchJson(url);
-        return raw;
+        console.log("Fetched SZ arrivals:", raw);
+        const arrivals = (raw?.stopTimes).map((arrival) => ({
+            headsign: arrival?.headsign,
+            tripId: arrival?.tripId,
+            scheduledDeparture: arrival?.place?.scheduledDeparture,
+            actualDeparture: arrival?.place?.actualDeparture,
+            routeShortName: arrival?.routeShortName,
+        }));
+        console.log("Processed SZ arrivals:", arrivals);
+        return arrivals;
     } catch (error) {
         console.error("Error fetching SZ arrivals:", error);
         return [];
@@ -659,12 +655,6 @@ const fetchSzArrivals = async (stationCode) => {
 };
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
-export {
-    fetchLppArrivals,
-    fetchIjppArrivals,
-    fetchLppRoute,
-    fetchIJPPTrip,
-    fetchLppPoints,
-};
-export { fetchSzStops, fetchSzTrip, fetchSzArrivals, szRoutePoints };
+export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
+export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };

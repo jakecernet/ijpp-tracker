@@ -42,6 +42,16 @@
     --x-bg: rgba(255, 255, 255, 0.6);
 }
 
+:root{
+    --lpp-color: #00640081;
+    --sz-color: #1E90FF81;
+    --nomago-color: #ccb80081;
+    --marprom-color: #ff000081;
+    --arriva-color: #00338081;
+    --murska-color: #00518081;
+    --default-color: #80808081;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -252,7 +262,8 @@ body {
 
                 .arrival-item {
                     display: grid;
-                    grid-template-columns: 1fr 1fr 1fr 1fr;
+                    grid-template-columns: 3fr 1fr auto;
+                    padding: 10px;
                     align-items: center;
                     border-bottom: 1px solid var(--selector-border);
                     text-align: center;
@@ -270,37 +281,28 @@ body {
                     p {
                         padding: 10px;
                     }
+
+                    .left {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+
+                        .circle {
+                            padding: 20px;
+                            border-radius: 50%;
+                            height: 4rem;
+                            width: 4rem;
+                            border: 1px solid var(--selector-border);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: var(--text-color);
+                        }
+                    }
                 }
 
                 .arrival-item:last-child {
                     border-bottom: none;
-                }
-            }
-
-            .lpp-arrival-item {
-                display: grid;
-                grid-template-columns: 3fr 1fr 1fr !important;
-                padding: 10px;
-
-                .left {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-
-                    .circle {
-                        padding: 20px;
-                        border-radius: 50%;
-                        height: 4rem;
-                        width: 4rem;
-                        background: var(--circle-bg);
-                        border: 1px solid var(--selector-border);
-                        font-size: 1.5rem;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: var(--active-color);
-                        font-weight: 600;
-                    }
                 }
             }
 
