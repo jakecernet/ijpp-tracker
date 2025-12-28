@@ -198,21 +198,22 @@ function App() {
 
     // Za fetchanje tripa iz ID-ja
     const getTripFromId = async (tripId, type) => {
+        console.log(tripId + " " + type);
         try {
             if (type === "LPP") {
                 const route = await fetchLppRoute(tripId);
                 setSelectedVehicle(route);
-                return;
             }
             if (type === "IJPP") {
-                const trip = await fetchIJPPTrip(tripId);
-                setSelectedVehicle(trip);
-                return;
+                const route = await fetchIJPPTrip(tripId);
+                setSelectedVehicle(route);
             }
             if (type === "SZ") {
                 const route = await fetchSzTrip(tripId);
                 setSelectedVehicle(route);
             }
+            console.log(route);
+            return;
         } catch (error) {
             console.error("Error loading SZ trip from ID:", error);
         }

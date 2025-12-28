@@ -128,11 +128,9 @@ const ArrivalsTab = ({
                     allArrivals.map((arrival, index) => (
                         <div
                             key={index}
-                            className={`arrival-item ${
-                                arrival.type === "LPP" ? "lpp-arrival-item" : ""
-                            } `}
+                            className="arrival-item"
                             onClick={() => {
-                                getTripFromId(arrival.tripId, arrival.type);
+                                getTripFromId(arrival, arrival.type);
                                 try {
                                     sessionStorage.setItem(
                                         "openRouteDrawer",
@@ -156,22 +154,23 @@ const ArrivalsTab = ({
                                             fontWeight: "bold",
                                         }}
                                     >
-                                        {arrival.routeName ||
-                                            arrival.routeShortName ||
-                                            arrival.tripName}
+                                        {arrival.type === "LPP"
+                                            ? arrival.routeName
+                                            : arrival.routeShortName ||
+                                              arrival.tripName}
                                     </h2>
                                 </div>
                                 <h3>{arrival.tripName || arrival.headsign}</h3>
                             </div>
                             <p>
-                                {arrival.arrivalTime
-                                    ? arrival.arrivalTime
-                                    : arrival.etaMinutes
-                                    ? arrival.etaMinutes + " min"
-                                    : formatArrivalTime(
+                                {arrival.type === "SZ"
+                                    ? formatArrivalTime(
                                           arrival?.actualDeparture ||
                                               arrival.scheduledDeparture
-                                      )}
+                                      )
+                                    : arrival.type === "LPP"
+                                    ? arrival.etaMinutes + " min"
+                                    : arrival?.realtimeDeparture?.slice(0, -3)}
                             </p>
                             <p>
                                 {arrival.type === "SZ" &&

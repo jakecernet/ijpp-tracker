@@ -343,8 +343,9 @@ const fetchTrainPositions = async () => {
  * @param {string} tripId - ID tripa
  * @returns Podrobnosti o tripu
  */
-const fetchIJPPTrip = async (tripId) => {
-    if (!tripId) return null;
+const fetchIJPPTrip = async (trip) => {
+    if (!trip) return null;
+    const tripId = trip.tripId || trip;
     try {
         const dateString = new Date().toISOString().split("T")[0];
         const raw = await fetchJson(
@@ -562,6 +563,7 @@ const fetchLppArrivals = async (stationCode) => {
                 depot: arrival.depot,
             }))
             .sort((a, b) => a.etaMinutes - b.etaMinutes);
+        console.log(arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching LPP arrivals:", error);
@@ -620,6 +622,7 @@ const fetchIjppArrivals = async (ijppId) => {
                 relativeDeparture: (
                     computeRelative(arrival.departure_realtime) / 60
                 ).toFixed(0),
+                routeShortName: arrival?.route_short_name,
             };
         });
         return arrivals;
