@@ -23,8 +23,8 @@ const RouteTab = ({
 
     const dataText = {
         lineName:
-            (isLPP ? (selectedVehicle?.lineNumber ?? "") + " | " : "") +
-            (selectedVehicle?.lineName ?? (isSZ ? route?.tripName : "")),
+            (isLPP ? selectedVehicle?.lineNumber + " | " : "") +
+            selectedVehicle?.tripName,
         operator: isLPP
             ? "Ljubljanski potniški promet"
             : isSZ

@@ -354,10 +354,16 @@ const fetchIJPPTrip = async (trip) => {
         const pointsResponse = await fetchJson(
             ijppRouteLink + tripId + "/geometry"
         );
-        const operator = fetchIJPPPositions().then((positions) => {
-            const vehicle = positions.find((pos) => pos.tripId === tripId);
-            return vehicle ? vehicle.operator : "";
-        });
+        const operator = fetchIJPPPositions().then((positions) =>
+            fetchIjppArrivals(
+                JSON.parse(localStorage.getItem("activeStation")).gtfs_id
+            ).then((arrivals) => {
+                const vehicle = positions.find((pos) => pos.tripId === tripId);
+                const arrival = arrivals.find((arr) => arr.tripId === tripId);
+                return arrival?.operatorName || vehicle?.operator || "";
+            })
+        );
+
         selectedRoute = {
             tripName: raw?.trip_headsign || "",
             tripId: raw?.gtfs_id || "",

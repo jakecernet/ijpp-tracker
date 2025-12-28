@@ -172,14 +172,15 @@ const ArrivalsTab = ({
                                     ? arrival.etaMinutes + " min"
                                     : arrival?.realtimeDeparture?.slice(0, -3)}
                             </p>
-                            <p>
-                                {arrival.type === "SZ" &&
-                                    "Zamuda: " +
+                            {arrival.type === "SZ" && (
+                                <p>
+                                    {"Zamuda: " +
                                         formatDelay(
                                             arrival.scheduledDeparture,
                                             arrival.actualDeparture
                                         )}
-                            </p>
+                                </p>
+                            )}
                         </div>
                     ))}
             </div>
