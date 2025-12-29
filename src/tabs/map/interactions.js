@@ -240,29 +240,11 @@ export function configureLppTripStopsPopup({ map }) {
         const props = feature.properties || {};
         const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
-        const html =
-            `<div style="min-width:220px">` +
-            `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>` +
-            `<button type="button" class="popup-button" data-role="goto-route" style="width:100%">Pojdi na linijo</button>` +
-            `</div>`;
-
+        const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
         const popup = new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
-        const container = popup.getElement();
-        const button = container?.querySelector('[data-role="goto-route"]');
-        if (button) {
-            button.addEventListener(
-                "click",
-                (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    popup.remove();
-                },
-                { once: true }
-            );
-        }
     });
 }
 
@@ -271,31 +253,13 @@ export function configureIjppTripStopsPopup({ map }) {
         const feature = event.features?.[0];
         if (!feature) return;
         const props = feature.properties || {};
-        const [lng, lat] = feature.geometry;
+        const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
-        const html =
-            `<div style="min-width:220px">` +
-            `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>` +
-            `<button type="button" class="popup-button" data-role="goto-route" style="width:100%">Pojdi na linijo</button>` +
-            `</div>`;
-
+        const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
         const popup = new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
-        const container = popup.getElement();
-        const button = container?.querySelector('[data-role="goto-route"]');
-        if (button) {
-            button.addEventListener(
-                "click",
-                (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    popup.remove();
-                },
-                { once: true }
-            );
-        }
     });
 }
 
@@ -306,28 +270,10 @@ export function configureSzTripStopsPopup({ map }) {
         const props = feature.properties || {};
         const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
-        const html =
-            `<div style="min-width:220px">` +
-            `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>` +
-            `<button type="button" class="popup-button" data-role="goto-route" style="width:100%">Pojdi na linijo</button>` +
-            `</div>`;
-
+        const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
         const popup = new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
-        const container = popup.getElement();
-        const button = container?.querySelector('[data-role="goto-route"]');
-        if (button) {
-            button.addEventListener(
-                "click",
-                (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    popup.remove();
-                },
-                { once: true }
-            );
-        }
     });
 }

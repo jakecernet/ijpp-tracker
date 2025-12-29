@@ -1105,7 +1105,8 @@ const Map = React.memo(function Map({
 
         // include start and end stops
         pushStop(selectedVehicle?.from);
-        if (Array.isArray(selectedVehicle?.stops)) selectedVehicle.stops.forEach(pushStop);
+        if (Array.isArray(selectedVehicle?.stops))
+            selectedVehicle.stops.forEach(pushStop);
         pushStop(selectedVehicle?.to);
 
         const stopsData = {
