@@ -42,9 +42,9 @@
     --x-bg: rgba(255, 255, 255, 0.6);
 }
 
-:root{
+:root {
     --lpp-color: #00640081;
-    --sz-color: #1E90FF81;
+    --sz-color: #1e90ff81;
     --nomago-color: #ccb80081;
     --marprom-color: #ff000081;
     --arriva-color: #00338081;
@@ -477,5 +477,46 @@ body {
     &:hover {
         background: rgba(96, 165, 250, 0.25);
         border-color: var(--active-color);
+    }
+}
+
+.popup-image-wrapper {
+    width: 100%;
+    height: 150px;
+    margin-bottom: 8px;
+    display: block;
+    background: #eeeeee1e;
+    overflow: hidden;
+
+    img {
+        width: 100%;
+        height: 150px;
+        object-fit: cover;
+        margin-bottom: 8px;
+        border-radius: 0px;
+        display: block;
+        background: #eee;
+    }
+
+    p {
+        color: #fff;
+        background: rgba(0, 0, 0, 0.836);
+        position: absolute;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-top: -40px;
+        right: 14px;
+        z-index: 3;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+
+        img{
+            width: 12px;
+            height: 12px;
+            margin: 0 6px 0 0;
+            filter: invert(1);
+        }
     }
 }

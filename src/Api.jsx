@@ -249,7 +249,7 @@ const fetchLPPPositions = async () => {
 
         const lppPositions = data.data.map((bus) => ({
             gpsLocation: [bus.latitude, bus.longitude],
-            operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
+            operator: "Ljubljanski potniški promet d.o.o.",
             lineNumber: bus.line_number,
             lineId: bus.line_id,
             lineName: bus.line_name,

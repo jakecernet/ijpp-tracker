@@ -159,7 +159,7 @@ export const BRAND_COLORS = {
 };
 
 export const operatorToIcon = {
-    "Javno podjetje Ljubljanski potniški promet d.o.o.": "lpp",
+    "Ljubljanski potniški promet d.o.o.": "lpp",
     "Nomago d.o.o.": "nomago",
     "Arriva d.o.o.": "arriva",
     Marprom: "marprom",
