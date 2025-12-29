@@ -86,7 +86,7 @@ body {
         bottom: 0;
         width: 100%;
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
         background: var(--nav-bg);
         backdrop-filter: blur(12px);
         height: 80px;
@@ -362,6 +362,23 @@ body {
                 }
             }
 
+            .config {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-evenly;
+
+                .element {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+
+                    input {
+                        width: auto;
+                    }
+                }
+            }
+
             input {
                 width: 100%;
                 border-radius: 0;
@@ -512,7 +529,7 @@ body {
         flex-direction: row;
         align-items: center;
 
-        img{
+        img {
             width: 12px;
             height: 12px;
             margin: 0 6px 0 0;

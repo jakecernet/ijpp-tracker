@@ -1,5 +1,3 @@
-import { act } from "react";
-
 const now = new Date();
 const later = new Date(now.getTime() + 60000); // 1 minuta
 
@@ -383,7 +381,6 @@ const fetchIJPPTrip = async (trip) => {
             isLPP: false,
             isSZ: false,
         };
-        console.log("Fetched IJPP trip:", selectedRoute);
         return selectedRoute;
     } catch (error) {
         console.error("Error fetching IJPP trip:", error);
@@ -475,7 +472,6 @@ const fetchLppRoute = async (lppRoute) => {
                 : [],
             geometry: geometry || [],
         };
-        console.log("Fetched LPP route:", selectedRoute);
         return selectedRoute;
     } catch (error) {
         console.error("Error fetching LPP route:", error);
@@ -573,7 +569,6 @@ const fetchLppArrivals = async (stationCode) => {
                 depot: arrival.depot,
             }))
             .sort((a, b) => a.etaMinutes - b.etaMinutes);
-        console.log(arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching LPP arrivals:", error);
@@ -651,7 +646,6 @@ const fetchSzArrivals = async (stationCode) => {
     try {
         const url = szArrivalsLink + `${encodeURIComponent(stationCode)}&n=100`;
         const raw = await fetchJson(url);
-        console.log("Fetched SZ arrivals:", raw);
         const arrivals = (raw?.stopTimes).map((arrival) => ({
             headsign: arrival?.headsign,
             tripId: arrival?.tripId,
@@ -659,7 +653,6 @@ const fetchSzArrivals = async (stationCode) => {
             actualDeparture: arrival?.place?.actualDeparture,
             routeShortName: arrival?.routeShortName,
         }));
-        console.log("Processed SZ arrivals:", arrivals);
         return arrivals;
     } catch (error) {
         console.error("Error fetching SZ arrivals:", error);

@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin } from "lucide-react";
+import { Map, Clock, MapPin, Search } from "lucide-react";
 import "./App.css";
 
 import {
@@ -20,12 +20,13 @@ import {
 const MapTab = lazy(() => import("./tabs/map"));
 const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
 const NearMeTab = lazy(() => import("./tabs/nearMe"));
+const SearchTab = lazy(() => import("./tabs/search"));
 
 if (typeof window !== "undefined") {
-    // Preload components to avoid lag on first navigation
     import("./tabs/map");
     import("./tabs/arrivals");
     import("./tabs/nearMe");
+    import("./tabs/search");
 }
 
 function App() {
@@ -339,6 +340,20 @@ function App() {
                                     />
                                 }
                             />
+                            <Route
+                                path="/search"
+                                element={
+                                    <SearchTab
+                                        gpsPositions={gpsPositions}
+                                        busStops={busStops}
+                                        trainStops={szStops}
+                                        setActiveStation={setActiveStation}
+                                        userLocation={userLocation}
+                                        trainPositions={trainPositions}
+                                        setSelectedVehicle={setSelectedVehicle}
+                                    />
+                                }
+                            />
                         </Routes>
                     </Suspense>
                 </div>
@@ -359,6 +374,12 @@ function App() {
                         <button>
                             <MapPin size={24} />
                             <h3>V bližini</h3>
+                        </button>
+                    </NavLink>
+                    <NavLink to="/search">
+                        <button>
+                            <Search size={24} />
+                            <h3>Išči</h3>
                         </button>
                     </NavLink>
                 </nav>
