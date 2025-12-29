@@ -7,6 +7,7 @@ import {
     DEFAULT_ZOOM,
     ICON_SOURCES,
     operatorToIcon,
+    BRAND_COLORS,
     OSM_RASTER_STYLE_DARK,
     OSM_RASTER_STYLE_LIGHT,
 } from "./map/config";
@@ -550,7 +551,23 @@ const Map = React.memo(function Map({
                     type: "line",
                     source: "ijpp-trip-line-src",
                     paint: {
-                        "line-color": "#1976d2",
+                        "line-color": [
+                            "match",
+                            ["get", "brand"],
+                            "nomago",
+                            BRAND_COLORS.nomago.stroke,
+                            "marprom",
+                            BRAND_COLORS.marprom.stroke,
+                            "arriva",
+                            BRAND_COLORS.arriva.stroke,
+                            "murska",
+                            BRAND_COLORS.arriva.stroke,
+                            "lpp",
+                            BRAND_COLORS.lpp.stroke,
+                            "sz",
+                            BRAND_COLORS.sz.stroke,
+                            BRAND_COLORS.default.stroke,
+                        ],
                         "line-width": [
                             "interpolate",
                             ["linear"],
@@ -577,25 +594,29 @@ const Map = React.memo(function Map({
             if (!map.getLayer("ijpp-trip-stops-points")) {
                 map.addLayer({
                     id: "ijpp-trip-stops-points",
-                    type: "symbol",
+                    type: "circle",
                     source: "ijpp-trip-stops-src",
-                    layout: {
-                        "icon-image": "route-stop",
-                        "icon-size": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            8,
-                            0.22,
-                            12,
-                            0.3,
-                            14,
-                            0.38,
-                            16,
-                            0.46,
+                    paint: {
+                        "circle-color": [
+                            "match",
+                            ["get", "brand"],
+                            "nomago",
+                            BRAND_COLORS.nomago.stroke,
+                            "marprom",
+                            BRAND_COLORS.marprom.stroke,
+                            "arriva",
+                            BRAND_COLORS.arriva.stroke,
+                            "murska",
+                            BRAND_COLORS.arriva.stroke,
+                            "lpp",
+                            BRAND_COLORS.lpp.stroke,
+                            "sz",
+                            BRAND_COLORS.sz.stroke,
+                            BRAND_COLORS.default.stroke,
                         ],
-                        "icon-anchor": "bottom",
-                        "icon-allow-overlap": true,
+                        "circle-radius": 6,
+                        "circle-stroke-color": "#ffffff",
+                        "circle-stroke-width": 2,
                     },
                 });
             }
@@ -617,7 +638,7 @@ const Map = React.memo(function Map({
                     type: "line",
                     source: "lpp-trip-line-src",
                     paint: {
-                        "line-color": "#2e7d32",
+                        "line-color": BRAND_COLORS.lpp.stroke,
                         "line-width": [
                             "interpolate",
                             ["linear"],
@@ -643,25 +664,13 @@ const Map = React.memo(function Map({
             if (!map.getLayer("lpp-trip-stops-points")) {
                 map.addLayer({
                     id: "lpp-trip-stops-points",
-                    type: "symbol",
+                    type: "circle",
                     source: "lpp-trip-stops-src",
-                    layout: {
-                        "icon-image": "route-stop",
-                        "icon-size": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            8,
-                            0.22,
-                            12,
-                            0.3,
-                            14,
-                            0.38,
-                            16,
-                            0.46,
-                        ],
-                        "icon-anchor": "bottom",
-                        "icon-allow-overlap": true,
+                    paint: {
+                        "circle-color": BRAND_COLORS.lpp.stroke,
+                        "circle-radius": 6,
+                        "circle-stroke-color": "#ffffff",
+                        "circle-stroke-width": 2,
                     },
                 });
             }
@@ -683,7 +692,7 @@ const Map = React.memo(function Map({
                     type: "line",
                     source: "sz-trip-line-src",
                     paint: {
-                        "line-color": "#29ace2",
+                        "line-color": BRAND_COLORS.sz.stroke,
                         "line-width": [
                             "interpolate",
                             ["linear"],
@@ -709,25 +718,13 @@ const Map = React.memo(function Map({
             if (!map.getLayer("sz-trip-stops-points")) {
                 map.addLayer({
                     id: "sz-trip-stops-points",
-                    type: "symbol",
+                    type: "circle",
                     source: "sz-trip-stops-src",
-                    layout: {
-                        "icon-image": "route-stop",
-                        "icon-size": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            8,
-                            0.22,
-                            12,
-                            0.3,
-                            14,
-                            0.38,
-                            16,
-                            0.46,
-                        ],
-                        "icon-anchor": "bottom",
-                        "icon-allow-overlap": true,
+                    paint: {
+                        "circle-color": BRAND_COLORS.sz.stroke,
+                        "circle-radius": 6,
+                        "circle-stroke-color": "#ffffff",
+                        "circle-stroke-width": 2,
                     },
                 });
             }
@@ -928,6 +925,8 @@ const Map = React.memo(function Map({
         const lineSource = map.getSource("ijpp-trip-line-src");
         const stopsSource = map.getSource("ijpp-trip-stops-src");
 
+        const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
+
         const lineData = selectedVehicle?.geometry?.length
             ? {
                   type: "Feature",
@@ -937,7 +936,7 @@ const Map = React.memo(function Map({
                           (c) => Array.isArray(c) && c.length >= 2
                       ),
                   },
-                  properties: {},
+                  properties: { brand },
               }
             : {
                   type: "Feature",
@@ -965,7 +964,7 @@ const Map = React.memo(function Map({
                                   type: "Point",
                                   coordinates: [coord[1], coord[0]],
                               },
-                              properties: { name: s?.name || "" },
+                              properties: { name: s?.name || "", brand },
                           };
                       })
                       .filter(Boolean)
