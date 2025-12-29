@@ -453,11 +453,15 @@ const fetchLppRoute = async (lppRoute) => {
             lppRoute.lineId || lppRoute.routeId
         );
 
+        const lineNumber = lppRoute.lineNumber || lppRoute.routeName || "";
+        const tripName = lppRoute.lineName || lppRoute.tripName || "";
+
         selectedRoute = {
             isLPP: true,
             isSZ: false,
             tripId: lppRoute.tripId || "",
-            tripName: lppRoute.lineName || "",
+            tripName: tripName,
+            lineNumber: lineNumber,
             operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
             stops: Array.isArray(raw.data)
                 ? raw.data.map((stop) => ({

@@ -83,7 +83,7 @@ export function configureTrainStopPopup({ map, onSelectStop }) {
     });
 }
 
-export function configureTrainPopup({ map, onSelectVehicle, onNavigateRoute }) {
+export function configureTrainPopup({ map, onSelectVehicle }) {
     attachPopup(
         map,
         "trainPositions-points",
@@ -149,7 +149,7 @@ export function configureTrainPopup({ map, onSelectVehicle, onNavigateRoute }) {
     );
 }
 
-export function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
+export function configureBusPopup({ map, onSelectVehicle }) {
     attachPopup(
         map,
         "buses-points",
@@ -233,7 +233,7 @@ export function configureBusPopup({ map, onSelectVehicle, onNavigateRoute }) {
     );
 }
 
-export function configureLppTripStopsPopup({ map, onNavigateRoute }) {
+export function configureLppTripStopsPopup({ map }) {
     map.on("click", "lpp-trip-stops-points", (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
@@ -258,7 +258,6 @@ export function configureLppTripStopsPopup({ map, onNavigateRoute }) {
                 (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onNavigateRoute?.();
                     popup.remove();
                 },
                 { once: true }
@@ -267,12 +266,12 @@ export function configureLppTripStopsPopup({ map, onNavigateRoute }) {
     });
 }
 
-export function configureIjppTripStopsPopup({ map, onNavigateRoute }) {
+export function configureIjppTripStopsPopup({ map }) {
     map.on("click", "ijpp-trip-stops-points", (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
         const props = feature.properties || {};
-        const [lng, lat] = feature.geometry.coordinates;
+        const [lng, lat] = feature.geometry;
         const name = props?.name || "Postaja";
         const html =
             `<div style="min-width:220px">` +
@@ -292,7 +291,6 @@ export function configureIjppTripStopsPopup({ map, onNavigateRoute }) {
                 (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onNavigateRoute?.();
                     popup.remove();
                 },
                 { once: true }
@@ -301,7 +299,7 @@ export function configureIjppTripStopsPopup({ map, onNavigateRoute }) {
     });
 }
 
-export function configureSzTripStopsPopup({ map, onNavigateRoute }) {
+export function configureSzTripStopsPopup({ map }) {
     map.on("click", "sz-trip-stops-points", (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
@@ -326,7 +324,6 @@ export function configureSzTripStopsPopup({ map, onNavigateRoute }) {
                 (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onNavigateRoute?.();
                     popup.remove();
                 },
                 { once: true }

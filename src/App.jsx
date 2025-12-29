@@ -197,27 +197,67 @@ function App() {
     }, [activeStation]);
 
     // Za fetchanje tripa iz ID-ja
-    const getTripFromId = async (tripId, type) => {
-        console.log(tripId + " " + type);
+    const getTripFromId = async (tripData, type) => {
         try {
+            let route = null;
+            const tripId =
+                typeof tripData === "object" ? tripData.tripId : tripData;
+
             if (type === "LPP") {
-                const route = await fetchLppRoute(tripId);
-                setSelectedVehicle(route);
+                const param =
+                    typeof tripData === "object"
+                        ? tripData
+                        : { tripId: tripData };
+                route = await fetchLppRoute(param);
+            } else if (type === "SZ") {
+                route = await fetchSzTrip(tripId);
+            } else {
+                route = await fetchIJPPTrip(tripId);
             }
-            if (type === "IJPP") {
-                const route = await fetchIJPPTrip(tripId);
-                setSelectedVehicle(route);
+
+            if (route) {
+                setSelectedVehicle((prev) => {
+                    // Merge if enriching same vehicle, else replace
+                    if (prev && prev.tripId === route.tripId) {
+                        return { ...prev, ...route };
+                    }
+                    return route;
+                });
             }
-            if (type === "SZ") {
-                const route = await fetchSzTrip(tripId);
-                setSelectedVehicle(route);
-            }
-            console.log(route);
-            return;
         } catch (error) {
-            console.error("Error loading SZ trip from ID:", error);
+            console.error("Error loading trip from ID:", error);
         }
     };
+
+    // Fetch full route details when a vehicle is selected
+    useEffect(() => {
+        if (!selectedVehicle) return;
+
+        if (selectedVehicle.geometry && selectedVehicle.stops) return;
+
+        let type = "IJPP";
+        if (
+            selectedVehicle.lineId ||
+            (selectedVehicle.operator &&
+                selectedVehicle.operator
+                    .toLowerCase()
+                    .includes("ljubljanski potniški promet"))
+        ) {
+            type = "LPP";
+        } else if (
+            selectedVehicle.tripShort ||
+            (selectedVehicle.operator &&
+                selectedVehicle.operator
+                    .toLowerCase()
+                    .includes("slovenske železnice"))
+        ) {
+            type = "SZ";
+        }
+
+        if (selectedVehicle.tripId || selectedVehicle.lineId) {
+            getTripFromId(selectedVehicle, type);
+        }
+    }, [selectedVehicle]);
 
     return (
         <Router>

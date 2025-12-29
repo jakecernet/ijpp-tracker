@@ -77,9 +77,6 @@ const Map = React.memo(function Map({
     trainPositions,
     setSelectedVehicle,
     selectedVehicle,
-    ijppTrip,
-    lppRoute,
-    szRoute,
     setTheme,
 }) {
     const mapRef = useRef(null);
@@ -931,12 +928,12 @@ const Map = React.memo(function Map({
         const lineSource = map.getSource("ijpp-trip-line-src");
         const stopsSource = map.getSource("ijpp-trip-stops-src");
 
-        const lineData = ijppTrip?.geometry?.length
+        const lineData = selectedVehicle?.geometry?.length
             ? {
                   type: "Feature",
                   geometry: {
                       type: "LineString",
-                      coordinates: ijppTrip.geometry.filter(
+                      coordinates: selectedVehicle.geometry.filter(
                           (c) => Array.isArray(c) && c.length >= 2
                       ),
                   },
@@ -950,8 +947,8 @@ const Map = React.memo(function Map({
 
         const stopsData = {
             type: "FeatureCollection",
-            features: Array.isArray(ijppTrip?.stops)
-                ? ijppTrip.stops
+            features: Array.isArray(selectedVehicle?.stops)
+                ? selectedVehicle.stops
                       .map((s) => {
                           const coord = Array.isArray(s?.gpsLocation)
                               ? s.gpsLocation
@@ -977,7 +974,7 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [ijppTrip]);
+    }, [selectedVehicle]);
 
     // Update LPP trip overlays
     useEffect(() => {
@@ -987,8 +984,8 @@ const Map = React.memo(function Map({
         const lineSource = map.getSource("lpp-trip-line-src");
         const stopsSource = map.getSource("lpp-trip-stops-src");
 
-        const lineCoords = Array.isArray(lppRoute?.geometry?.[0]?.points)
-            ? lppRoute.geometry[0].points
+        const lineCoords = Array.isArray(selectedVehicle?.geometry?.[0]?.points)
+            ? selectedVehicle.geometry[0].points
                   .filter((c) => Array.isArray(c) && c.length >= 2)
                   .map((c) => [c[1], c[0]])
             : [];
@@ -1001,8 +998,8 @@ const Map = React.memo(function Map({
 
         const stopsData = {
             type: "FeatureCollection",
-            features: Array.isArray(lppRoute?.stops)
-                ? lppRoute.stops
+            features: Array.isArray(selectedVehicle?.stops)
+                ? selectedVehicle.stops
                       .map((s) => {
                           let coord = null;
                           if (Array.isArray(s?.stop_location)) {
@@ -1063,7 +1060,7 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [lppRoute]);
+    }, [selectedVehicle]);
 
     // Update SZ trip overlays
     useEffect(() => {
@@ -1073,8 +1070,8 @@ const Map = React.memo(function Map({
         const lineSource = map.getSource("sz-trip-line-src");
         const stopsSource = map.getSource("sz-trip-stops-src");
 
-        const lineCoords = Array.isArray(szRoute?.geometry)
-            ? szRoute.geometry
+        const lineCoords = Array.isArray(selectedVehicle?.geometry)
+            ? selectedVehicle.geometry
                   .filter((c) => Array.isArray(c) && c.length >= 2)
                   // geometry already [lng, lat]
                   .map((c) => [c[0], c[1]])
@@ -1108,9 +1105,9 @@ const Map = React.memo(function Map({
         };
 
         // include start and end stops
-        pushStop(szRoute?.from);
-        if (Array.isArray(szRoute?.stops)) szRoute.stops.forEach(pushStop);
-        pushStop(szRoute?.to);
+        pushStop(selectedVehicle?.from);
+        if (Array.isArray(selectedVehicle?.stops)) selectedVehicle.stops.forEach(pushStop);
+        pushStop(selectedVehicle?.to);
 
         const stopsData = {
             type: "FeatureCollection",
@@ -1119,7 +1116,7 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [szRoute]);
+    }, [selectedVehicle]);
 
     // Update map center
     useEffect(() => {
@@ -1284,9 +1281,6 @@ const Map = React.memo(function Map({
                         {selectedVehicle ? (
                             <RouteTab
                                 selectedVehicle={selectedVehicle}
-                                lppRoute={lppRoute}
-                                szRoute={szRoute}
-                                ijppTrip={ijppTrip}
                                 setActiveStation={setActiveStation}
                                 onDragPointerDown={onRouteDrawerPointerDown}
                                 onDragPointerMove={onRouteDrawerPointerMove}

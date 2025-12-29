@@ -67,6 +67,7 @@ export const ICON_SOURCES = [
     { id: "route-stop", image: routeStop },
 ];
 
+// TODO: fix this shit and unify icons
 export const CLUSTER_CONFIG = {
     buses: { radius: 40, maxZoom: 14, color: "#5b8cff" },
     busStops: { radius: 60, maxZoom: 20, color: "#7a5bff" },
