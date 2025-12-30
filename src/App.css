@@ -458,6 +458,14 @@ body {
             }
         }
 
+        .content {
+            height: calc(100svh - 80px);
+
+            .map-container {
+                height: calc(100svh - 80px);
+            }
+        }
+
         .insideDiv .arrival-list .arrival-item {
             font-size: 0.8em;
         }
