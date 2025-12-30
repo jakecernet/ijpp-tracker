@@ -447,6 +447,8 @@ body {
 
 @media screen and (max-width: 480px) {
     .container {
+        height: 100dvh;
+
         nav {
             a {
                 button {
