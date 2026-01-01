@@ -45,7 +45,7 @@
 :root {
     --lpp-color: #00640081;
     --sz-color: #1e90ff81;
-    --nomago-color: #ccb80081;
+    --nomago-color: #ffe6008c;
     --marprom-color: #ff000081;
     --arriva-color: #00338081;
     --murska-color: #00518081;
@@ -306,6 +306,46 @@ body {
                 }
             }
 
+            .route-item {
+                display: flex;
+                flex-direction: row;
+                justify-content: space-around;
+                padding: 10px;
+                align-items: center;
+                border-bottom: 1px solid var(--selector-border);
+                text-align: center;
+                transition: background 0.2s ease;
+                color: var(--text-color);
+
+                &:hover {
+                    background: rgba(51, 65, 85, 0.3);
+                }
+
+                h2 {
+                    padding: 10px;
+                }
+
+                p {
+                    padding: 10px;
+                }
+
+                .circle {
+                    padding: 20px;
+                    border-radius: 50%;
+                    height: 4rem;
+                    width: 4rem;
+                    border: 1px solid var(--selector-border);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--text-color);
+                }
+
+                .route-item:last-child {
+                    border-bottom: none;
+                }
+            }
+
             .station-list {
                 display: flex;
                 flex-direction: column;
@@ -362,7 +402,7 @@ body {
                 }
             }
 
-            .top-nav{
+            .top-nav {
                 display: flex;
                 flex-direction: row;
                 align-items: center;
@@ -386,7 +426,7 @@ body {
 
                 button:hover {
                     color: var(--active-color);
-                    background: rgba(0, 0, 0, 0.25);                    
+                    background: rgba(0, 0, 0, 0.25);
                 }
 
                 button.active {

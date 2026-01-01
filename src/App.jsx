@@ -62,11 +62,6 @@ function App() {
     const [lppArrivals, setLppArrivals] = useState([]);
     const [szArrivals, setSzArrivals] = useState([]);
 
-    const [lppRoute, setLppRoute] = useState([]);
-    const [szRoute, setSzRoute] = useState([]);
-    const [ijppTrip, setIjppTrip] = useState(null);
-    const [route, setRoute] = useState(null);
-
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
         const loadBusStops = async () => {
@@ -345,12 +340,12 @@ function App() {
                                 element={
                                     <SearchTab
                                         gpsPositions={gpsPositions}
+                                        trainPositions={trainPositions}
                                         busStops={busStops}
                                         trainStops={szStops}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        trainPositions={trainPositions}
-                                        setSelectedVehicle={setSelectedVehicle}
+                                        getTripFromId={getTripFromId}
                                     />
                                 }
                             />

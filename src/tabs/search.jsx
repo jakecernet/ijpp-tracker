@@ -7,7 +7,7 @@ const SearchTab = ({
     trainStops,
     setActiveStation,
     trainPositions,
-    setSelectedVehicle,
+    getTripFromId,
 }) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [stations, setStations] = useState(true);
@@ -18,16 +18,36 @@ const SearchTab = ({
         () => [...busStops, ...trainStops],
         [busStops, trainStops]
     );
-    const allRoutes = useMemo(
-        () => [
-            ...new Set(gpsPositions.map((pos) => pos.line)),
-            ...new Set(trainPositions.map((pos) => pos.line)),
-        ],
-        [gpsPositions, trainPositions]
-    );
+
+    const allRoutes = useMemo(() => {
+        const shouldInclude = (pos) =>
+            !(
+                pos?.operator === "Ljubljanski potniški promet d.o.o." &&
+                !pos?.lineName
+            );
+
+        const allVehicles = [
+            ...gpsPositions.filter(shouldInclude),
+            ...trainPositions.filter(shouldInclude),
+        ];
+
+        const uniqueRoutes = [];
+        const seenNames = new Set();
+
+        for (const vehicle of allVehicles) {
+            const name = vehicle.lineName || vehicle.route_name;
+            if (name && !seenNames.has(name)) {
+                seenNames.add(name);
+                uniqueRoutes.push(vehicle);
+            }
+        }
+
+        return uniqueRoutes;
+    }, [gpsPositions, trainPositions]);
     const [filtered, setFiltered] = useState([]);
 
     useEffect(() => {
+        console.log(allRoutes);
         if (searchTerm.length < 3) {
             setFiltered([]);
             return;
@@ -37,7 +57,9 @@ const SearchTab = ({
             station?.name?.toLowerCase().includes(searchTerm.toLowerCase())
         );
         const filteredRoutes = allRoutes.filter((route) =>
-            route?.toLowerCase().includes(searchTerm.toLowerCase())
+            (route.lineName || route.route_name || route.lineNumber)
+                ?.toLowerCase()
+                .includes(searchTerm.toLowerCase())
         );
         setFiltered([...filteredStations, ...filteredRoutes]);
     }, [searchTerm, allStations, allRoutes]);
@@ -58,6 +80,42 @@ const SearchTab = ({
         </div>
     );
 
+    const RouteItem = ({ item }) => (
+        <div
+            className="route-item"
+            onClick={() => {
+                getTripFromId(item, item.type);
+                try {
+                    sessionStorage.setItem("openRouteDrawer", "1");
+                } catch {}
+                window.location.hash = "/map";
+            }}
+        >
+            <div
+                className="circle"
+                style={{
+                    background: bgColorMap(item),
+                }}
+            >
+                {item.lineNumber ?? item.tripId.slice(5)}
+            </div>
+            <h3>{item.lineName || item.headsign}</h3>
+        </div>
+    );
+
+    const bgColorMap = (arrival) => {
+        const operator = arrival?.operator || arrival?.operatorName;
+        if (operator?.includes("Ljubljanski potniški promet"))
+            return "var(--lpp-color)";
+        if (operator?.includes("Slovenske železnice")) return "var(--sz-color)";
+        if (operator?.includes("Nomago")) return "var(--nomago-color)";
+        if (operator?.includes("Marprom")) return "var(--marprom-color)";
+        if (operator?.includes("Arriva")) return "var(--arriva-color)";
+        if (operator?.includes("Murska")) return "var(--murska-color)";
+
+        return "var(--default-color)";
+    };
+
     return (
         <div className="insideDiv">
             <h2>Iskanje</h2>
@@ -71,7 +129,7 @@ const SearchTab = ({
                 <button
                     className={page === "search" ? "active" : ""}
                     onClick={() => setPage("search")}
-                 >
+                >
                     Vse
                 </button>
                 <button
@@ -113,17 +171,35 @@ const SearchTab = ({
                         )}
                         <ul>
                             {filtered.map((item, index) => {
-                                if (typeof item === "string" && lines) {
+                                const routeName =
+                                    item.lineName || item.route_name;
+                                if (routeName && lines) {
                                     return (
-                                        <li
+                                        <RouteItem
                                             key={index}
-                                            className="element"
-                                            onClick={() => {
-                                                setSelectedVehicle(item);
+                                            item={item}
+                                            onSelect={() => {
+                                                getTripFromId(
+                                                    item,
+                                                    item.operator.includes(
+                                                        "Slovenske železnice"
+                                                    )
+                                                        ? "SZ"
+                                                        : item.operator.includes(
+                                                              "Ljubljanski potniški promet"
+                                                          )
+                                                        ? "LPP"
+                                                        : "IJPP"
+                                                );
+                                                try {
+                                                    sessionStorage.setItem(
+                                                        "openRouteDrawer",
+                                                        "1"
+                                                    );
+                                                } catch {}
+                                                window.location.hash = "/map";
                                             }}
-                                        >
-                                            <strong>Linija:</strong> {item}
-                                        </li>
+                                        />
                                     );
                                 } else if (item.name && stations) {
                                     return (
@@ -132,6 +208,8 @@ const SearchTab = ({
                                             busStop={item}
                                             onSelect={() => {
                                                 setActiveStation(item);
+                                                window.location.hash =
+                                                    "/arrivals";
                                             }}
                                         />
                                     );

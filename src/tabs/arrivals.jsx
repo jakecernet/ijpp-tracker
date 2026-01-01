@@ -24,6 +24,7 @@ const ArrivalsTab = ({
 
     // Filtriranje ijpp prihodov
     const filteredArrivals = useMemo(() => {
+        console.log("IJPP Arrivals:", ijppArrivals);
         return ijppArrivals
             .filter((arrival) =>
                 arrival?.tripName
@@ -96,21 +97,18 @@ const ArrivalsTab = ({
         })) ?? []),
     ];
 
-    const bgColorMap = (arrival) =>
-        ({
-            LPP: "var(--lpp-color)",
-            SZ: "var(--sz-color)",
-            IJPP:
-                arrival?.operator === "Nomago"
-                    ? "var(--nomago-color)"
-                    : arrival?.operator === "Marprom"
-                    ? "var(--marprom-color)"
-                    : arrival?.operator === "Arriva"
-                    ? "var(--arriva-color)"
-                    : arrival?.operator === "Murska"
-                    ? "var(--murska-color)"
-                    : "var(--default-color)",
-        }[arrival.type]);
+    const bgColorMap = (arrival) => {
+        const operator = arrival?.operator || arrival?.operatorName;
+        if (arrival.type === "LPP") return "var(--lpp-color)";
+        if (arrival.type === "SZ") return "var(--sz-color)";
+
+        if (operator?.includes("Nomago")) return "var(--nomago-color)";
+        if (operator?.includes("Marprom")) return "var(--marprom-color)";
+        if (operator?.includes("Arriva")) return "var(--arriva-color)";
+        if (operator?.includes("Murska")) return "var(--murska-color)";
+
+        return "var(--default-color)";
+    };
 
     return (
         <div className="insideDiv">
