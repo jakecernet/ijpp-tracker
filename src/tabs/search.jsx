@@ -83,12 +83,14 @@ const SearchTab = ({
     const RouteItem = ({ item }) => (
         <div
             className="route-item"
-            onClick={() => {
-                getTripFromId(item, item.type);
-                try {
-                    sessionStorage.setItem("openRouteDrawer", "1");
-                } catch {}
-                window.location.hash = "/map";
+            onClick={async () => {
+                const route = await getTripFromId(item, item.type);
+                if (route) {
+                    try {
+                        sessionStorage.setItem("openRouteDrawer", "1");
+                    } catch {}
+                    window.location.hash = "/map";
+                }
             }}
         >
             <div

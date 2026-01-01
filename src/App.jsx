@@ -219,6 +219,7 @@ function App() {
                     }
                     return route;
                 });
+                return route;
             }
         } catch (error) {
             console.error("Error loading trip from ID:", error);

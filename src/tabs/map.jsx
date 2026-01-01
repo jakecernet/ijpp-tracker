@@ -110,6 +110,7 @@ const Map = React.memo(function Map({
         generic: true,
     });
     const prevVisibilityRef = useRef(null);
+    const [isMapLoaded, setIsMapLoaded] = useState(false);
 
     useEffect(() => {
         handlersRef.current = { setActiveStation, setSelectedVehicle };
@@ -874,6 +875,7 @@ const Map = React.memo(function Map({
                     window.location.hash = "/map";
                 },
             });
+            setIsMapLoaded(true);
         });
 
         return () => {
@@ -905,7 +907,7 @@ const Map = React.memo(function Map({
         setPrefixVisible(map, "busStops", visibility.busStops);
         setPrefixVisible(map, "trainStops", visibility.trainStops);
         setPrefixVisible(map, "trainPositions", visibility.trainPositions);
-    }, [visibility]);
+    }, [visibility, isMapLoaded]);
 
     useEffect(() => {
         try {
@@ -973,7 +975,7 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [selectedVehicle]);
+    }, [selectedVehicle, isMapLoaded]);
 
     // Update LPP trip overlays
     useEffect(() => {
@@ -1059,7 +1061,7 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [selectedVehicle]);
+    }, [selectedVehicle, isMapLoaded]);
 
     // Update SZ trip overlays
     useEffect(() => {
@@ -1116,7 +1118,7 @@ const Map = React.memo(function Map({
 
         if (lineSource && lineSource.setData) lineSource.setData(lineData);
         if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [selectedVehicle]);
+    }, [selectedVehicle, isMapLoaded]);
 
     // Update map center
     useEffect(() => {

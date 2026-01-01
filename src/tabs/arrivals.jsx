@@ -127,15 +127,20 @@ const ArrivalsTab = ({
                         <div
                             key={index}
                             className="arrival-item"
-                            onClick={() => {
-                                getTripFromId(arrival, arrival.type);
-                                try {
-                                    sessionStorage.setItem(
-                                        "openRouteDrawer",
-                                        "1"
-                                    );
-                                } catch {}
-                                window.location.hash = "/map";
+                            onClick={async () => {
+                                const route = await getTripFromId(
+                                    arrival,
+                                    arrival.type
+                                );
+                                if (route) {
+                                    try {
+                                        sessionStorage.setItem(
+                                            "openRouteDrawer",
+                                            "1"
+                                        );
+                                    } catch {}
+                                    window.location.hash = "/map";
+                                }
                             }}
                         >
                             <div className="left">
