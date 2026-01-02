@@ -59,19 +59,13 @@
 }
 
 @font-face {
-    font-family: "Proxima Nova";
-    src: url("./proximanova_regular.ttf") format("truetype");
-    font-display: swap;
-}
-
-@font-face {
     font-family: "Proxima Nova Light";
     src: url("./proximanova_light.otf") format("opentype");
     font-display: swap;
 }
 
 body {
-    font-family: "Proxima Nova", Inter, system-ui, Avenir, Helvetica, Arial,
+    font-family: "Proxima Nova Light", Inter, system-ui, Avenir, Helvetica, Arial,
         sans-serif;
     color: var(--text-color);
 }
@@ -86,7 +80,7 @@ body {
         bottom: 0;
         width: 100%;
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         background: var(--nav-bg);
         backdrop-filter: blur(12px);
         height: 80px;
@@ -257,7 +251,6 @@ body {
             }
 
             .arrival-list {
-                height: calc(100vh - 185px);
                 overflow-y: scroll;
 
                 .arrival-item {
@@ -358,7 +351,6 @@ body {
                 display: flex;
                 flex-direction: column;
                 gap: 10px;
-                max-height: calc(100vh - 190px);
                 overflow-y: auto;
                 margin-top: 10px;
                 color: var(--text-color);
@@ -480,7 +472,7 @@ body {
                     flex: 1;
                     min-width: 0;
 
-                    .name{
+                    .name {
                         flex: 1;
                         min-width: 0;
                         display: flex;
@@ -518,12 +510,37 @@ body {
             }
 
             .results {
-                height: calc(100svh - 300px);
+                height: calc(100svh - 240px);
                 overflow-y: auto;
 
                 ul {
                     list-style: none;
                 }
+
+                .empty-message {
+                    text-align: center;
+                    color: var(--hover-color);
+                    padding: 40px 20px;
+                }
+
+                .station-info-header {
+                    text-align: center;
+                    padding: 10px;
+                    color: var(--text-color);
+                    border-bottom: 1px solid var(--selector-border);
+                    background: rgba(0, 0, 0, 0.1);
+                }
+
+                .route-list {
+                    list-style: none;
+                }
+            }
+
+            .distance {
+                color: var(--hover-color);
+                font-size: 0.85em;
+                padding: 0 10px;
+                white-space: nowrap;
             }
 
             .liked {
@@ -566,8 +583,7 @@ body {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                flex-shrink: 0;
-                height: 32px;
+                height: fit-content;
 
                 &:hover {
                     color: #ef4444;

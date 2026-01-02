@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin, Search } from "lucide-react";
+import { Map, MapPin, Route as RouteIcon } from "lucide-react";
 import "./App.css";
 
 import {
@@ -18,15 +18,13 @@ import {
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
-const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
-const NearMeTab = lazy(() => import("./tabs/nearMe"));
-const SearchTab = lazy(() => import("./tabs/search"));
+const StationsTab = lazy(() => import("./tabs/stations"));
+const LinesTab = lazy(() => import("./tabs/lines"));
 
 if (typeof window !== "undefined") {
     import("./tabs/map");
-    import("./tabs/arrivals");
-    import("./tabs/nearMe");
-    import("./tabs/search");
+    import("./tabs/stations");
+    import("./tabs/lines");
 }
 
 function App() {
@@ -314,21 +312,9 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/arrivals"
-                                element={
-                                    <ArrivalsTab
-                                        activeStation={activeStation}
-                                        ijppArrivals={ijppArrivals}
-                                        lppArrivals={lppArrivals}
-                                        szArrivals={szArrivals}
-                                        getTripFromId={getTripFromId}
-                                    />
-                                }
-                            />
-                            <Route
                                 path="/stations"
                                 element={
-                                    <NearMeTab
+                                    <StationsTab
                                         setActiveStation={setActiveStation}
                                         busStops={busStops}
                                         szStops={szStops}
@@ -337,15 +323,14 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/search"
+                                path="/lines"
                                 element={
-                                    <SearchTab
+                                    <LinesTab
                                         gpsPositions={gpsPositions}
-                                        trainPositions={trainPositions}
-                                        busStops={busStops}
-                                        trainStops={szStops}
-                                        setActiveStation={setActiveStation}
-                                        userLocation={userLocation}
+                                        activeStation={activeStation}
+                                        ijppArrivals={ijppArrivals}
+                                        lppArrivals={lppArrivals}
+                                        szArrivals={szArrivals}
                                         getTripFromId={getTripFromId}
                                     />
                                 }
@@ -360,22 +345,16 @@ function App() {
                             <h3>Zemljevid</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/arrivals">
-                        <button>
-                            <Clock size={24} />
-                            <h3>Prihodi</h3>
-                        </button>
-                    </NavLink>
                     <NavLink to="/stations">
                         <button>
                             <MapPin size={24} />
-                            <h3>V bližini</h3>
+                            <h3>Postaje</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/search">
+                    <NavLink to="/lines">
                         <button>
-                            <Search size={24} />
-                            <h3>Išči</h3>
+                            <RouteIcon size={24} />
+                            <h3>Linije</h3>
                         </button>
                     </NavLink>
                 </nav>
