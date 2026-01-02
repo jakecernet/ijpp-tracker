@@ -7,24 +7,25 @@ import {
     DEFAULT_ZOOM,
     ICON_SOURCES,
     operatorToIcon,
-    BRAND_COLORS,
     OSM_RASTER_STYLE_DARK,
     OSM_RASTER_STYLE_LIGHT,
 } from "./map/config";
-import { toGeoJSONPoints, ensureIcons } from "./map/utils";
+import { toGeoJSONPoints, ensureIcons, stopsToFeatures } from "./map/utils";
 import {
     setupSourcesAndLayers,
     updateSourceData,
     setPrefixVisible,
+    setupTripOverlay,
+    clearTripOverlay,
+    updateTripOverlay,
+    BRAND_COLOR_EXPR,
 } from "./map/layers";
 import {
     configureBusStopPopup,
     configureTrainStopPopup,
     configureTrainPopup,
     configureBusPopup,
-    configureLppTripStopsPopup,
-    configureIjppTripStopsPopup,
-    configureSzTripStopsPopup,
+    configureTripStopsPopup,
 } from "./map/interactions";
 import LayerSelector from "./map/LayerSelector";
 import RouteTab from "./route.jsx";
@@ -535,200 +536,10 @@ const Map = React.memo(function Map({
                 trainStops: trainStopsGeoJSON,
             });
 
-            // Setup IJPP trip overlay sources
-            if (!map.getSource("ijpp-trip-line-src")) {
-                map.addSource("ijpp-trip-line-src", {
-                    type: "geojson",
-                    data: {
-                        type: "Feature",
-                        geometry: { type: "LineString", coordinates: [] },
-                        properties: {},
-                    },
-                });
-            }
-            if (!map.getLayer("ijpp-trip-line")) {
-                map.addLayer({
-                    id: "ijpp-trip-line",
-                    type: "line",
-                    source: "ijpp-trip-line-src",
-                    paint: {
-                        "line-color": [
-                            "match",
-                            ["get", "brand"],
-                            "nomago",
-                            BRAND_COLORS.nomago.stroke,
-                            "marprom",
-                            BRAND_COLORS.marprom.stroke,
-                            "arriva",
-                            BRAND_COLORS.arriva.stroke,
-                            "murska",
-                            BRAND_COLORS.arriva.stroke,
-                            "lpp",
-                            BRAND_COLORS.lpp.stroke,
-                            "sz",
-                            BRAND_COLORS.sz.stroke,
-                            BRAND_COLORS.default.stroke,
-                        ],
-                        "line-width": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            10,
-                            3,
-                            14,
-                            5,
-                            16,
-                            7,
-                        ],
-                        "line-opacity": 0.9,
-                    },
-                    layout: { "line-cap": "round", "line-join": "round" },
-                });
-            }
-
-            if (!map.getSource("ijpp-trip-stops-src")) {
-                map.addSource("ijpp-trip-stops-src", {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            if (!map.getLayer("ijpp-trip-stops-points")) {
-                map.addLayer({
-                    id: "ijpp-trip-stops-points",
-                    type: "circle",
-                    source: "ijpp-trip-stops-src",
-                    paint: {
-                        "circle-color": [
-                            "match",
-                            ["get", "brand"],
-                            "nomago",
-                            BRAND_COLORS.nomago.stroke,
-                            "marprom",
-                            BRAND_COLORS.marprom.stroke,
-                            "arriva",
-                            BRAND_COLORS.arriva.stroke,
-                            "murska",
-                            BRAND_COLORS.arriva.stroke,
-                            "lpp",
-                            BRAND_COLORS.lpp.stroke,
-                            "sz",
-                            BRAND_COLORS.sz.stroke,
-                            BRAND_COLORS.default.stroke,
-                        ],
-                        "circle-radius": 6,
-                        "circle-stroke-color": "#ffffff",
-                        "circle-stroke-width": 2,
-                    },
-                });
-            }
-
-            // Setup LPP trip overlay sources
-            if (!map.getSource("lpp-trip-line-src")) {
-                map.addSource("lpp-trip-line-src", {
-                    type: "geojson",
-                    data: {
-                        type: "Feature",
-                        geometry: { type: "LineString", coordinates: [] },
-                        properties: {},
-                    },
-                });
-            }
-            if (!map.getLayer("lpp-trip-line")) {
-                map.addLayer({
-                    id: "lpp-trip-line",
-                    type: "line",
-                    source: "lpp-trip-line-src",
-                    paint: {
-                        "line-color": BRAND_COLORS.lpp.stroke,
-                        "line-width": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            10,
-                            3,
-                            14,
-                            5,
-                            16,
-                            7,
-                        ],
-                        "line-opacity": 0.9,
-                    },
-                    layout: { "line-cap": "round", "line-join": "round" },
-                });
-            }
-            if (!map.getSource("lpp-trip-stops-src")) {
-                map.addSource("lpp-trip-stops-src", {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            if (!map.getLayer("lpp-trip-stops-points")) {
-                map.addLayer({
-                    id: "lpp-trip-stops-points",
-                    type: "circle",
-                    source: "lpp-trip-stops-src",
-                    paint: {
-                        "circle-color": BRAND_COLORS.lpp.stroke,
-                        "circle-radius": 6,
-                        "circle-stroke-color": "#ffffff",
-                        "circle-stroke-width": 2,
-                    },
-                });
-            }
-
-            // Setup SZ trip overlay sources
-            if (!map.getSource("sz-trip-line-src")) {
-                map.addSource("sz-trip-line-src", {
-                    type: "geojson",
-                    data: {
-                        type: "Feature",
-                        geometry: { type: "LineString", coordinates: [] },
-                        properties: {},
-                    },
-                });
-            }
-            if (!map.getLayer("sz-trip-line")) {
-                map.addLayer({
-                    id: "sz-trip-line",
-                    type: "line",
-                    source: "sz-trip-line-src",
-                    paint: {
-                        "line-color": BRAND_COLORS.sz.stroke,
-                        "line-width": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            10,
-                            3,
-                            14,
-                            5,
-                            16,
-                            7,
-                        ],
-                        "line-opacity": 0.9,
-                    },
-                    layout: { "line-cap": "round", "line-join": "round" },
-                });
-            }
-            if (!map.getSource("sz-trip-stops-src")) {
-                map.addSource("sz-trip-stops-src", {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            if (!map.getLayer("sz-trip-stops-points")) {
-                map.addLayer({
-                    id: "sz-trip-stops-points",
-                    type: "circle",
-                    source: "sz-trip-stops-src",
-                    paint: {
-                        "circle-color": BRAND_COLORS.sz.stroke,
-                        "circle-radius": 6,
-                        "circle-stroke-color": "#ffffff",
-                        "circle-stroke-width": 2,
-                    },
-                });
-            }
+            // Setup trip overlays for all providers
+            ["ijpp", "lpp", "sz"].forEach((prefix) =>
+                setupTripOverlay(map, prefix, BRAND_COLOR_EXPR)
+            );
 
             // Configure all popups
             configureBusStopPopup({
@@ -797,10 +608,6 @@ const Map = React.memo(function Map({
                         trainStops: false,
                     });
                 },
-                onNavigateRoute: () => {
-                    setRouteDrawerOpen(true);
-                    window.location.hash = "/map";
-                },
             });
 
             configureBusPopup({
@@ -817,64 +624,13 @@ const Map = React.memo(function Map({
                         trainStops: false,
                     });
                 },
-                onNavigateRoute: () => {
-                    setRouteDrawerOpen(true);
-                    window.location.hash = "/map";
-                },
             });
 
-            configureIjppTripStopsPopup({
-                map,
-                onNavigateRoute: () => {
-                    // Enable route-only bus view when navigating from IJPP route stops
-                    prevVisibilityRef.current = visibility;
-                    setFilterByRoute(true);
-                    setVisibility({
-                        buses: true,
-                        busStops: false,
-                        trainPositions: false,
-                        trainStops: false,
-                    });
-                    setRouteDrawerOpen(true);
-                    window.location.hash = "/map";
-                },
-            });
+            // Configure trip stops popups for all providers
+            ["ijpp", "lpp", "sz"].forEach((prefix) =>
+                configureTripStopsPopup(map, `${prefix}-trip-stops-points`)
+            );
 
-            // Add popup for LPP route stop markers
-            configureLppTripStopsPopup({
-                map,
-                onNavigateRoute: () => {
-                    // Enable route-only bus view when navigating from LPP route stops
-                    prevVisibilityRef.current = visibility;
-                    setFilterByRoute(true);
-                    setVisibility({
-                        buses: true,
-                        busStops: false,
-                        trainPositions: false,
-                        trainStops: false,
-                    });
-                    setRouteDrawerOpen(true);
-                    window.location.hash = "/map";
-                },
-            });
-
-            // Add popup for SZ route stop markers
-            configureSzTripStopsPopup({
-                map,
-                onNavigateRoute: () => {
-                    // Enable route-only SZ view when navigating from SZ route stops
-                    prevVisibilityRef.current = visibility;
-                    setFilterByRoute(true);
-                    setVisibility({
-                        buses: false,
-                        busStops: false,
-                        trainPositions: true,
-                        trainStops: false,
-                    });
-                    setRouteDrawerOpen(true);
-                    window.location.hash = "/map";
-                },
-            });
             setIsMapLoaded(true);
         });
 
@@ -919,205 +675,60 @@ const Map = React.memo(function Map({
         } catch {}
     }, [visibility, busOperators, filterByRoute]);
 
-    // Update IJPP trip overlays
+    // Update all trip overlays in a single effect
     useEffect(() => {
         const map = mapInstanceRef.current;
-        if (!map) return;
-
-        const lineSource = map.getSource("ijpp-trip-line-src");
-        const stopsSource = map.getSource("ijpp-trip-stops-src");
+        if (!map || !isMapLoaded) return;
 
         const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
 
-        const lineData = selectedVehicle?.geometry?.length
-            ? {
-                  type: "Feature",
-                  geometry: {
-                      type: "LineString",
-                      coordinates: selectedVehicle.geometry.filter(
-                          (c) => Array.isArray(c) && c.length >= 2
-                      ),
-                  },
-                  properties: { brand },
-              }
-            : {
-                  type: "Feature",
-                  geometry: { type: "LineString", coordinates: [] },
-                  properties: {},
-              };
+        // Determine which provider's overlay to update based on selected vehicle
+        const isLpp =
+            selectedVehicle?.lineId !== undefined ||
+            selectedVehicle?.geometry?.[0]?.points !== undefined;
+        const isSz =
+            selectedVehicle?.tripShort !== undefined &&
+            selectedVehicle?.lineNumber === undefined;
+        const isIjpp = !isLpp && !isSz && selectedVehicle?.tripId !== undefined;
 
-        const stopsData = {
-            type: "FeatureCollection",
-            features: Array.isArray(selectedVehicle?.stops)
-                ? selectedVehicle.stops
-                      .map((s) => {
-                          const coord = Array.isArray(s?.gpsLocation)
-                              ? s.gpsLocation
-                              : null;
-                          if (
-                              !coord ||
-                              !Number.isFinite(coord[0]) ||
-                              !Number.isFinite(coord[1])
-                          )
-                              return null;
-                          return {
-                              type: "Feature",
-                              geometry: {
-                                  type: "Point",
-                                  coordinates: [coord[1], coord[0]],
-                              },
-                              properties: { name: s?.name || "", brand },
-                          };
-                      })
-                      .filter(Boolean)
-                : [],
-        };
+        // Clear all overlays first
+        ["ijpp", "lpp", "sz"].forEach((prefix) =>
+            clearTripOverlay(map, prefix)
+        );
 
-        if (lineSource && lineSource.setData) lineSource.setData(lineData);
-        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [selectedVehicle, isMapLoaded]);
+        if (!selectedVehicle) return;
 
-    // Update LPP trip overlays
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-
-        const lineSource = map.getSource("lpp-trip-line-src");
-        const stopsSource = map.getSource("lpp-trip-stops-src");
-
-        const lineCoords = Array.isArray(selectedVehicle?.geometry?.[0]?.points)
-            ? selectedVehicle.geometry[0].points
-                  .filter((c) => Array.isArray(c) && c.length >= 2)
-                  .map((c) => [c[1], c[0]])
-            : [];
-
-        const lineData = {
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: lineCoords },
-            properties: {},
-        };
-
-        const stopsData = {
-            type: "FeatureCollection",
-            features: Array.isArray(selectedVehicle?.stops)
-                ? selectedVehicle.stops
-                      .map((s) => {
-                          let coord = null;
-                          if (Array.isArray(s?.stop_location)) {
-                              coord = [s.stop_location[0], s.stop_location[1]];
-                          } else if (
-                              s?.stop_location &&
-                              typeof s.stop_location === "object"
-                          ) {
-                              const lat = Number(
-                                  s.stop_location.lat ?? s.stop_location[0]
-                              );
-                              const lon = Number(
-                                  s.stop_location.lon ?? s.stop_location[1]
-                              );
-                              coord =
-                                  Number.isFinite(lat) && Number.isFinite(lon)
-                                      ? [lat, lon]
-                                      : null;
-                          } else if (Array.isArray(s?.gpsLocation)) {
-                              coord = s.gpsLocation;
-                          } else {
-                              const lat = Number(
-                                  s.latitude ?? s.lat ?? s.stop_lat ?? null
-                              );
-                              const lon = Number(
-                                  s.longitude ?? s.lon ?? s.stop_lon ?? null
-                              );
-                              coord =
-                                  Number.isFinite(lat) && Number.isFinite(lon)
-                                      ? [lat, lon]
-                                      : null;
-                          }
-                          if (
-                              !coord ||
-                              !Number.isFinite(coord[0]) ||
-                              !Number.isFinite(coord[1])
-                          )
-                              return null;
-                          return {
-                              type: "Feature",
-                              geometry: {
-                                  type: "Point",
-                                  coordinates: [coord[1], coord[0]],
-                              },
-                              properties: {
-                                  name:
-                                      s?.name ||
-                                      s?.stop_name ||
-                                      s?.station_name ||
-                                      s?.route_name ||
-                                      "",
-                              },
-                          };
-                      })
-                      .filter(Boolean)
-                : [],
-        };
-
-        if (lineSource && lineSource.setData) lineSource.setData(lineData);
-        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-    }, [selectedVehicle, isMapLoaded]);
-
-    // Update SZ trip overlays
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-
-        const lineSource = map.getSource("sz-trip-line-src");
-        const stopsSource = map.getSource("sz-trip-stops-src");
-
-        const lineCoords = Array.isArray(selectedVehicle?.geometry)
-            ? selectedVehicle.geometry
-                  .filter((c) => Array.isArray(c) && c.length >= 2)
-                  // geometry already [lng, lat]
-                  .map((c) => [c[0], c[1]])
-            : [];
-
-        const lineData = {
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: lineCoords },
-            properties: {},
-        };
-
-        // Build features for start (from), intermediate stops, and end (to)
-        const features = [];
-
-        const pushStop = (s) => {
-            if (!s) return;
-            const coord = Array.isArray(s?.gpsLocation)
-                ? s.gpsLocation
-                : [s?.lat, s?.lon];
-            if (
-                !coord ||
-                !Number.isFinite(coord[0]) ||
-                !Number.isFinite(coord[1])
+        if (isIjpp) {
+            // IJPP: geometry is direct array of [lng, lat]
+            const lineCoords = (selectedVehicle.geometry || []).filter(
+                (c) => Array.isArray(c) && c.length >= 2
+            );
+            const stopsFeatures = stopsToFeatures(selectedVehicle.stops, brand);
+            updateTripOverlay(map, "ijpp", lineCoords, stopsFeatures, brand);
+        } else if (isLpp) {
+            // LPP: geometry is array with points property, coords are [lat, lng]
+            const lineCoords = Array.isArray(
+                selectedVehicle.geometry?.[0]?.points
             )
-                return;
-            features.push({
-                type: "Feature",
-                geometry: { type: "Point", coordinates: [coord[1], coord[0]] },
-                properties: { name: s?.name || "" },
-            });
-        };
-
-        // include start and end stops
-        pushStop(selectedVehicle?.from);
-        if (Array.isArray(selectedVehicle?.stops))
-            selectedVehicle.stops.forEach(pushStop);
-        pushStop(selectedVehicle?.to);
-
-        const stopsData = {
-            type: "FeatureCollection",
-            features,
-        };
-
-        if (lineSource && lineSource.setData) lineSource.setData(lineData);
-        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
+                ? selectedVehicle.geometry[0].points
+                      .filter((c) => Array.isArray(c) && c.length >= 2)
+                      .map((c) => [c[1], c[0]])
+                : [];
+            const stopsFeatures = stopsToFeatures(selectedVehicle.stops, "lpp");
+            updateTripOverlay(map, "lpp", lineCoords, stopsFeatures, "lpp");
+        } else if (isSz) {
+            // SZ: geometry already [lng, lat], include from/to stops
+            const lineCoords = (selectedVehicle.geometry || []).filter(
+                (c) => Array.isArray(c) && c.length >= 2
+            );
+            const stopsFeatures = stopsToFeatures(
+                selectedVehicle.stops,
+                "sz",
+                selectedVehicle.from,
+                selectedVehicle.to
+            );
+            updateTripOverlay(map, "sz", lineCoords, stopsFeatures, "sz");
+        }
     }, [selectedVehicle, isMapLoaded]);
 
     // Update map center
@@ -1157,40 +768,9 @@ const Map = React.memo(function Map({
     const clearPathOverlays = () => {
         const map = mapInstanceRef.current;
         if (map) {
-            const clearLine = {
-                type: "Feature",
-                geometry: {
-                    type: "LineString",
-                    coordinates: [],
-                },
-                properties: {},
-            };
-            const clearStops = {
-                type: "FeatureCollection",
-                features: [],
-            };
-            [
-                {
-                    line: "ijpp-trip-line-src",
-                    stops: "ijpp-trip-stops-src",
-                },
-                {
-                    line: "lpp-trip-line-src",
-                    stops: "lpp-trip-stops-src",
-                },
-                {
-                    line: "sz-trip-line-src",
-                    stops: "sz-trip-stops-src",
-                },
-            ].forEach(({ line, stops }) => {
-                try {
-                    const lineSrc = map.getSource(line);
-                    const stopsSrc = map.getSource(stops);
-                    if (lineSrc && lineSrc.setData) lineSrc.setData(clearLine);
-                    if (stopsSrc && stopsSrc.setData)
-                        stopsSrc.setData(clearStops);
-                } catch {}
-            });
+            ["ijpp", "lpp", "sz"].forEach((prefix) =>
+                clearTripOverlay(map, prefix)
+            );
         }
     };
 

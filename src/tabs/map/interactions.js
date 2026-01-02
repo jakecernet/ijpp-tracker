@@ -219,38 +219,8 @@ export function configureBusPopup({ map, onSelectVehicle }) {
     );
 }
 
-export function configureLppTripStopsPopup({ map }) {
-    map.on("click", "lpp-trip-stops-points", (event) => {
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const props = feature.properties || {};
-        const [lng, lat] = feature.geometry.coordinates;
-        const name = props?.name || "Postaja";
-        const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        new maplibregl.Popup({ closeButton: false })
-            .setLngLat([lng, lat])
-            .setHTML(html)
-            .addTo(map);
-    });
-}
-
-export function configureIjppTripStopsPopup({ map }) {
-    map.on("click", "ijpp-trip-stops-points", (event) => {
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const props = feature.properties || {};
-        const [lng, lat] = feature.geometry.coordinates;
-        const name = props?.name || "Postaja";
-        const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        new maplibregl.Popup({ closeButton: false })
-            .setLngLat([lng, lat])
-            .setHTML(html)
-            .addTo(map);
-    });
-}
-
-export function configureSzTripStopsPopup({ map }) {
-    map.on("click", "sz-trip-stops-points", (event) => {
+export function configureTripStopsPopup(map, layerId) {
+    map.on("click", layerId, (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
         const props = feature.properties || {};

@@ -6,6 +6,112 @@ import {
     HALO_RADIUS,
 } from "./config";
 
+// Shared brand color expression for line/circle coloring
+export const BRAND_COLOR_EXPR = [
+    "match",
+    ["coalesce", ["get", "brand"], ["get", "icon"]],
+    "arriva",
+    BRAND_COLORS.arriva.stroke,
+    "sz",
+    BRAND_COLORS.sz.stroke,
+    "nomago",
+    BRAND_COLORS.nomago.stroke,
+    "lpp",
+    BRAND_COLORS.lpp.stroke,
+    "marprom",
+    BRAND_COLORS.marprom.stroke,
+    "murska",
+    BRAND_COLORS.arriva.stroke,
+    BRAND_COLORS.default.stroke,
+];
+
+const TRIP_LINE_WIDTH = [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    10,
+    3,
+    14,
+    5,
+    16,
+    7,
+];
+
+const EMPTY_LINE = {
+    type: "Feature",
+    geometry: { type: "LineString", coordinates: [] },
+    properties: {},
+};
+const EMPTY_FEATURES = { type: "FeatureCollection", features: [] };
+
+export function setupTripOverlay(map, prefix, colorExpr = BRAND_COLOR_EXPR) {
+    const lineSrc = `${prefix}-trip-line-src`;
+    const stopsSrc = `${prefix}-trip-stops-src`;
+    const lineLayer = `${prefix}-trip-line`;
+    const stopsLayer = `${prefix}-trip-stops-points`;
+
+    if (!map.getSource(lineSrc)) {
+        map.addSource(lineSrc, { type: "geojson", data: EMPTY_LINE });
+    }
+    if (!map.getLayer(lineLayer)) {
+        map.addLayer({
+            id: lineLayer,
+            type: "line",
+            source: lineSrc,
+            paint: {
+                "line-color": colorExpr,
+                "line-width": TRIP_LINE_WIDTH,
+                "line-opacity": 0.9,
+            },
+            layout: { "line-cap": "round", "line-join": "round" },
+        });
+    }
+    if (!map.getSource(stopsSrc)) {
+        map.addSource(stopsSrc, { type: "geojson", data: EMPTY_FEATURES });
+    }
+    if (!map.getLayer(stopsLayer)) {
+        map.addLayer({
+            id: stopsLayer,
+            type: "circle",
+            source: stopsSrc,
+            paint: {
+                "circle-color": colorExpr,
+                "circle-radius": 6,
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 2,
+            },
+        });
+    }
+}
+
+export function clearTripOverlay(map, prefix) {
+    const lineSrc = map.getSource(`${prefix}-trip-line-src`);
+    const stopsSrc = map.getSource(`${prefix}-trip-stops-src`);
+    if (lineSrc?.setData) lineSrc.setData(EMPTY_LINE);
+    if (stopsSrc?.setData) stopsSrc.setData(EMPTY_FEATURES);
+}
+
+export function updateTripOverlay(
+    map,
+    prefix,
+    lineCoords,
+    stopsFeatures,
+    brand
+) {
+    const lineSrc = map.getSource(`${prefix}-trip-line-src`);
+    const stopsSrc = map.getSource(`${prefix}-trip-stops-src`);
+
+    const lineData = {
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: lineCoords },
+        properties: { brand: brand || "generic" },
+    };
+    const stopsData = { type: "FeatureCollection", features: stopsFeatures };
+
+    if (lineSrc?.setData) lineSrc.setData(lineData);
+    if (stopsSrc?.setData) stopsSrc.setData(stopsData);
+}
+
 export function registerHaloLayer(map, prefix) {
     const id = `${prefix}-halo`;
     if (map.getLayer(id)) return;
