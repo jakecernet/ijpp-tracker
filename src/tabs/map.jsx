@@ -343,9 +343,29 @@ const Map = React.memo(function Map({
         } catch {}
     }, []);
 
+    const selectedVehicleCoords = useMemo(() => {
+        if (!selectedVehicle || !gpsPositions) return null;
+
+        // Find the selected vehicle in gpsPositions
+        const vehicle = gpsPositions.find((pos) => {
+            if (selectedVehicle.tripId && pos.tripId === selectedVehicle.tripId) {
+                return true;
+            }
+            if (selectedVehicle.lineNumber && pos.lineNumber === selectedVehicle.lineNumber) {
+                return true;
+            }
+            if (selectedVehicle.lineId && pos.lineId === selectedVehicle.lineId) {
+                return true;
+            }
+            return false;
+        });
+
+        return vehicle?.gpsLocation || null;
+    }, [selectedVehicle, gpsPositions]);
+
     const center = useMemo(
-        () => activeStation?.coordinates || userLocation || DEFAULT_CENTER,
-        [activeStation, userLocation]
+        () => selectedVehicleCoords || userLocation || DEFAULT_CENTER,
+        [selectedVehicleCoords, userLocation]
     );
 
     const busesGeoJSON = useMemo(() => {
