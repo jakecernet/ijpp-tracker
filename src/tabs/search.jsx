@@ -1,5 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
-import { Bus } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Bus, Train, Heart } from "lucide-react";
+
+const LIKED_STATIONS_KEY = "likedStations";
+const LIKED_ROUTES_KEY = "likedRoutes";
+
+const loadLikedItems = (key) => {
+    try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
+};
+
+const saveLikedItems = (key, items) => {
+    try {
+        localStorage.setItem(key, JSON.stringify(items));
+    } catch {}
+};
 
 const SearchTab = ({
     gpsPositions,
@@ -13,6 +31,12 @@ const SearchTab = ({
     const [stations, setStations] = useState(true);
     const [lines, setLines] = useState(true);
     const [page, setPage] = useState("search");
+    const [likedStations, setLikedStations] = useState(() =>
+        loadLikedItems(LIKED_STATIONS_KEY)
+    );
+    const [likedRoutes, setLikedRoutes] = useState(() =>
+        loadLikedItems(LIKED_ROUTES_KEY)
+    );
 
     const allStations = useMemo(
         () => [...busStops, ...trainStops],
@@ -44,47 +68,150 @@ const SearchTab = ({
 
         return uniqueRoutes;
     }, [gpsPositions, trainPositions]);
+
     const [filtered, setFiltered] = useState([]);
 
+    // Get unique station ID for liking
+    const getStationId = useCallback((station) => {
+        return station?.ref_id || station?.id || station?.name;
+    }, []);
+
+    // Get unique route ID for liking
+    const getRouteId = useCallback((route) => {
+        return route?.lineName || route?.route_name || route?.lineNumber;
+    }, []);
+
+    const isStationLiked = useCallback(
+        (station) => {
+            const id = getStationId(station);
+            return likedStations.some((s) => s.id === id);
+        },
+        [likedStations, getStationId]
+    );
+
+    const isRouteLiked = useCallback(
+        (route) => {
+            const id = getRouteId(route);
+            return likedRoutes.some((r) => r.id === id);
+        },
+        [likedRoutes, getRouteId]
+    );
+
+    const toggleLikeStation = useCallback(
+        (station, e) => {
+            e?.stopPropagation();
+            const id = getStationId(station);
+            setLikedStations((prev) => {
+                const exists = prev.some((s) => s.id === id);
+                const newLiked = exists
+                    ? prev.filter((s) => s.id !== id)
+                    : [...prev, { id, name: station.name, data: station }];
+                saveLikedItems(LIKED_STATIONS_KEY, newLiked);
+                return newLiked;
+            });
+        },
+        [getStationId]
+    );
+
+    const toggleLikeRoute = useCallback(
+        (route, e) => {
+            e?.stopPropagation();
+            const id = getRouteId(route);
+            setLikedRoutes((prev) => {
+                const exists = prev.some((r) => r.id === id);
+                const newLiked = exists
+                    ? prev.filter((r) => r.id !== id)
+                    : [
+                          ...prev,
+                          {
+                              id,
+                              name: route.lineName || route.route_name,
+                              lineNumber: route.lineNumber,
+                              operator: route.operator,
+                              headsign: route.headsign,
+                          },
+                      ];
+                saveLikedItems(LIKED_ROUTES_KEY, newLiked);
+                return newLiked;
+            });
+        },
+        [getRouteId]
+    );
+
     useEffect(() => {
-        console.log(allRoutes);
         if (searchTerm.length < 3) {
             setFiltered([]);
             return;
         }
 
-        const filteredStations = allStations.filter((station) =>
-            station?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        const filteredRoutes = allRoutes.filter((route) =>
-            (route.lineName || route.route_name || route.lineNumber)
-                ?.toLowerCase()
-                .includes(searchTerm.toLowerCase())
-        );
+        const term = searchTerm.toLowerCase();
+        const filteredStations = stations
+            ? allStations.filter((station) =>
+                  station?.name?.toLowerCase().includes(term)
+              )
+            : [];
+        const filteredRoutes = lines
+            ? allRoutes.filter((route) =>
+                  (route.lineName || route.route_name || route.lineNumber)
+                      ?.toLowerCase()
+                      .includes(term)
+              )
+            : [];
         setFiltered([...filteredStations, ...filteredRoutes]);
-    }, [searchTerm, allStations, allRoutes]);
+    }, [searchTerm, allStations, allRoutes, stations, lines]);
 
-    const StationItem = ({ busStop, onSelect }) => (
+    const StationItem = ({ busStop, onSelect, isLiked, onToggleLike }) => (
         <div className="station-item-search" onClick={onSelect}>
-            <div>
-                <Bus size={24} />
-                <h3>{busStop?.name}</h3>
-                <ul>
-                    {busStop?.routes_on_stop?.map((route, index) => (
-                        <li key={index}>
-                            <p>{route}</p>
+            <div className="station-content">
+                <div className="name">
+                    {busStop?.type === "train" ? (
+                        <Train size={24} />
+                    ) : (
+                        <Bus size={24} />
+                    )}
+                    <h3>{busStop?.name}</h3>
+                </div>
+                <ul className="station-info">
+                    {busStop?.routes_on_stop
+                        ?.slice(0, 4)
+                        .map((route, index) => (
+                            <li key={index}>
+                                <p>{route}</p>
+                            </li>
+                        ))}
+                    {busStop?.routes_on_stop?.length > 4 && (
+                        <li>
+                            <p>+ {busStop.routes_on_stop.length - 4}</p>
                         </li>
-                    ))}
+                    )}
                 </ul>
             </div>
+            <button
+                className={`like-btn ${isLiked ? "liked" : ""}`}
+                onClick={onToggleLike}
+                aria-label={
+                    isLiked
+                        ? "Odstrani iz priljubljenih"
+                        : "Dodaj med priljubljene"
+                }
+            >
+                <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+            </button>
         </div>
     );
 
-    const RouteItem = ({ item }) => (
+    const RouteItem = ({ item, isLiked, onToggleLike }) => (
         <div
             className="route-item"
             onClick={async () => {
-                const route = await getTripFromId(item, item.type);
+                const operatorType = item.operator?.includes(
+                    "Slovenske železnice"
+                )
+                    ? "SZ"
+                    : item.operator?.includes("Ljubljanski potniški promet")
+                    ? "LPP"
+                    : "IJPP";
+                const route = await getTripFromId(item, operatorType);
                 if (route) {
                     try {
                         sessionStorage.setItem("openRouteDrawer", "1");
@@ -99,9 +226,20 @@ const SearchTab = ({
                     background: bgColorMap(item),
                 }}
             >
-                {item.lineNumber ?? item.tripId.slice(5)}
+                {item.lineNumber ?? item.tripId?.slice(5) ?? "?"}
             </div>
-            <h3>{item.lineName || item.headsign}</h3>
+            <h3>{item.lineName || item.headsign || item.name}</h3>
+            <button
+                className={`like-btn ${isLiked ? "liked" : ""}`}
+                onClick={onToggleLike}
+                aria-label={
+                    isLiked
+                        ? "Odstrani iz priljubljenih"
+                        : "Dodaj med priljubljene"
+                }
+            >
+                <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+            </button>
         </div>
     );
 
@@ -141,7 +279,79 @@ const SearchTab = ({
                     Priljubljene
                 </button>
             </div>
-            {page === "liked" && <div className="liked"></div>}
+            {page === "liked" && (
+                <div className="liked">
+                    {likedStations.length === 0 && likedRoutes.length === 0 ? (
+                        <p className="empty-message">
+                            Ni priljubljenih postaj ali linij. Kliknite na ❤️ za
+                            dodajanje.
+                        </p>
+                    ) : (
+                        <>
+                            {likedStations.length > 0 && (
+                                <div className="liked-section">
+                                    <h3>Priljubljene postaje</h3>
+                                    <ul>
+                                        {likedStations.map((liked, index) => (
+                                            <StationItem
+                                                key={`liked-station-${index}`}
+                                                busStop={liked.data}
+                                                isLiked={true}
+                                                onToggleLike={(e) =>
+                                                    toggleLikeStation(
+                                                        liked.data,
+                                                        e
+                                                    )
+                                                }
+                                                onSelect={() => {
+                                                    setActiveStation(
+                                                        liked.data
+                                                    );
+                                                    window.location.hash =
+                                                        "/arrivals";
+                                                }}
+                                            />
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {likedRoutes.length > 0 && (
+                                <div className="liked-section">
+                                    <h3>Priljubljene linije</h3>
+                                    <ul>
+                                        {likedRoutes.map((liked, index) => {
+                                            // Try to find active route data
+                                            const activeRoute = allRoutes.find(
+                                                (r) =>
+                                                    getRouteId(r) === liked.id
+                                            );
+                                            const routeData = activeRoute || {
+                                                lineName: liked.name,
+                                                lineNumber: liked.lineNumber,
+                                                operator: liked.operator,
+                                                headsign: liked.headsign,
+                                            };
+                                            return (
+                                                <RouteItem
+                                                    key={`liked-route-${index}`}
+                                                    item={routeData}
+                                                    isLiked={true}
+                                                    onToggleLike={(e) =>
+                                                        toggleLikeRoute(
+                                                            routeData,
+                                                            e
+                                                        )
+                                                    }
+                                                />
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
             {page === "search" && (
                 <div className="searching">
                     <div className="config">
@@ -178,36 +388,27 @@ const SearchTab = ({
                                 if (routeName && lines) {
                                     return (
                                         <RouteItem
-                                            key={index}
+                                            key={`route-${index}`}
                                             item={item}
-                                            onSelect={() => {
-                                                getTripFromId(
-                                                    item,
-                                                    item.operator.includes(
-                                                        "Slovenske železnice"
-                                                    )
-                                                        ? "SZ"
-                                                        : item.operator.includes(
-                                                              "Ljubljanski potniški promet"
-                                                          )
-                                                        ? "LPP"
-                                                        : "IJPP"
-                                                );
-                                                try {
-                                                    sessionStorage.setItem(
-                                                        "openRouteDrawer",
-                                                        "1"
-                                                    );
-                                                } catch {}
-                                                window.location.hash = "/map";
-                                            }}
+                                            isLiked={isRouteLiked(item)}
+                                            onToggleLike={(e) =>
+                                                toggleLikeRoute(item, e)
+                                            }
                                         />
                                     );
-                                } else if (item.name && stations) {
+                                } else if (
+                                    item.name &&
+                                    stations &&
+                                    !routeName
+                                ) {
                                     return (
                                         <StationItem
-                                            key={index}
+                                            key={`station-${index}`}
                                             busStop={item}
+                                            isLiked={isStationLiked(item)}
+                                            onToggleLike={(e) =>
+                                                toggleLikeStation(item, e)
+                                            }
                                             onSelect={() => {
                                                 setActiveStation(item);
                                                 window.location.hash =
@@ -216,6 +417,7 @@ const SearchTab = ({
                                         />
                                     );
                                 }
+                                return null;
                             })}
                         </ul>
                     </div>
