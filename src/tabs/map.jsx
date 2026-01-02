@@ -10,7 +10,13 @@ import {
     OSM_RASTER_STYLE_DARK,
     OSM_RASTER_STYLE_LIGHT,
 } from "./map/config";
-import { toGeoJSONPoints, ensureIcons, stopsToFeatures } from "./map/utils";
+import {
+    toGeoJSONPoints,
+    ensureIcons,
+    stopsToFeatures,
+    parseTrainCoord,
+    getStopCoord,
+} from "./map/utils";
 import {
     setupSourcesAndLayers,
     updateSourceData,
@@ -343,61 +349,52 @@ const Map = React.memo(function Map({
     );
 
     const busesGeoJSON = useMemo(() => {
-        const currentRouteInfo = selectedVehicle;
-
-        const filtered = (gpsPositions || []).filter((position) => {
-            const brandKey = operatorToIcon[position?.operator] || "generic";
+        const filtered = (gpsPositions || []).filter((pos) => {
+            const brandKey = operatorToIcon[pos?.operator] || "generic";
             if (!busOperators[brandKey]) return false;
 
-            if (filterByRoute && currentRouteInfo) {
-                if (
-                    position.lineNumber !== undefined ||
-                    position.lineId !== undefined
+            if (filterByRoute && selectedVehicle) {
+                const hasLine =
+                    pos.lineNumber !== undefined || pos.lineId !== undefined;
+                if (hasLine) {
+                    const match =
+                        (selectedVehicle.lineNumber &&
+                            pos.lineNumber === selectedVehicle.lineNumber) ||
+                        (selectedVehicle.routeName &&
+                            pos.lineNumber === selectedVehicle.routeName) ||
+                        (selectedVehicle.tripId &&
+                            pos.tripId === selectedVehicle.tripId);
+                    if (!match) return false;
+                } else if (
+                    pos.tripId !== undefined &&
+                    selectedVehicle.tripId &&
+                    pos.tripId !== selectedVehicle.tripId
                 ) {
-                    const routeMatch =
-                        (currentRouteInfo.lineNumber &&
-                            position.lineNumber ===
-                                currentRouteInfo.lineNumber) ||
-                        (currentRouteInfo.routeName &&
-                            position.lineNumber ===
-                                currentRouteInfo.routeName) ||
-                        (currentRouteInfo.tripId &&
-                            position.tripId === currentRouteInfo.tripId);
-                    if (!routeMatch) return false;
-                } else if (position.tripId !== undefined) {
-                    if (
-                        currentRouteInfo.tripId &&
-                        position.tripId !== currentRouteInfo.tripId
-                    )
-                        return false;
+                    return false;
                 }
             }
-
             return true;
         });
 
         return toGeoJSONPoints(
             filtered,
-            (position) => position?.gpsLocation,
-            (position) => {
-                const props = { ...position };
-                delete props.gpsLocation;
-
+            (pos) => pos?.gpsLocation,
+            (pos) => {
+                const icon = operatorToIcon[pos?.operator] || "bus-generic";
                 const isLpp =
-                    (typeof position?.operator === "string" &&
-                        position.operator
-                            .toLowerCase()
-                            .includes("ljubljanski potniški promet")) ||
-                    position?.lineNumber !== undefined ||
-                    position?.lineId !== undefined;
-
-                props.sourceType = isLpp ? "lpp" : "ijpp";
-                props.icon =
-                    operatorToIcon[position?.operator] || "bus-generic";
-                props.brand = operatorToIcon[position?.operator] || "generic";
-                props.operator = position?.operator || "";
-
-                return props;
+                    pos?.operator
+                        ?.toLowerCase?.()
+                        .includes("ljubljanski potniški promet") ||
+                    pos?.lineNumber !== undefined ||
+                    pos?.lineId !== undefined;
+                return {
+                    ...pos,
+                    gpsLocation: undefined,
+                    sourceType: isLpp ? "lpp" : "ijpp",
+                    icon,
+                    brand: icon === "bus-generic" ? "generic" : icon,
+                    operator: pos?.operator || "",
+                };
             }
         );
     }, [gpsPositions, busOperators, filterByRoute, selectedVehicle]);
@@ -425,70 +422,31 @@ const Map = React.memo(function Map({
 
     const trainStopsGeoJSON = useMemo(
         () =>
-            toGeoJSONPoints(
-                trainStops,
-                (stop) => {
-                    const lat = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[0]
-                            : stop?.lat
-                    );
-                    const lon = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[1]
-                            : stop?.lon
-                    );
-                    return Number.isFinite(lat) && Number.isFinite(lon)
-                        ? [lat, lon]
-                        : null;
-                },
-                (stop) => {
-                    const lat = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[0]
-                            : stop?.lat
-                    );
-                    const lon = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[1]
-                            : stop?.lon
-                    );
-                    return {
-                        id: stop?.stopId ?? stop?.id ?? stop?.name,
-                        name: stop?.name ?? "",
-                        stopId: stop?.stopId ?? null,
-                        icon: "train-stop",
-                        lat: Number.isFinite(lat) ? lat : null,
-                        lon: Number.isFinite(lon) ? lon : null,
-                    };
-                }
-            ),
+            toGeoJSONPoints(trainStops, getStopCoord, (stop) => {
+                const coord = getStopCoord(stop);
+                return {
+                    id: stop?.stopId ?? stop?.id ?? stop?.name,
+                    name: stop?.name ?? "",
+                    stopId: stop?.stopId ?? null,
+                    icon: "train-stop",
+                    lat: coord?.[0] ?? null,
+                    lon: coord?.[1] ?? null,
+                };
+            }),
         [trainStops]
     );
 
     const trainPositionsGeoJSON = useMemo(() => {
-        const currentRouteInfo = selectedVehicle;
-
-        const filtered = (trainPositions || []).filter((train) => {
-            if (filterByRoute && currentRouteInfo?.tripId) {
-                return train.tripId === currentRouteInfo.tripId;
-            }
-            return true;
-        });
+        const filtered =
+            filterByRoute && selectedVehicle?.tripId
+                ? (trainPositions || []).filter(
+                      (t) => t.tripId === selectedVehicle.tripId
+                  )
+                : trainPositions || [];
 
         return toGeoJSONPoints(
             filtered,
-            (train) => {
-                const coord = train?.gpsLocation;
-                if (!coord) return null;
-                const [lng, lat] = String(coord)
-                    .split(",")
-                    .map((value) => Number(value.trim()))
-                    .slice(0, 2);
-                return Number.isFinite(lat) && Number.isFinite(lng)
-                    ? [lat, lng]
-                    : null;
-            },
+            (train) => parseTrainCoord(train?.gpsLocation),
             (train) => ({
                 id: train?.tripId,
                 relation: [train?.from?.name, train?.to?.name]
@@ -507,7 +465,7 @@ const Map = React.memo(function Map({
                 to: JSON.stringify(train?.to ?? null),
             })
         );
-    }, [trainPositions, filterByRoute, selectedVehicleKey]);
+    }, [trainPositions, filterByRoute, selectedVehicle?.tripId]);
 
     useEffect(() => {
         if (mapInstanceRef.current) return;
@@ -680,54 +638,55 @@ const Map = React.memo(function Map({
         const map = mapInstanceRef.current;
         if (!map || !isMapLoaded) return;
 
-        const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
-
-        // Determine which provider's overlay to update based on selected vehicle
-        const isLpp =
-            selectedVehicle?.lineId !== undefined ||
-            selectedVehicle?.geometry?.[0]?.points !== undefined;
-        const isSz =
-            selectedVehicle?.tripShort !== undefined &&
-            selectedVehicle?.lineNumber === undefined;
-        const isIjpp = !isLpp && !isSz && selectedVehicle?.tripId !== undefined;
-
         // Clear all overlays first
-        ["ijpp", "lpp", "sz"].forEach((prefix) =>
-            clearTripOverlay(map, prefix)
-        );
-
+        ["ijpp", "lpp", "sz"].forEach((p) => clearTripOverlay(map, p));
         if (!selectedVehicle) return;
 
-        if (isIjpp) {
-            // IJPP: geometry is direct array of [lng, lat]
-            const lineCoords = (selectedVehicle.geometry || []).filter(
-                (c) => Array.isArray(c) && c.length >= 2
-            );
-            const stopsFeatures = stopsToFeatures(selectedVehicle.stops, brand);
-            updateTripOverlay(map, "ijpp", lineCoords, stopsFeatures, brand);
-        } else if (isLpp) {
-            // LPP: geometry is array with points property, coords are [lat, lng]
-            const lineCoords = Array.isArray(
-                selectedVehicle.geometry?.[0]?.points
-            )
-                ? selectedVehicle.geometry[0].points
-                      .filter((c) => Array.isArray(c) && c.length >= 2)
-                      .map((c) => [c[1], c[0]])
+        const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
+        const geo = selectedVehicle.geometry || [];
+        const validCoord = (c) => Array.isArray(c) && c.length >= 2;
+
+        // Determine provider and update appropriate overlay
+        const hasLppPoints = geo[0]?.points !== undefined;
+        const isLpp = selectedVehicle.lineId !== undefined || hasLppPoints;
+        const isSz =
+            selectedVehicle.tripShort !== undefined &&
+            selectedVehicle.lineNumber === undefined;
+
+        if (isLpp) {
+            const lineCoords = hasLppPoints
+                ? geo[0].points.filter(validCoord).map((c) => [c[1], c[0]])
                 : [];
-            const stopsFeatures = stopsToFeatures(selectedVehicle.stops, "lpp");
-            updateTripOverlay(map, "lpp", lineCoords, stopsFeatures, "lpp");
+            updateTripOverlay(
+                map,
+                "lpp",
+                lineCoords,
+                stopsToFeatures(selectedVehicle.stops, "lpp"),
+                "lpp"
+            );
         } else if (isSz) {
-            // SZ: geometry already [lng, lat], include from/to stops
-            const lineCoords = (selectedVehicle.geometry || []).filter(
-                (c) => Array.isArray(c) && c.length >= 2
-            );
-            const stopsFeatures = stopsToFeatures(
-                selectedVehicle.stops,
+            const lineCoords = geo.filter(validCoord);
+            updateTripOverlay(
+                map,
                 "sz",
-                selectedVehicle.from,
-                selectedVehicle.to
+                lineCoords,
+                stopsToFeatures(
+                    selectedVehicle.stops,
+                    "sz",
+                    selectedVehicle.from,
+                    selectedVehicle.to
+                ),
+                "sz"
             );
-            updateTripOverlay(map, "sz", lineCoords, stopsFeatures, "sz");
+        } else if (selectedVehicle.tripId !== undefined) {
+            const lineCoords = geo.filter(validCoord);
+            updateTripOverlay(
+                map,
+                "ijpp",
+                lineCoords,
+                stopsToFeatures(selectedVehicle.stops, brand),
+                brand
+            );
         }
     }, [selectedVehicle, isMapLoaded]);
 

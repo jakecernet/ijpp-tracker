@@ -189,13 +189,15 @@ function ensureClusterLayers(map, id, color) {
                 "circle-radius": [
                     "step",
                     ["get", "point_count"],
+                    14,
                     10,
-                    20,
-                    13,
+                    18,
                     50,
-                    17,
+                    22,
+                    100,
+                    26,
                 ],
-                "circle-opacity": 0.8,
+                "circle-opacity": 0.85,
             },
         });
     }
@@ -209,7 +211,8 @@ function ensureClusterLayers(map, id, color) {
             layout: {
                 "text-field": ["get", "point_count_abbreviated"],
                 "text-font": ["Open Sans Semibold"],
-                "text-size": 10,
+                "text-size": 12,
+                "text-allow-overlap": true,
             },
             paint: { "text-color": "#ffffff" },
         });
@@ -218,6 +221,10 @@ function ensureClusterLayers(map, id, color) {
 
 function ensurePointLayer(map, id, iconSize, anchor) {
     if (map.getLayer(`${id}-points`)) return;
+
+    // Vehicle layers (buses, trains) should always show on top
+    const isVehicle = id === "buses" || id === "trainPositions";
+
     map.addLayer({
         id: `${id}-points`,
         type: "symbol",
@@ -225,9 +232,11 @@ function ensurePointLayer(map, id, iconSize, anchor) {
         filter: ["!", ["has", "point_count"]],
         layout: {
             "icon-image": ["get", "icon"],
-            "icon-allow-overlap": true,
+            "icon-allow-overlap": isVehicle,
+            "icon-ignore-placement": isVehicle,
             "icon-size": iconSize,
             "icon-anchor": anchor,
+            "symbol-sort-key": isVehicle ? 1 : 0,
         },
     });
 }

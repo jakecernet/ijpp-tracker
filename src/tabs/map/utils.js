@@ -123,3 +123,28 @@ export function stopsToFeatures(stops, brand, includeFrom, includeTo) {
 
     return features;
 }
+
+/**
+ * Parse train gpsLocation string "lng,lat" to [lat, lng]
+ */
+export function parseTrainCoord(gpsLocation) {
+    if (!gpsLocation) return null;
+    const [lng, lat] = String(gpsLocation)
+        .split(",")
+        .map((v) => Number(v.trim()));
+    return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
+}
+
+/**
+ * Get coordinates from stop with gpsLocation array or lat/lon props
+ */
+export function getStopCoord(stop) {
+    if (!stop) return null;
+    const lat = Number(
+        Array.isArray(stop.gpsLocation) ? stop.gpsLocation[0] : stop.lat
+    );
+    const lon = Number(
+        Array.isArray(stop.gpsLocation) ? stop.gpsLocation[1] : stop.lon
+    );
+    return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
+}
