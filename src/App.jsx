@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, MapPin, Route as RouteIcon } from "lucide-react";
+import { Map, MapPin, Route as RouteIcon, Settings2 } from "lucide-react";
 import "./App.css";
 
 import {
@@ -20,11 +20,13 @@ import {
 const MapTab = lazy(() => import("./tabs/map"));
 const StationsTab = lazy(() => import("./tabs/stations"));
 const LinesTab = lazy(() => import("./tabs/lines"));
+const SettingsTab = lazy(() => import("./tabs/settings"));
 
 if (typeof window !== "undefined") {
     import("./tabs/map");
     import("./tabs/stations");
     import("./tabs/lines");
+    import("./tabs/settings");
 }
 
 function App() {
@@ -43,11 +45,59 @@ function App() {
         localStorage.getItem("theme") || "light"
     );
 
+    const [visibility, setVisibility] = useState(() => {
+        try {
+            const saved = localStorage.getItem("mapLayerSettings");
+            if (saved) {
+                const settings = JSON.parse(saved);
+                if (settings.visibility) {
+                    return settings.visibility;
+                }
+            }
+        } catch {}
+        return {
+            buses: true,
+            busStops: true,
+            trainPositions: true,
+            trainStops: true,
+        };
+    });
+
+    const [busOperators, setBusOperators] = useState(() => {
+        try {
+            const saved = localStorage.getItem("mapLayerSettings");
+            if (saved) {
+                const settings = JSON.parse(saved);
+                if (settings.busOperators) {
+                    return settings.busOperators;
+                }
+            }
+        } catch {}
+        return {
+            arriva: true,
+            lpp: true,
+            nomago: true,
+            marprom: true,
+            murska: true,
+            generic: true,
+        };
+    });
+
     useEffect(() => {
         localStorage.getItem("theme")
             ? setTheme(localStorage.getItem("theme"))
             : localStorage.setItem("theme", "light");
     }, [theme]);
+
+    useEffect(() => {
+        try {
+            const payload = {
+                visibility,
+                busOperators,
+            };
+            localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
+        } catch {}
+    }, [visibility, busOperators]);
 
     const [gpsPositions, setGpsPositions] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
@@ -290,6 +340,10 @@ function App() {
                                         selectedVehicle={selectedVehicle}
                                         theme={theme}
                                         setTheme={setTheme}
+                                        visibility={visibility}
+                                        setVisibility={setVisibility}
+                                        busOperators={busOperators}
+                                        setBusOperators={setBusOperators}
                                     />
                                 }
                             />
@@ -308,6 +362,10 @@ function App() {
                                         selectedVehicle={selectedVehicle}
                                         theme={theme}
                                         setTheme={setTheme}
+                                        visibility={visibility}
+                                        setVisibility={setVisibility}
+                                        busOperators={busOperators}
+                                        setBusOperators={setBusOperators}
                                     />
                                 }
                             />
@@ -335,6 +393,18 @@ function App() {
                                     />
                                 }
                             />
+                            <Route
+                                path="/settings"
+                                element={
+                                    <SettingsTab
+                                        visibility={visibility}
+                                        setVisibility={setVisibility}
+                                        busOperators={busOperators}
+                                        setBusOperators={setBusOperators}
+                                        setTheme={setTheme}
+                                    />
+                                }
+                            />
                         </Routes>
                     </Suspense>
                 </div>
@@ -355,6 +425,12 @@ function App() {
                         <button>
                             <RouteIcon size={24} />
                             <h3>Linije</h3>
+                        </button>
+                    </NavLink>
+                    <NavLink to="/settings">
+                        <button>
+                            <Settings2 size={24} />
+                            <h3>Nastavitve</h3>
                         </button>
                     </NavLink>
                 </nav>

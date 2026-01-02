@@ -33,7 +33,6 @@ import {
     configureBusPopup,
     configureTripStopsPopup,
 } from "./map/interactions";
-import LayerSelector from "./map/LayerSelector";
 import RouteTab from "./route.jsx";
 
 import userPNG from "../img/user.png";
@@ -86,6 +85,10 @@ const Map = React.memo(function Map({
     setSelectedVehicle,
     selectedVehicle,
     setTheme,
+    visibility,
+    setVisibility,
+    busOperators,
+    setBusOperators,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
@@ -96,26 +99,11 @@ const Map = React.memo(function Map({
         userLocation || activeStation?.coordinates || DEFAULT_CENTER
     );
 
-    const [showFilter, setShowFilter] = useState(false);
     const [filterByRoute, setFilterByRoute] = useState(false);
     const [routeDrawerOpen, setRouteDrawerOpen] = useState(false);
     const [routeDrawerSnap, setRouteDrawerSnap] = useState("peek");
     const [routeDrawerHeight, setRouteDrawerHeight] = useState(0);
     const [routeDrawerTranslateY, setRouteDrawerTranslateY] = useState(null);
-    const [visibility, setVisibility] = useState({
-        buses: true,
-        busStops: true,
-        trainPositions: true,
-        trainStops: true,
-    });
-    const [busOperators, setBusOperators] = useState({
-        arriva: true,
-        lpp: true,
-        nomago: true,
-        marprom: true,
-        murska: true,
-        generic: true,
-    });
     const prevVisibilityRef = useRef(null);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
@@ -348,13 +336,22 @@ const Map = React.memo(function Map({
 
         // Find the selected vehicle in gpsPositions
         const vehicle = gpsPositions.find((pos) => {
-            if (selectedVehicle.tripId && pos.tripId === selectedVehicle.tripId) {
+            if (
+                selectedVehicle.tripId &&
+                pos.tripId === selectedVehicle.tripId
+            ) {
                 return true;
             }
-            if (selectedVehicle.lineNumber && pos.lineNumber === selectedVehicle.lineNumber) {
+            if (
+                selectedVehicle.lineNumber &&
+                pos.lineNumber === selectedVehicle.lineNumber
+            ) {
                 return true;
             }
-            if (selectedVehicle.lineId && pos.lineId === selectedVehicle.lineId) {
+            if (
+                selectedVehicle.lineId &&
+                pos.lineId === selectedVehicle.lineId
+            ) {
                 return true;
             }
             return false;
@@ -782,15 +779,6 @@ const Map = React.memo(function Map({
         <div>
             <div className="map-container" style={{ position: "relative" }}>
                 <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
-                <LayerSelector
-                    showFilter={showFilter}
-                    setShowFilter={setShowFilter}
-                    visibility={visibility}
-                    setVisibility={setVisibility}
-                    busOperators={busOperators}
-                    setBusOperators={setBusOperators}
-                    setTheme={setTheme}
-                />
                 <div
                     className={
                         routeDrawerOpen

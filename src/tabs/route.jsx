@@ -62,7 +62,7 @@ const RouteTab = ({
                                         "activeStation",
                                         JSON.stringify(payload)
                                     );
-                                    window.location.hash = "/arrivals";
+                                    window.location.hash = "/lines";
                                 }}
                             >
                                 <h3>{stop.name}</h3>
