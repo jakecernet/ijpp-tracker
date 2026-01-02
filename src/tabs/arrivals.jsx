@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { format, formatDistanceToNow, set } from "date-fns";
-import { ar, sl } from "date-fns/locale";
+import { format } from "date-fns";
+import { sl } from "date-fns/locale";
 
 const ArrivalsTab = ({
     activeStation,
@@ -9,18 +9,7 @@ const ArrivalsTab = ({
     szArrivals,
     getTripFromId,
 }) => {
-    const [stationSelected, setStationSelected] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-        const activeStationData = JSON.parse(
-            localStorage.getItem("activeStation")
-        );
-        setStationSelected(
-            activeStationData && activeStationData.id !== 123456789
-        );
-    }, [activeStation]);
 
     // Filtriranje ijpp prihodov
     const filteredArrivals = useMemo(() => {
@@ -120,10 +109,8 @@ const ArrivalsTab = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
             />
-            {error && <p>{error}</p>}
             <div className="arrival-list">
-                {!error &&
-                    allArrivals.map((arrival, index) => (
+                    {allArrivals.map((arrival, index) => (
                         <div
                             key={index}
                             className="arrival-item"

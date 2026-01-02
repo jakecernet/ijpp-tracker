@@ -518,15 +518,15 @@ const fetchSzTrip = async (tripId) => {
                   stops:
                       [
                           startStop,
-                          ...raw[0]?.intermediateStops?.map((stop) => ({
+                          ...(raw[0]?.intermediateStops?.map((stop) => ({
                               name: stop?.name || "",
                               stopId: stop?.stopId || "",
                               gpsLocation: [stop?.lat || 0, stop?.lon || 0],
                               arrival: stop?.arrival || "",
                               departure: stop?.departure || "",
-                          })),
+                          })) || []),
                           endStop,
-                      ] || [],
+                      ],
                   geometry: raw[0]?.legGeometry
                       ? decodePolylineToPoints(
                             raw[0]?.legGeometry?.points || "",
@@ -646,7 +646,7 @@ const fetchSzArrivals = async (stationCode) => {
     try {
         const url = szArrivalsLink + `${encodeURIComponent(stationCode)}&n=100`;
         const raw = await fetchJson(url);
-        const arrivals = (raw?.stopTimes).map((arrival) => ({
+        const arrivals = (raw?.stopTimes || []).map((arrival) => ({
             headsign: arrival?.headsign,
             tripId: arrival?.tripId,
             scheduledDeparture: arrival?.place?.scheduledDeparture,

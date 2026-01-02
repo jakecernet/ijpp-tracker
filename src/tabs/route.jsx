@@ -9,7 +9,6 @@ const RouteTab = ({
     const isSZ = selectedVehicle?.isSZ;
 
     const stops = selectedVehicle?.stops || [];
-    const route = selectedVehicle || {};
 
     const printTime = (timeStr) => {
         if (!timeStr) return "";

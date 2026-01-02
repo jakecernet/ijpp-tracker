@@ -178,20 +178,6 @@ export function configureBusPopup({ map, onSelectVehicle }) {
                         (event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            const rawStops = properties.stops;
-                            let stops = [];
-                            if (Array.isArray(rawStops)) {
-                                stops = rawStops;
-                            } else if (typeof rawStops === "string") {
-                                try {
-                                    stops = JSON.parse(rawStops);
-                                } catch (err) {
-                                    console.warn(
-                                        "Neveljaven format postaj:",
-                                        err
-                                    );
-                                }
-                            }
                             onSelectVehicle({
                                 lineName: properties.lineName || null,
                                 operator: properties.operator || null,
@@ -241,7 +227,7 @@ export function configureLppTripStopsPopup({ map }) {
         const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
         const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        const popup = new maplibregl.Popup({ closeButton: false })
+        new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
@@ -256,7 +242,7 @@ export function configureIjppTripStopsPopup({ map }) {
         const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
         const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        const popup = new maplibregl.Popup({ closeButton: false })
+        new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
@@ -271,7 +257,7 @@ export function configureSzTripStopsPopup({ map }) {
         const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
         const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        const popup = new maplibregl.Popup({ closeButton: false })
+        new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
