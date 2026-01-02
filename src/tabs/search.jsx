@@ -4,6 +4,8 @@ import { Bus, Train, Heart } from "lucide-react";
 const LIKED_STATIONS_KEY = "likedStations";
 const LIKED_ROUTES_KEY = "likedRoutes";
 
+const lppRoutesApiUrl = "https://tracker.cernetic.cc/api/lpp-all-routes";
+
 const loadLikedItems = (key) => {
     try {
         const stored = localStorage.getItem(key);
@@ -68,6 +70,28 @@ const SearchTab = ({
 
         return uniqueRoutes;
     }, [gpsPositions, trainPositions]);
+
+    const fetchLppRoutes = async () => {
+        try {
+            const response = await fetch(lppRoutesApiUrl);
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+            return data;
+        } catch {
+            return [];
+        }
+    };
+
+    const [lppNumberedRoutes, setLppNumberedRoutes] = useState([]);
+
+    useEffect(() => {
+        const loadLppRoutes = async () => {
+            const raw = (await fetchLppRoutes()) || [];
+            const routes = raw?.data || [];
+            setLppNumberedRoutes(routes);
+        };
+        loadLppRoutes();
+    }, []);
 
     const [filtered, setFiltered] = useState([]);
 
@@ -139,7 +163,22 @@ const SearchTab = ({
     );
 
     useEffect(() => {
-        if (searchTerm.length < 3) {
+        if (searchTerm.length < 3 && searchTerm.length > 0) {
+            if (!lines) {
+                setFiltered([]);
+                return;
+            }
+            const filteredLpp = lppNumberedRoutes.filter((route) =>
+                route?.route_number
+                    ?.toString()
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase())
+            );
+            setFiltered(filteredLpp);
+            return;
+        }
+
+        if (searchTerm.length === 0) {
             setFiltered([]);
             return;
         }
@@ -158,7 +197,14 @@ const SearchTab = ({
               )
             : [];
         setFiltered([...filteredStations, ...filteredRoutes]);
-    }, [searchTerm, allStations, allRoutes, stations, lines]);
+    }, [
+        searchTerm,
+        allStations,
+        allRoutes,
+        stations,
+        lines,
+        lppNumberedRoutes,
+    ]);
 
     const StationItem = ({ busStop, onSelect, isLiked, onToggleLike }) => (
         <div className="station-item-search" onClick={onSelect}>
@@ -377,12 +423,35 @@ const SearchTab = ({
                         </div>
                     </div>
                     <div className="results">
-                        {searchTerm.length < 3 && <p>Vnesite vsaj 3 znake.</p>}
-                        {filtered.length === 0 && searchTerm.length >= 3 && (
+                        {searchTerm.length >= 3 && filtered.length === 0 && (
                             <p>Ni rezultatov.</p>
+                        )}
+                        {searchTerm.length < 3 && filtered.length === 0 && (
+                            <p>Vnesite vsaj 3 znake ali številko linije.</p>
                         )}
                         <ul>
                             {filtered.map((item, index) => {
+                                if (item.route_number && lines) {
+                                    const routeData = {
+                                        lineName: item.route_name,
+                                        lineNumber: item.route_number,
+                                        tripId: item.trip_id,
+                                        routeId: item.route_id,
+                                        lineId: item.route_id,
+                                        operator:
+                                            "Ljubljanski potniški promet d.o.o.",
+                                    };
+                                    return (
+                                        <RouteItem
+                                            key={`lpp-route-${index}`}
+                                            item={routeData}
+                                            isLiked={isRouteLiked(routeData)}
+                                            onToggleLike={(e) =>
+                                                toggleLikeRoute(routeData, e)
+                                            }
+                                        />
+                                    );
+                                }
                                 const routeName =
                                     item.lineName || item.route_name;
                                 if (routeName && lines) {
