@@ -25,6 +25,10 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
         loadLikedItems(LIKED_STATIONS_KEY)
     );
     const [distancesCalculated, setDistancesCalculated] = useState(false);
+    const [radius] = useState(() => {
+        const stored = localStorage.getItem("stationRadius");
+        return stored ? JSON.parse(stored) : { busRadius: 5, szRadius: 20 };
+    });
 
     // Calculate distances for near me
     useEffect(() => {
@@ -99,7 +103,8 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
         if (!distancesCalculated) return [];
         return allStations
             .filter((stop) => {
-                const maxDistance = stop.type === "bus" ? 5 : 20;
+                const maxDistance =
+                    stop.type === "bus" ? radius?.busRadius : radius?.szRadius;
                 return stop.distance <= maxDistance && stop.distance > 0;
             })
             .filter((stop) =>
