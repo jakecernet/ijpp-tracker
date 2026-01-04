@@ -533,7 +533,7 @@ const Map = React.memo(function Map({
                         "activeStation",
                         JSON.stringify(payload)
                     );
-                    window.location.hash = "/arrivals";
+                    window.location.hash = "/lines";
                 },
             });
 
@@ -565,7 +565,7 @@ const Map = React.memo(function Map({
                         "activeStation",
                         JSON.stringify(payload)
                     );
-                    window.location.hash = "/arrivals";
+                    window.location.hash = "/lines";
                 },
             });
 
