@@ -10,22 +10,30 @@ import {
     OSM_RASTER_STYLE_DARK,
     OSM_RASTER_STYLE_LIGHT,
 } from "./map/config";
-import { toGeoJSONPoints, ensureIcons } from "./map/utils";
+import {
+    toGeoJSONPoints,
+    ensureIcons,
+    stopsToFeatures,
+    parseTrainCoord,
+    getStopCoord,
+} from "./map/utils";
 import {
     setupSourcesAndLayers,
     updateSourceData,
     setPrefixVisible,
+    setupTripOverlay,
+    clearTripOverlay,
+    updateTripOverlay,
+    BRAND_COLOR_EXPR,
 } from "./map/layers";
 import {
     configureBusStopPopup,
     configureTrainStopPopup,
     configureTrainPopup,
     configureBusPopup,
-    configureLppTripStopsPopup,
-    configureIjppTripStopsPopup,
-    configureSzTripStopsPopup,
+    configureTripStopsPopup,
 } from "./map/interactions";
-import LayerSelector from "./map/LayerSelector";
+import RouteTab from "./route.jsx";
 
 import userPNG from "../img/user.png";
 import locationPNG from "../img/location.png";
@@ -75,43 +83,229 @@ const Map = React.memo(function Map({
     userLocation,
     trainPositions,
     setSelectedVehicle,
-    ijppTrip,
-    lppRoute,
-    szRoute,
-    theme,
+    selectedVehicle,
     setTheme,
+    visibility,
+    setVisibility,
+    busOperators,
+    setBusOperators,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
     const handlersRef = useRef({ setActiveStation, setSelectedVehicle });
+    const routeDrawerRef = useRef(null);
     const initialCenterRef = useRef(
         userLocation || activeStation?.coordinates || DEFAULT_CENTER
     );
 
-    const [showFilter, setShowFilter] = useState(false);
     const [filterByRoute, setFilterByRoute] = useState(false);
-    const [visibility, setVisibility] = useState({
-        buses: true,
-        busStops: true,
-        trainPositions: true,
-        trainStops: true,
-    });
-    const [busOperators, setBusOperators] = useState({
-        arriva: true,
-        lpp: true,
-        nomago: true,
-        marprom: true,
-        murska: true,
-        generic: true,
-    });
+    const [routeDrawerOpen, setRouteDrawerOpen] = useState(false);
+    const [routeDrawerSnap, setRouteDrawerSnap] = useState("peek");
+    const [routeDrawerHeight, setRouteDrawerHeight] = useState(0);
+    const [routeDrawerTranslateY, setRouteDrawerTranslateY] = useState(null);
     const prevVisibilityRef = useRef(null);
+    const [isMapLoaded, setIsMapLoaded] = useState(false);
 
     useEffect(() => {
         handlersRef.current = { setActiveStation, setSelectedVehicle };
     }, [setActiveStation, setSelectedVehicle]);
 
-    // Restore persisted layer settings (visibility, operators, filter)
+    useEffect(() => {
+        try {
+            const requested = sessionStorage.getItem("openRouteDrawer") === "1";
+            if (!requested) return;
+            sessionStorage.removeItem("openRouteDrawer");
+            setRouteDrawerOpen(true);
+            setRouteDrawerSnap("peek");
+        } catch {}
+    }, []);
+
+    const selectedVehicleKey = useMemo(() => {
+        if (!selectedVehicle) return null;
+
+        if (selectedVehicle.tripId != null) {
+            return String(selectedVehicle.tripId);
+        }
+
+        return JSON.stringify({
+            lineNumber: selectedVehicle.lineNumber ?? null,
+            lineId: selectedVehicle.lineId ?? null,
+            routeId: selectedVehicle.routeId ?? null,
+            vehicleId: selectedVehicle.vehicleId ?? null,
+            from:
+                selectedVehicle.from?.stopId ??
+                selectedVehicle.from?.name ??
+                null,
+            to: selectedVehicle.to?.stopId ?? selectedVehicle.to?.name ?? null,
+        });
+    }, [selectedVehicle]);
+
+    const didMountRef = useRef(false);
+    const lastSelectedVehicleKeyRef = useRef(null);
+
+    // Auto-open
+    useEffect(() => {
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            lastSelectedVehicleKeyRef.current = selectedVehicleKey;
+            return;
+        }
+
+        if (!selectedVehicleKey) {
+            lastSelectedVehicleKeyRef.current = null;
+            return;
+        }
+
+        if (lastSelectedVehicleKeyRef.current !== selectedVehicleKey) {
+            lastSelectedVehicleKeyRef.current = selectedVehicleKey;
+            setRouteDrawerOpen(true);
+            setRouteDrawerSnap("peek");
+        }
+    }, [selectedVehicleKey]);
+    // When the drawer is open for a selected route, show only the route path + route stops overlays.
+    // (Arrivals selection bypasses map popups that normally set this up.)
+    useEffect(() => {
+        if (!routeDrawerOpen) return;
+        if (!selectedVehicle) return;
+
+        const operatorText =
+            typeof selectedVehicle?.operator === "string"
+                ? selectedVehicle.operator.toLowerCase()
+                : "";
+        const isTrainRoute =
+            selectedVehicle?.brand === "sz" ||
+            operatorText.includes("sž") ||
+            operatorText.includes("slovenske železnice") ||
+            (selectedVehicle?.tripShort != null &&
+                selectedVehicle?.lineNumber == null &&
+                selectedVehicle?.lineId == null);
+
+        setFilterByRoute(true);
+        setVisibility((current) => {
+            const target = {
+                buses: !isTrainRoute,
+                busStops: false,
+                trainPositions: isTrainRoute,
+                trainStops: false,
+            };
+
+            const isAlreadyFocused =
+                current &&
+                current.buses === target.buses &&
+                current.busStops === target.busStops &&
+                current.trainPositions === target.trainPositions &&
+                current.trainStops === target.trainStops;
+
+            if (!isAlreadyFocused) {
+                prevVisibilityRef.current = current;
+            }
+
+            return target;
+        });
+    }, [routeDrawerOpen, selectedVehicleKey, selectedVehicle]);
+
+    // Measure drawer height
+    useEffect(() => {
+        const el = routeDrawerRef.current;
+        if (!el) return;
+
+        const update = () => {
+            const next = Math.round(el.getBoundingClientRect().height);
+            if (Number.isFinite(next) && next > 0) setRouteDrawerHeight(next);
+        };
+
+        update();
+
+        if (typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(() => update());
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    const routeDrawerPeekHeight = 140;
+    const routeDrawerPeekTranslateY = useMemo(() => {
+        if (!routeDrawerHeight) return 0;
+        return Math.max(0, routeDrawerHeight - routeDrawerPeekHeight);
+    }, [routeDrawerHeight]);
+
+    // Apply snap when opening/closing or when height changes.
+    useEffect(() => {
+        if (!routeDrawerOpen) {
+            setRouteDrawerTranslateY(null);
+            return;
+        }
+
+        if (routeDrawerSnap === "full") {
+            setRouteDrawerTranslateY(0);
+            return;
+        }
+
+        setRouteDrawerTranslateY(routeDrawerPeekTranslateY);
+    }, [routeDrawerOpen, routeDrawerSnap, routeDrawerPeekTranslateY]);
+
+    const dragStateRef = useRef({
+        dragging: false,
+        startY: 0,
+        startTranslateY: 0,
+    });
+
+    const prevRouteDrawerOpenRef = useRef(false);
+
+    const onRouteDrawerPointerDown = (e) => {
+        if (!routeDrawerOpen) return;
+        if (e.button != null && e.button !== 0) return;
+
+        const startTranslate =
+            routeDrawerTranslateY != null
+                ? routeDrawerTranslateY
+                : routeDrawerSnap === "full"
+                ? 0
+                : routeDrawerPeekTranslateY;
+
+        dragStateRef.current = {
+            dragging: true,
+            startY: e.clientY,
+            startTranslateY: startTranslate,
+        };
+
+        try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
+    };
+
+    const onRouteDrawerPointerMove = (e) => {
+        if (!dragStateRef.current.dragging) return;
+
+        const delta = e.clientY - dragStateRef.current.startY;
+        const next = dragStateRef.current.startTranslateY + delta;
+
+        const maxY = routeDrawerHeight || routeDrawerPeekTranslateY;
+        const clamped = Math.min(maxY, Math.max(0, next));
+        setRouteDrawerTranslateY(clamped);
+    };
+
+    const onRouteDrawerPointerUpOrCancel = () => {
+        if (!dragStateRef.current.dragging) return;
+        dragStateRef.current.dragging = false;
+
+        const y =
+            routeDrawerTranslateY != null
+                ? routeDrawerTranslateY
+                : routeDrawerPeekTranslateY;
+
+        const dismissThreshold = routeDrawerPeekTranslateY + 60;
+        if (y >= dismissThreshold) {
+            resetRouteView();
+            setRouteDrawerOpen(false);
+            return;
+        }
+
+        const threshold = routeDrawerPeekTranslateY / 2;
+        if (y <= threshold) setRouteDrawerSnap("full");
+        else setRouteDrawerSnap("peek");
+    };
+
     useEffect(() => {
         try {
             const raw = localStorage.getItem("mapLayerSettings");
@@ -133,83 +327,94 @@ const Map = React.memo(function Map({
                         ...settings.busOperators,
                     }));
                 }
-                if (typeof settings.filterByRoute === "boolean") {
-                    setFilterByRoute(settings.filterByRoute);
-                }
             }
         } catch {}
     }, []);
 
+    const selectedVehicleCoords = useMemo(() => {
+        if (!selectedVehicle || !gpsPositions) return null;
+
+        // Find the selected vehicle in gpsPositions
+        const vehicle = gpsPositions.find((pos) => {
+            if (
+                selectedVehicle.tripId &&
+                pos.tripId === selectedVehicle.tripId
+            ) {
+                return true;
+            }
+            if (
+                selectedVehicle.lineNumber &&
+                pos.lineNumber === selectedVehicle.lineNumber
+            ) {
+                return true;
+            }
+            if (
+                selectedVehicle.lineId &&
+                pos.lineId === selectedVehicle.lineId
+            ) {
+                return true;
+            }
+            return false;
+        });
+
+        return vehicle?.gpsLocation || null;
+    }, [selectedVehicle, gpsPositions]);
+
     const center = useMemo(
-        () => activeStation?.coordinates || userLocation || DEFAULT_CENTER,
-        [activeStation, userLocation]
+        () => selectedVehicleCoords || userLocation || DEFAULT_CENTER,
+        [selectedVehicleCoords, userLocation]
     );
 
     const busesGeoJSON = useMemo(() => {
-        let currentRouteInfo = null;
-        try {
-            const stored = localStorage.getItem("selectedBusRoute");
-            if (stored) currentRouteInfo = JSON.parse(stored);
-        } catch (error) {
-            console.log("[v0] Error reading route from localStorage:", error);
-        }
-
-        const filtered = (gpsPositions || []).filter((position) => {
-            const brandKey = operatorToIcon[position?.operator] || "generic";
+        const filtered = (gpsPositions || []).filter((pos) => {
+            const brandKey = operatorToIcon[pos?.operator] || "generic";
             if (!busOperators[brandKey]) return false;
 
-            if (filterByRoute && currentRouteInfo) {
-                if (
-                    position.lineNumber !== undefined ||
-                    position.lineId !== undefined
+            if (filterByRoute && selectedVehicle) {
+                const hasLine =
+                    pos.lineNumber !== undefined || pos.lineId !== undefined;
+                if (hasLine) {
+                    const match =
+                        (selectedVehicle.lineNumber &&
+                            pos.lineNumber === selectedVehicle.lineNumber) ||
+                        (selectedVehicle.routeName &&
+                            pos.lineNumber === selectedVehicle.routeName) ||
+                        (selectedVehicle.tripId &&
+                            pos.tripId === selectedVehicle.tripId);
+                    if (!match) return false;
+                } else if (
+                    pos.tripId !== undefined &&
+                    selectedVehicle.tripId &&
+                    pos.tripId !== selectedVehicle.tripId
                 ) {
-                    const routeMatch =
-                        (currentRouteInfo.lineNumber &&
-                            position.lineNumber ===
-                                currentRouteInfo.lineNumber) ||
-                        (currentRouteInfo.routeName &&
-                            position.lineNumber ===
-                                currentRouteInfo.routeName) ||
-                        (currentRouteInfo.tripId &&
-                            position.tripId === currentRouteInfo.tripId);
-                    if (!routeMatch) return false;
-                } else if (position.tripId !== undefined) {
-                    if (
-                        currentRouteInfo.tripId &&
-                        position.tripId !== currentRouteInfo.tripId
-                    )
-                        return false;
+                    return false;
                 }
             }
-
             return true;
         });
 
         return toGeoJSONPoints(
             filtered,
-            (position) => position?.gpsLocation,
-            (position) => {
-                const props = { ...position };
-                delete props.gpsLocation;
-
+            (pos) => pos?.gpsLocation,
+            (pos) => {
+                const icon = operatorToIcon[pos?.operator] || "bus-generic";
                 const isLpp =
-                    (typeof position?.operator === "string" &&
-                        position.operator
-                            .toLowerCase()
-                            .includes("ljubljanski potniški promet")) ||
-                    position?.lineNumber !== undefined ||
-                    position?.lineId !== undefined;
-
-                props.sourceType = isLpp ? "lpp" : "ijpp";
-                props.icon =
-                    operatorToIcon[position?.operator] || "bus-generic";
-                props.brand = operatorToIcon[position?.operator] || "generic";
-                props.operator = position?.operator || "";
-
-                return props;
+                    pos?.operator
+                        ?.toLowerCase?.()
+                        .includes("ljubljanski potniški promet") ||
+                    pos?.lineNumber !== undefined ||
+                    pos?.lineId !== undefined;
+                return {
+                    ...pos,
+                    gpsLocation: undefined,
+                    sourceType: isLpp ? "lpp" : "ijpp",
+                    icon,
+                    brand: icon === "bus-generic" ? "generic" : icon,
+                    operator: pos?.operator || "",
+                };
             }
         );
-    }, [gpsPositions, busOperators, filterByRoute]);
+    }, [gpsPositions, busOperators, filterByRoute, selectedVehicle]);
 
     const busStopsGeoJSON = useMemo(
         () =>
@@ -234,74 +439,31 @@ const Map = React.memo(function Map({
 
     const trainStopsGeoJSON = useMemo(
         () =>
-            toGeoJSONPoints(
-                trainStops,
-                (stop) => {
-                    const lat = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[0]
-                            : stop?.lat
-                    );
-                    const lon = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[1]
-                            : stop?.lon
-                    );
-                    return Number.isFinite(lat) && Number.isFinite(lon)
-                        ? [lat, lon]
-                        : null;
-                },
-                (stop) => {
-                    const lat = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[0]
-                            : stop?.lat
-                    );
-                    const lon = Number(
-                        Array.isArray(stop?.gpsLocation)
-                            ? stop.gpsLocation[1]
-                            : stop?.lon
-                    );
-                    return {
-                        id: stop?.stopId ?? stop?.id ?? stop?.name,
-                        name: stop?.name ?? "",
-                        stopId: stop?.stopId ?? null,
-                        icon: "train-stop",
-                        lat: Number.isFinite(lat) ? lat : null,
-                        lon: Number.isFinite(lon) ? lon : null,
-                    };
-                }
-            ),
+            toGeoJSONPoints(trainStops, getStopCoord, (stop) => {
+                const coord = getStopCoord(stop);
+                return {
+                    id: stop?.stopId ?? stop?.id ?? stop?.name,
+                    name: stop?.name ?? "",
+                    stopId: stop?.stopId ?? null,
+                    icon: "train-stop",
+                    lat: coord?.[0] ?? null,
+                    lon: coord?.[1] ?? null,
+                };
+            }),
         [trainStops]
     );
 
     const trainPositionsGeoJSON = useMemo(() => {
-        let currentRouteInfo = null;
-        try {
-            const stored = localStorage.getItem("selectedBusRoute");
-            if (stored) currentRouteInfo = JSON.parse(stored);
-        } catch {}
-
-        const filtered = (trainPositions || []).filter((train) => {
-            if (filterByRoute && currentRouteInfo?.tripId) {
-                return train.tripId === currentRouteInfo.tripId;
-            }
-            return true;
-        });
+        const filtered =
+            filterByRoute && selectedVehicle?.tripId
+                ? (trainPositions || []).filter(
+                      (t) => t.tripId === selectedVehicle.tripId
+                  )
+                : trainPositions || [];
 
         return toGeoJSONPoints(
             filtered,
-            (train) => {
-                const coord = train?.gpsLocation;
-                if (!coord) return null;
-                const [lng, lat] = String(coord)
-                    .split(",")
-                    .map((value) => Number(value.trim()))
-                    .slice(0, 2);
-                return Number.isFinite(lat) && Number.isFinite(lng)
-                    ? [lat, lng]
-                    : null;
-            },
+            (train) => parseTrainCoord(train?.gpsLocation),
             (train) => ({
                 id: train?.tripId,
                 relation: [train?.from?.name, train?.to?.name]
@@ -320,7 +482,7 @@ const Map = React.memo(function Map({
                 to: JSON.stringify(train?.to ?? null),
             })
         );
-    }, [trainPositions, filterByRoute]);
+    }, [trainPositions, filterByRoute, selectedVehicle?.tripId]);
 
     useEffect(() => {
         if (mapInstanceRef.current) return;
@@ -349,249 +511,10 @@ const Map = React.memo(function Map({
                 trainStops: trainStopsGeoJSON,
             });
 
-            // Setup IJPP trip overlay sources
-            if (!map.getSource("ijpp-trip-line-src")) {
-                map.addSource("ijpp-trip-line-src", {
-                    type: "geojson",
-                    data: {
-                        type: "Feature",
-                        geometry: { type: "LineString", coordinates: [] },
-                        properties: {},
-                    },
-                });
-            }
-            if (!map.getLayer("ijpp-trip-line")) {
-                map.addLayer({
-                    id: "ijpp-trip-line",
-                    type: "line",
-                    source: "ijpp-trip-line-src",
-                    paint: {
-                        "line-color": "#1976d2",
-                        "line-width": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            10,
-                            3,
-                            14,
-                            5,
-                            16,
-                            7,
-                        ],
-                        "line-opacity": 0.9,
-                    },
-                    layout: { "line-cap": "round", "line-join": "round" },
-                });
-            }
-
-            if (!map.getSource("ijpp-trip-stops-src")) {
-                map.addSource("ijpp-trip-stops-src", {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            if (!map.getLayer("ijpp-trip-stops-points")) {
-                map.addLayer({
-                    id: "ijpp-trip-stops-points",
-                    type: "symbol",
-                    source: "ijpp-trip-stops-src",
-                    layout: {
-                        "icon-image": "route-stop",
-                        "icon-size": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            8,
-                            0.22,
-                            12,
-                            0.3,
-                            14,
-                            0.38,
-                            16,
-                            0.46,
-                        ],
-                        "icon-anchor": "bottom",
-                        "icon-allow-overlap": true,
-                    },
-                });
-            }
-
-            // Setup LPP trip overlay sources
-            if (!map.getSource("lpp-trip-line-src")) {
-                map.addSource("lpp-trip-line-src", {
-                    type: "geojson",
-                    data: {
-                        type: "Feature",
-                        geometry: { type: "LineString", coordinates: [] },
-                        properties: {},
-                    },
-                });
-            }
-            if (!map.getLayer("lpp-trip-line")) {
-                map.addLayer({
-                    id: "lpp-trip-line",
-                    type: "line",
-                    source: "lpp-trip-line-src",
-                    paint: {
-                        "line-color": "#2e7d32",
-                        "line-width": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            10,
-                            3,
-                            14,
-                            5,
-                            16,
-                            7,
-                        ],
-                        "line-opacity": 0.9,
-                    },
-                    layout: { "line-cap": "round", "line-join": "round" },
-                });
-            }
-            if (!map.getSource("lpp-trip-stops-src")) {
-                map.addSource("lpp-trip-stops-src", {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            if (!map.getLayer("lpp-trip-stops-points")) {
-                map.addLayer({
-                    id: "lpp-trip-stops-points",
-                    type: "symbol",
-                    source: "lpp-trip-stops-src",
-                    layout: {
-                        "icon-image": "route-stop",
-                        "icon-size": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            8,
-                            0.22,
-                            12,
-                            0.3,
-                            14,
-                            0.38,
-                            16,
-                            0.46,
-                        ],
-                        "icon-anchor": "bottom",
-                        "icon-allow-overlap": true,
-                    },
-                });
-            }
-
-            // Setup SZ trip overlay sources
-            if (!map.getSource("sz-trip-line-src")) {
-                map.addSource("sz-trip-line-src", {
-                    type: "geojson",
-                    data: {
-                        type: "Feature",
-                        geometry: { type: "LineString", coordinates: [] },
-                        properties: {},
-                    },
-                });
-            }
-            if (!map.getLayer("sz-trip-line")) {
-                map.addLayer({
-                    id: "sz-trip-line",
-                    type: "line",
-                    source: "sz-trip-line-src",
-                    paint: {
-                        "line-color": "#29ace2",
-                        "line-width": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            10,
-                            3,
-                            14,
-                            5,
-                            16,
-                            7,
-                        ],
-                        "line-opacity": 0.9,
-                    },
-                    layout: { "line-cap": "round", "line-join": "round" },
-                });
-            }
-            if (!map.getSource("sz-trip-stops-src")) {
-                map.addSource("sz-trip-stops-src", {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            if (!map.getLayer("sz-trip-stops-points")) {
-                map.addLayer({
-                    id: "sz-trip-stops-points",
-                    type: "symbol",
-                    source: "sz-trip-stops-src",
-                    layout: {
-                        "icon-image": "route-stop",
-                        "icon-size": [
-                            "interpolate",
-                            ["linear"],
-                            ["zoom"],
-                            8,
-                            0.22,
-                            12,
-                            0.3,
-                            14,
-                            0.38,
-                            16,
-                            0.46,
-                        ],
-                        "icon-anchor": "bottom",
-                        "icon-allow-overlap": true,
-                    },
-                });
-            }
-
-            // Restore persisted IJPP trip overlay
-            try {
-                const persisted = JSON.parse(
-                    localStorage.getItem("ijppTripOverlay") || "null"
-                );
-                if (persisted && typeof persisted === "object") {
-                    const lineSource = map.getSource("ijpp-trip-line-src");
-                    const stopsSource = map.getSource("ijpp-trip-stops-src");
-                    if (lineSource && lineSource.setData && persisted.line)
-                        lineSource.setData(persisted.line);
-                    if (stopsSource && stopsSource.setData && persisted.stops)
-                        stopsSource.setData(persisted.stops);
-                }
-            } catch {}
-
-            // Restore persisted LPP trip overlay
-            try {
-                const persisted = JSON.parse(
-                    localStorage.getItem("lppTripOverlay") || "null"
-                );
-                if (persisted && typeof persisted === "object") {
-                    const lineSource = map.getSource("lpp-trip-line-src");
-                    const stopsSource = map.getSource("lpp-trip-stops-src");
-                    if (lineSource && lineSource.setData && persisted.line)
-                        lineSource.setData(persisted.line);
-                    if (stopsSource && stopsSource.setData && persisted.stops)
-                        stopsSource.setData(persisted.stops);
-                }
-            } catch {}
-
-            // Restore persisted SZ trip overlay
-            try {
-                const persisted = JSON.parse(
-                    localStorage.getItem("szTripOverlay") || "null"
-                );
-                if (persisted && typeof persisted === "object") {
-                    const lineSource = map.getSource("sz-trip-line-src");
-                    const stopsSource = map.getSource("sz-trip-stops-src");
-                    if (lineSource && lineSource.setData && persisted.line)
-                        lineSource.setData(persisted.line);
-                    if (stopsSource && stopsSource.setData && persisted.stops)
-                        stopsSource.setData(persisted.stops);
-                }
-            } catch {}
+            // Setup trip overlays for all providers
+            ["ijpp", "lpp", "sz"].forEach((prefix) =>
+                setupTripOverlay(map, prefix, BRAND_COLOR_EXPR)
+            );
 
             // Configure all popups
             configureBusStopPopup({
@@ -649,14 +572,6 @@ const Map = React.memo(function Map({
             configureTrainPopup({
                 map,
                 onSelectVehicle: (vehicle) => {
-                    try {
-                        localStorage.setItem(
-                            "selectedBusRoute",
-                            JSON.stringify(vehicle)
-                        );
-                    } catch (err) {
-                        console.warn("Shranjevanje ni uspelo:", err);
-                    }
                     handlersRef.current.setSelectedVehicle(vehicle);
                     // Enable route-only SZ view and hide buses & stations
                     prevVisibilityRef.current = visibility;
@@ -668,22 +583,11 @@ const Map = React.memo(function Map({
                         trainStops: false,
                     });
                 },
-                onNavigateRoute: () => {
-                    window.location.hash = "/route";
-                },
             });
 
             configureBusPopup({
                 map,
                 onSelectVehicle: (vehicle) => {
-                    try {
-                        localStorage.setItem(
-                            "selectedBusRoute",
-                            JSON.stringify(vehicle)
-                        );
-                    } catch (err) {
-                        console.warn("Shranjevanje ni uspelo:", err);
-                    }
                     handlersRef.current.setSelectedVehicle(vehicle);
                     // Enable route-only bus view and hide stations & SZ markers
                     prevVisibilityRef.current = visibility;
@@ -695,60 +599,14 @@ const Map = React.memo(function Map({
                         trainStops: false,
                     });
                 },
-                onNavigateRoute: () => {
-                    window.location.hash = "/route";
-                },
             });
 
-            configureIjppTripStopsPopup({
-                map,
-                onNavigateRoute: () => {
-                    // Enable route-only bus view when navigating from IJPP route stops
-                    prevVisibilityRef.current = visibility;
-                    setFilterByRoute(true);
-                    setVisibility({
-                        buses: true,
-                        busStops: false,
-                        trainPositions: false,
-                        trainStops: false,
-                    });
-                    window.location.hash = "/route";
-                },
-            });
+            // Configure trip stops popups for all providers
+            ["ijpp", "lpp", "sz"].forEach((prefix) =>
+                configureTripStopsPopup(map, `${prefix}-trip-stops-points`)
+            );
 
-            // Add popup for LPP route stop markers
-            configureLppTripStopsPopup({
-                map,
-                onNavigateRoute: () => {
-                    // Enable route-only bus view when navigating from LPP route stops
-                    prevVisibilityRef.current = visibility;
-                    setFilterByRoute(true);
-                    setVisibility({
-                        buses: true,
-                        busStops: false,
-                        trainPositions: false,
-                        trainStops: false,
-                    });
-                    window.location.hash = "/route";
-                },
-            });
-
-            // Add popup for SZ route stop markers
-            configureSzTripStopsPopup({
-                map,
-                onNavigateRoute: () => {
-                    // Enable route-only SZ view when navigating from SZ route stops
-                    prevVisibilityRef.current = visibility;
-                    setFilterByRoute(true);
-                    setVisibility({
-                        buses: false,
-                        busStops: false,
-                        trainPositions: true,
-                        trainStops: false,
-                    });
-                    window.location.hash = "/route";
-                },
-            });
+            setIsMapLoaded(true);
         });
 
         return () => {
@@ -780,238 +638,74 @@ const Map = React.memo(function Map({
         setPrefixVisible(map, "busStops", visibility.busStops);
         setPrefixVisible(map, "trainStops", visibility.trainStops);
         setPrefixVisible(map, "trainPositions", visibility.trainPositions);
-    }, [visibility]);
+    }, [visibility, isMapLoaded]);
 
-    // Persist layer settings as a single localStorage item
     useEffect(() => {
         try {
             const payload = {
                 visibility,
                 busOperators,
-                filterByRoute,
             };
             localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
         } catch {}
     }, [visibility, busOperators, filterByRoute]);
 
-    // Update IJPP trip overlays
+    // Update all trip overlays in a single effect
     useEffect(() => {
         const map = mapInstanceRef.current;
-        if (!map) return;
+        if (!map || !isMapLoaded) return;
 
-        const lineSource = map.getSource("ijpp-trip-line-src");
-        const stopsSource = map.getSource("ijpp-trip-stops-src");
+        // Clear all overlays first
+        ["ijpp", "lpp", "sz"].forEach((p) => clearTripOverlay(map, p));
+        if (!selectedVehicle) return;
 
-        const lineData = ijppTrip?.geometry?.length
-            ? {
-                  type: "Feature",
-                  geometry: {
-                      type: "LineString",
-                      coordinates: ijppTrip.geometry.filter(
-                          (c) => Array.isArray(c) && c.length >= 2
-                      ),
-                  },
-                  properties: {},
-              }
-            : {
-                  type: "Feature",
-                  geometry: { type: "LineString", coordinates: [] },
-                  properties: {},
-              };
+        const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
+        const geo = selectedVehicle.geometry || [];
+        const validCoord = (c) => Array.isArray(c) && c.length >= 2;
 
-        const stopsData = {
-            type: "FeatureCollection",
-            features: Array.isArray(ijppTrip?.stops)
-                ? ijppTrip.stops
-                      .map((s) => {
-                          const coord = Array.isArray(s?.gpsLocation)
-                              ? s.gpsLocation
-                              : null;
-                          if (
-                              !coord ||
-                              !Number.isFinite(coord[0]) ||
-                              !Number.isFinite(coord[1])
-                          )
-                              return null;
-                          return {
-                              type: "Feature",
-                              geometry: {
-                                  type: "Point",
-                                  coordinates: [coord[1], coord[0]],
-                              },
-                              properties: { name: s?.name || "" },
-                          };
-                      })
-                      .filter(Boolean)
-                : [],
-        };
+        // Determine provider and update appropriate overlay
+        const hasLppPoints = geo[0]?.points !== undefined;
+        const isLpp = selectedVehicle.lineId !== undefined || hasLppPoints;
+        const isSz =
+            selectedVehicle.tripShort !== undefined &&
+            selectedVehicle.lineNumber === undefined;
 
-        if (lineSource && lineSource.setData) lineSource.setData(lineData);
-        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-
-        try {
-            localStorage.setItem(
-                "ijppTripOverlay",
-                JSON.stringify({ line: lineData, stops: stopsData })
+        if (isLpp) {
+            const lineCoords = hasLppPoints
+                ? geo[0].points.filter(validCoord).map((c) => [c[1], c[0]])
+                : [];
+            updateTripOverlay(
+                map,
+                "lpp",
+                lineCoords,
+                stopsToFeatures(selectedVehicle.stops, "lpp"),
+                "lpp"
             );
-        } catch {}
-    }, [ijppTrip]);
-
-    // Update LPP trip overlays
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-
-        const lineSource = map.getSource("lpp-trip-line-src");
-        const stopsSource = map.getSource("lpp-trip-stops-src");
-
-        const lineCoords = Array.isArray(lppRoute?.geometry?.[0]?.points)
-            ? lppRoute.geometry[0].points
-                  .filter((c) => Array.isArray(c) && c.length >= 2)
-                  .map((c) => [c[1], c[0]])
-            : [];
-
-        const lineData = {
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: lineCoords },
-            properties: {},
-        };
-
-        const stopsData = {
-            type: "FeatureCollection",
-            features: Array.isArray(lppRoute?.stops)
-                ? lppRoute.stops
-                      .map((s) => {
-                          let coord = null;
-                          if (Array.isArray(s?.stop_location)) {
-                              coord = [s.stop_location[0], s.stop_location[1]];
-                          } else if (
-                              s?.stop_location &&
-                              typeof s.stop_location === "object"
-                          ) {
-                              const lat = Number(
-                                  s.stop_location.lat ?? s.stop_location[0]
-                              );
-                              const lon = Number(
-                                  s.stop_location.lon ?? s.stop_location[1]
-                              );
-                              coord =
-                                  Number.isFinite(lat) && Number.isFinite(lon)
-                                      ? [lat, lon]
-                                      : null;
-                          } else if (Array.isArray(s?.gpsLocation)) {
-                              coord = s.gpsLocation;
-                          } else {
-                              const lat = Number(
-                                  s.latitude ?? s.lat ?? s.stop_lat ?? null
-                              );
-                              const lon = Number(
-                                  s.longitude ?? s.lon ?? s.stop_lon ?? null
-                              );
-                              coord =
-                                  Number.isFinite(lat) && Number.isFinite(lon)
-                                      ? [lat, lon]
-                                      : null;
-                          }
-                          if (
-                              !coord ||
-                              !Number.isFinite(coord[0]) ||
-                              !Number.isFinite(coord[1])
-                          )
-                              return null;
-                          return {
-                              type: "Feature",
-                              geometry: {
-                                  type: "Point",
-                                  coordinates: [coord[1], coord[0]],
-                              },
-                              properties: {
-                                  name:
-                                      s?.name ||
-                                      s?.stop_name ||
-                                      s?.station_name ||
-                                      s?.route_name ||
-                                      "",
-                              },
-                          };
-                      })
-                      .filter(Boolean)
-                : [],
-        };
-
-        if (lineSource && lineSource.setData) lineSource.setData(lineData);
-        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-
-        try {
-            localStorage.setItem(
-                "lppTripOverlay",
-                JSON.stringify({ line: lineData, stops: stopsData })
+        } else if (isSz) {
+            const lineCoords = geo.filter(validCoord);
+            updateTripOverlay(
+                map,
+                "sz",
+                lineCoords,
+                stopsToFeatures(
+                    selectedVehicle.stops,
+                    "sz",
+                    selectedVehicle.from,
+                    selectedVehicle.to
+                ),
+                "sz"
             );
-        } catch {}
-    }, [lppRoute]);
-
-    // Update SZ trip overlays
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map) return;
-
-        const lineSource = map.getSource("sz-trip-line-src");
-        const stopsSource = map.getSource("sz-trip-stops-src");
-
-        const lineCoords = Array.isArray(szRoute?.geometry)
-            ? szRoute.geometry
-                  .filter((c) => Array.isArray(c) && c.length >= 2)
-                  // geometry already [lng, lat]
-                  .map((c) => [c[0], c[1]])
-            : [];
-
-        const lineData = {
-            type: "Feature",
-            geometry: { type: "LineString", coordinates: lineCoords },
-            properties: {},
-        };
-
-        // Build features for start (from), intermediate stops, and end (to)
-        const features = [];
-
-        const pushStop = (s) => {
-            if (!s) return;
-            const coord = Array.isArray(s?.gpsLocation)
-                ? s.gpsLocation
-                : [s?.lat, s?.lon];
-            if (
-                !coord ||
-                !Number.isFinite(coord[0]) ||
-                !Number.isFinite(coord[1])
-            )
-                return;
-            features.push({
-                type: "Feature",
-                geometry: { type: "Point", coordinates: [coord[1], coord[0]] },
-                properties: { name: s?.name || "" },
-            });
-        };
-
-        // include start and end stops
-        pushStop(szRoute?.from);
-        if (Array.isArray(szRoute?.stops)) szRoute.stops.forEach(pushStop);
-        pushStop(szRoute?.to);
-
-        const stopsData = {
-            type: "FeatureCollection",
-            features,
-        };
-
-        if (lineSource && lineSource.setData) lineSource.setData(lineData);
-        if (stopsSource && stopsSource.setData) stopsSource.setData(stopsData);
-
-        try {
-            localStorage.setItem(
-                "szTripOverlay",
-                JSON.stringify({ line: lineData, stops: stopsData })
+        } else if (selectedVehicle.tripId !== undefined) {
+            const lineCoords = geo.filter(validCoord);
+            updateTripOverlay(
+                map,
+                "ijpp",
+                lineCoords,
+                stopsToFeatures(selectedVehicle.stops, brand),
+                brand
             );
-        } catch {}
-    }, [szRoute]);
+        }
+    }, [selectedVehicle, isMapLoaded]);
 
     // Update map center
     useEffect(() => {
@@ -1046,147 +740,110 @@ const Map = React.memo(function Map({
         });
     }, [userLocation, activeStation]);
 
+    //zbriše črto in postaje na poti iz zemljevida
     const clearPathOverlays = () => {
         const map = mapInstanceRef.current;
         if (map) {
-            const clearLine = {
-                type: "Feature",
-                geometry: {
-                    type: "LineString",
-                    coordinates: [],
-                },
-                properties: {},
-            };
-            const clearStops = {
-                type: "FeatureCollection",
-                features: [],
-            };
-            [
-                {
-                    line: "ijpp-trip-line-src",
-                    stops: "ijpp-trip-stops-src",
-                    storage: "ijppTripOverlay",
-                },
-                {
-                    line: "lpp-trip-line-src",
-                    stops: "lpp-trip-stops-src",
-                    storage: "lppTripOverlay",
-                },
-                {
-                    line: "sz-trip-line-src",
-                    stops: "sz-trip-stops-src",
-                    storage: "szTripOverlay",
-                },
-            ].forEach(({ line, stops, storage }) => {
-                try {
-                    const lineSrc = map.getSource(line);
-                    const stopsSrc = map.getSource(stops);
-                    if (lineSrc && lineSrc.setData) lineSrc.setData(clearLine);
-                    if (stopsSrc && stopsSrc.setData)
-                        stopsSrc.setData(clearStops);
-                    try {
-                        localStorage.setItem(
-                            storage,
-                            JSON.stringify({
-                                line: clearLine,
-                                stops: clearStops,
-                            })
-                        );
-                    } catch {}
-                } catch {}
-            });
+            ["ijpp", "lpp", "sz"].forEach((prefix) =>
+                clearTripOverlay(map, prefix)
+            );
         }
     };
+
+    const resetRouteView = () => {
+        setFilterByRoute(false);
+        const prev = prevVisibilityRef.current;
+        if (prev && typeof prev === "object") {
+            setVisibility(prev);
+        } else {
+            setVisibility({
+                buses: true,
+                busStops: true,
+                trainPositions: true,
+                trainStops: true,
+            });
+        }
+        clearPathOverlays();
+        setSelectedVehicle(null);
+    };
+
+    useEffect(() => {
+        const wasOpen = prevRouteDrawerOpenRef.current;
+        prevRouteDrawerOpenRef.current = routeDrawerOpen;
+        if (wasOpen && !routeDrawerOpen) {
+            resetRouteView();
+        }
+    }, [routeDrawerOpen]);
 
     return (
         <div>
             <div className="map-container" style={{ position: "relative" }}>
                 <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
-                <LayerSelector
-                    showFilter={showFilter}
-                    setShowFilter={setShowFilter}
-                    visibility={visibility}
-                    setVisibility={setVisibility}
-                    busOperators={busOperators}
-                    setBusOperators={setBusOperators}
-                    setTheme={setTheme}
-                />
-                {(() => {
-                    try {
-                        if (typeof localStorage === "undefined") return false;
-                        const keys = [
-                            "ijppTripOverlay",
-                            "lppTripOverlay",
-                            "szTripOverlay",
-                        ];
-                        for (const k of keys) {
-                            const raw = localStorage.getItem(k);
-                            if (!raw) continue;
-                            const obj = JSON.parse(raw);
-                            if (!obj) continue;
-                            if (
-                                (obj.line &&
-                                    obj.line.geometry &&
-                                    Array.isArray(
-                                        obj.line.geometry.coordinates
-                                    ) &&
-                                    obj.line.geometry.coordinates.length > 0) ||
-                                (obj.stops &&
-                                    obj.stops.features &&
-                                    Array.isArray(obj.stops.features) &&
-                                    obj.stops.features.length > 0)
-                            ) {
-                                return true;
-                            }
-                        }
-                    } catch {}
-                    return false;
-                })() && (
+                <div
+                    className={
+                        routeDrawerOpen
+                            ? "route-drawer route-drawer--open"
+                            : "route-drawer"
+                    }
+                    ref={routeDrawerRef}
+                    style={
+                        routeDrawerOpen
+                            ? {
+                                  transform: `translateY(${
+                                      routeDrawerTranslateY ??
+                                      routeDrawerPeekTranslateY
+                                  }px)`,
+                              }
+                            : undefined
+                    }
+                    role="dialog"
+                    aria-label="Pot"
+                >
                     <div
-                        style={{
-                            position: "absolute",
-                            bottom: 12,
-                            right: 12,
-                            background: "var(--x-bg)",
-                            padding: "5px",
-                            borderRadius: 8,
-                            zIndex: 10,
-                            display: "flex",
-                            alignItems: "center",
-                        }}
+                        className="route-drawer__header"
+                        onPointerDown={onRouteDrawerPointerDown}
+                        onPointerMove={onRouteDrawerPointerMove}
+                        onPointerUp={onRouteDrawerPointerUpOrCancel}
+                        onPointerCancel={onRouteDrawerPointerUpOrCancel}
                     >
+                        <div
+                            className="route-drawer__grab"
+                            aria-hidden="true"
+                        />
                         <button
                             type="button"
-                            aria-label="Izklopi filter linije"
-                            onClick={() => {
-                                setFilterByRoute(false);
-                                const prev = prevVisibilityRef.current;
-                                if (prev && typeof prev === "object") {
-                                    setVisibility(prev);
-                                } else {
-                                    setVisibility({
-                                        buses: true,
-                                        busStops: true,
-                                        trainPositions: true,
-                                        trainStops: true,
-                                    });
-                                }
-                                clearPathOverlays();
+                            className="route-drawer__close"
+                            aria-label="Zapri"
+                            onPointerDown={(e) => {
+                                e.stopPropagation();
                             }}
-                            style={{
-                                background: "transparent",
-                                color: "var(--text-color)",
-                                border: "1px solid var(--text-color)",
-                                borderRadius: 6,
-                                padding: "2px 6px",
-                                cursor: "pointer",
-                                fontSize: 12,
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                resetRouteView();
+                                setRouteDrawerOpen(false);
                             }}
                         >
                             ×
                         </button>
                     </div>
-                )}
+                    <div className="route-drawer__content">
+                        {selectedVehicle ? (
+                            <RouteTab
+                                selectedVehicle={selectedVehicle}
+                                setActiveStation={setActiveStation}
+                                onDragPointerDown={onRouteDrawerPointerDown}
+                                onDragPointerMove={onRouteDrawerPointerMove}
+                                onDragPointerUpOrCancel={
+                                    onRouteDrawerPointerUpOrCancel
+                                }
+                            />
+                        ) : (
+                            <div style={{ padding: 12 }}>
+                                <p>Ni izbrane linije.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );

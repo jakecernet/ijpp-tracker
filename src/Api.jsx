@@ -27,6 +27,20 @@ const szStopsLink =
     "https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/sz_stops.json";
 
 /**
+ * Univerzalni objekt izbrane rute
+ * @type {Object}
+ */
+let selectedRoute = {
+    tripId: "",
+    tripName: "",
+    operator: "",
+    stops: [],
+    geometry: [],
+    isLPP: false,
+    isSZ: false,
+};
+
+/**
  * Helper za fetchanje JSON podatkov
  * @param {*} url - Link
  * @returns JSON s podatki
@@ -35,6 +49,123 @@ async function fetchJson(url) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     return response.json();
+}
+
+/**
+ * Helper za dekodiranje nekega sranja za dobit lokacije vlakov
+ * @param {string} str - Polyline tekst
+ * @returns {Array} Tabelo [longitude, latitude] koordinat
+ */
+function decodePolyline(str) {
+    let index = 0,
+        lat = 0,
+        lng = 0,
+        coordinates = [],
+        shift,
+        result,
+        byte;
+    const factor = 1e5;
+    while (index < str.length) {
+        shift = result = 0;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+        lat += dlat;
+
+        shift = result = 0;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+        lng += dlng;
+
+        coordinates.push([lng / factor, lat / factor]);
+    }
+    return coordinates;
+}
+
+/** Pretvori sekunde od polnoči v časovni format HH:MM:SS
+ * @param {number} seconds - Sekunde od polnoči
+ * @returns Čas v formatu HH:MM:SS
+ */
+function seconds2time(seconds) {
+    const hour = `${Math.floor(seconds / 3600)}`.padStart(2, "0");
+    const minute = `${Math.floor((seconds % 3600) / 60)}`.padStart(2, "0");
+    const second = `${seconds % 60}`.padStart(2, "0");
+    return `${hour}:${minute}:${second}`;
+}
+
+/**
+ * Helper za dekodirat routo vlaka iz polylina
+ * @param {string} polyline - Polyline tekst
+ * @param {Array} points - Tabelo točk
+ */
+function decodePolylineOnce(str, precision) {
+    const factor = Math.pow(10, precision);
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+    const pts = [];
+    while (index < str.length) {
+        let result = 0;
+        let shift = 0;
+        let byte;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        const dlat = result & 1 ? ~(result >> 1) : result >> 1;
+        lat += dlat;
+
+        result = 0;
+        shift = 0;
+        do {
+            byte = str.charCodeAt(index++) - 63;
+            result |= (byte & 0x1f) << shift;
+            shift += 5;
+        } while (byte >= 0x20);
+        const dlng = result & 1 ? ~(result >> 1) : result >> 1;
+        lng += dlng;
+
+        const latitude = lat / factor;
+        const longitude = lng / factor;
+        pts.push([longitude, latitude]);
+    }
+    return pts;
+}
+
+/**
+ * Še en helper
+ */
+function isValidCoord([lon, lat]) {
+    return (
+        Number.isFinite(lat) &&
+        Number.isFinite(lon) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lon) <= 180
+    );
+}
+
+/**
+ * Dejanska helper funkcija za dekodiranje polylina
+ **/
+export function decodePolylineToPoints(str, precision) {
+    if (!str || typeof str !== "string") return [];
+    let pts = decodePolylineOnce(str, precision);
+    // If decoded points look implausible (e.g., 3 digits before decimal), try precision+1 (common 1e6 factor)
+    const first = pts[0];
+    if (!first || !isValidCoord(first)) {
+        const alt = decodePolylineOnce(str, precision + 1);
+        if (alt[0] && isValidCoord(alt[0])) pts = alt;
+    }
+    // Filter to valid coordinate range just in case
+    return pts.filter(isValidCoord);
 }
 
 /**
@@ -69,6 +200,10 @@ const fetchAllBusStops = async () => {
                 const ijppId =
                     stop.ijpp_id ?? stop.ijppID ?? stop.ijppId ?? null;
 
+                const routesOnStop = stop.route_groups_on_station
+                    ? stop.route_groups_on_station
+                    : [];
+
                 return {
                     ...stop,
                     name: stop.name ?? stop.stop_name ?? "",
@@ -78,11 +213,26 @@ const fetchAllBusStops = async () => {
                     refID: refId,
                     ijpp_id: ijppId,
                     ijppID: ijppId,
+                    routes_on_stop: routesOnStop,
                 };
             })
             .filter(Boolean);
     } catch (error) {
         console.error("Error fetching bus stops:", error);
+        return [];
+    }
+};
+
+/**
+ * Fetcha postaje vlakov
+ * @returns Tabelo s postajami
+ */
+const fetchSzStops = async () => {
+    try {
+        const raw = await fetchJson(szStopsLink);
+        return raw;
+    } catch (error) {
+        console.error("Error fetching SZ stops:", error);
         return [];
     }
 };
@@ -97,7 +247,7 @@ const fetchLPPPositions = async () => {
 
         const lppPositions = data.data.map((bus) => ({
             gpsLocation: [bus.latitude, bus.longitude],
-            operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
+            operator: "Ljubljanski potniški promet d.o.o.",
             lineNumber: bus.line_number,
             lineId: bus.line_id,
             lineName: bus.line_name,
@@ -187,50 +337,13 @@ const fetchTrainPositions = async () => {
 };
 
 /**
- * Helper za dekodiranje nekega sranja za dobit lokacije vlakov
- * @param {string} str - Polyline tekst
- * @returns {Array} Tabelo [longitude, latitude] koordinat
- */
-function decodePolyline(str) {
-    let index = 0,
-        lat = 0,
-        lng = 0,
-        coordinates = [],
-        shift,
-        result,
-        byte;
-    const factor = 1e5;
-    while (index < str.length) {
-        shift = result = 0;
-        do {
-            byte = str.charCodeAt(index++) - 63;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-        } while (byte >= 0x20);
-        const dlat = result & 1 ? ~(result >> 1) : result >> 1;
-        lat += dlat;
-
-        shift = result = 0;
-        do {
-            byte = str.charCodeAt(index++) - 63;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-        } while (byte >= 0x20);
-        const dlng = result & 1 ? ~(result >> 1) : result >> 1;
-        lng += dlng;
-
-        coordinates.push([lng / factor, lat / factor]);
-    }
-    return coordinates;
-}
-
-/**
  *  Fetcha IJPP trip
  * @param {string} tripId - ID tripa
  * @returns Podrobnosti o tripu
  */
-const fetchIJPPTrip = async (tripId) => {
-    if (!tripId) return null;
+const fetchIJPPTrip = async (trip) => {
+    if (!trip) return null;
+    const tripId = trip.tripId || trip;
     try {
         const dateString = new Date().toISOString().split("T")[0];
         const raw = await fetchJson(
@@ -239,7 +352,17 @@ const fetchIJPPTrip = async (tripId) => {
         const pointsResponse = await fetchJson(
             ijppRouteLink + tripId + "/geometry"
         );
-        const trip = {
+        const operator = fetchIJPPPositions().then((positions) =>
+            fetchIjppArrivals(
+                JSON.parse(localStorage.getItem("activeStation")).gtfs_id
+            ).then((arrivals) => {
+                const vehicle = positions.find((pos) => pos.tripId === tripId);
+                const arrival = arrivals.find((arr) => arr.tripId === tripId);
+                return arrival?.operatorName || vehicle?.operator || "";
+            })
+        );
+
+        selectedRoute = {
             tripName: raw?.trip_headsign || "",
             tripId: raw?.gtfs_id || "",
             stops: raw?.stop_times
@@ -254,10 +377,170 @@ const fetchIJPPTrip = async (tripId) => {
                   }))
                 : [],
             geometry: pointsResponse.coordinates || [],
+            operator: await operator,
+            isLPP: false,
+            isSZ: false,
         };
-        return trip;
+        return selectedRoute;
     } catch (error) {
         console.error("Error fetching IJPP trip:", error);
+        return null;
+    }
+};
+
+/** Fetcha točke LPP route
+ * @param {string} routeId - ID route
+ * @returns Tabelo s točkami route
+ */
+const fetchLppPoints = async (routeId) => {
+    if (!routeId) return null;
+    try {
+        const raw = await fetchJson(lppRoutePointsLink + routeId);
+        const points = raw.data
+            ?.filter((point) => point.geojson_shape != null) // Filter out points with null geojson_shape
+            .map((point) => {
+                // Additional safety check for geojson_shape.type
+                if (!point.geojson_shape || !point.geojson_shape.type) {
+                    console.warn(
+                        "Skipping point with missing geojson_shape:",
+                        point
+                    );
+                    return null;
+                }
+
+                return {
+                    tripId: point.trip_id,
+                    routeNumber: point.route_number,
+                    routeName: point.route_name,
+                    points:
+                        point.geojson_shape.type === "LineString"
+                            ? point.geojson_shape.coordinates.map((coord) => [
+                                  coord[1],
+                                  coord[0],
+                              ])
+                            : point.geojson_shape.type === "MultiLineString"
+                            ? point.geojson_shape.coordinates.flatMap(
+                                  (lineString) =>
+                                      lineString.map((coord) => [
+                                          coord[1],
+                                          coord[0],
+                                      ])
+                              )
+                            : [],
+                };
+            })
+            .filter(Boolean); // Remove any null entries from the map
+        return points && points.length > 0 ? points : null;
+    } catch (error) {
+        console.error("Error fetching LPP route points:", error);
+        return null;
+    }
+};
+
+/**
+ * Fetcha LPP routo za določen trip ID (preko proxyja za https://data.lpp.si/api/route/arrivals-on-route)
+ * @param {string} tripId - ID tripa
+ * @returns Postaje na poti in prihode na posamezne postaje
+ */
+const fetchLppRoute = async (lppRoute) => {
+    if (!lppRoute) return null;
+    try {
+        const raw = await fetchJson(lppRouteLink + lppRoute.tripId);
+        const geometry = await fetchLppPoints(
+            lppRoute.lineId || lppRoute.routeId
+        );
+
+        const lineNumber = lppRoute.lineNumber || lppRoute.routeName || "";
+        const tripName = lppRoute.lineName || lppRoute.tripName || "";
+
+        selectedRoute = {
+            isLPP: true,
+            isSZ: false,
+            tripId: lppRoute.tripId || "",
+            tripName: tripName,
+            lineNumber: lineNumber,
+            operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
+            stops: Array.isArray(raw.data)
+                ? raw.data.map((stop) => ({
+                      name: stop.name || "",
+                      stopId: stop.station_code || "",
+                      gpsLocation: [stop.latitude || 0, stop.longitude || 0],
+                      arrivals: stop?.arrivals.map((arrival) => ({
+                          eta_min: arrival.eta_min,
+                      })),
+                  }))
+                : [],
+            geometry: geometry || [],
+        };
+        return selectedRoute;
+    } catch (error) {
+        console.error("Error fetching LPP route:", error);
+        return null;
+    }
+};
+
+/**
+ * Fetcha pot SZ linije
+ * @param {string} tripId - ID poti
+ * @returns Podrobnosti o routi vlaka
+ */
+const fetchSzTrip = async (tripId) => {
+    if (!tripId) return null;
+    try {
+        const fetched = await fetchJson(szRouteLink + tripId);
+        const raw = fetched?.legs || null;
+        const startStop = raw && raw[0] ? raw[0].from : null;
+        const endStop = raw && raw[0] ? raw[0].to : null;
+        selectedRoute = Array.isArray(raw)
+            ? {
+                  from: {
+                      name: raw[0]?.from?.name || "",
+                      stopId: raw[0]?.from?.stopId || "",
+                      gpsLocation: [
+                          raw[0]?.from?.lat || 0,
+                          raw[0]?.from?.lon || 0,
+                      ],
+                      departure: raw[0]?.from?.departure || "",
+                  },
+                  to: {
+                      name: raw[0]?.to?.name || "",
+                      stopId: raw[0]?.to?.stopId || "",
+                      gpsLocation: [raw[0]?.to?.lat || 0, raw[0]?.to?.lon || 0],
+                      arrival: raw[0]?.to?.arrival || "",
+                  },
+                  tripName: raw[0]?.headsign || "",
+                  duration: raw[0]?.duration || "",
+                  startTime: raw[0]?.startTime || "",
+                  endTime: raw[0]?.endTime || "",
+                  realTime: raw[0]?.realTime || false,
+                  tripId: raw[0]?.tripId || "",
+                  shortName: raw[0]?.routeShortName || "",
+                  stops:
+                      [
+                          startStop,
+                          ...(raw[0]?.intermediateStops?.map((stop) => ({
+                              name: stop?.name || "",
+                              stopId: stop?.stopId || "",
+                              gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+                              arrival: stop?.arrival || "",
+                              departure: stop?.departure || "",
+                          })) || []),
+                          endStop,
+                      ],
+                  geometry: raw[0]?.legGeometry
+                      ? decodePolylineToPoints(
+                            raw[0]?.legGeometry?.points || "",
+                            6
+                        )
+                      : [],
+                  operator: "Slovenske železnice d.o.o.",
+                  isLPP: false,
+                  isSZ: true,
+              }
+            : null;
+        return selectedRoute;
+    } catch (error) {
+        console.error("Error fetching SZ trip:", error);
         return null;
     }
 };
@@ -284,8 +567,6 @@ const fetchLppArrivals = async (stationCode) => {
                 vehicleId: arrival.vehicle_id,
                 type: arrival.type,
                 depot: arrival.depot,
-                from: arrival.stations?.departure,
-                to: arrival.stations?.arrival,
             }))
             .sort((a, b) => a.etaMinutes - b.etaMinutes);
         return arrivals;
@@ -295,19 +576,8 @@ const fetchLppArrivals = async (stationCode) => {
     }
 };
 
-/** Pretvori sekunde od polnoči v časovni format HH:MM:SS
- * @param {number} seconds - Sekunde od polnoči
- * @returns Čas v formatu HH:MM:SS
- */
-function seconds2time(seconds) {
-    const hour = `${Math.floor(seconds / 3600)}`.padStart(2, "0");
-    const minute = `${Math.floor((seconds % 3600) / 60)}`.padStart(2, "0");
-    const second = `${seconds % 60}`.padStart(2, "0");
-    return `${hour}:${minute}:${second}`;
-}
-
 /**
- * Fetcha IJPP prihode za dano IJPP postajo (trenutno ne dela)
+ * Fetcha IJPP prihode za dano IJPP postajo
  * @param {string} ijppId - ID IJPP postaje
  * @returns Tabelo prihodov
  */
@@ -357,245 +627,12 @@ const fetchIjppArrivals = async (ijppId) => {
                 relativeDeparture: (
                     computeRelative(arrival.departure_realtime) / 60
                 ).toFixed(0),
+                routeShortName: arrival?.route_short_name,
             };
         });
         return arrivals;
     } catch (error) {
         console.error("Error fetching IJPP arrivals:", error);
-        return [];
-    }
-};
-
-/**
- * Fetcha LPP routo za določen trip ID (preko proxyja za https://data.lpp.si/api/route/arrivals-on-route)
- * @param {string} tripId - ID tripa
- * @returns Postaje na poti in prihode na posamezne postaje
- */
-const fetchLppRoute = async (tripId, routeId) => {
-    if (!tripId) return null;
-    try {
-        const raw = await fetchJson(lppRouteLink + tripId);
-        const geometry = await fetchLppPoints(routeId);
-        return {
-            stops: raw.data ?? null,
-            geometry: geometry,
-        };
-    } catch (error) {
-        console.error("Error fetching LPP route:", error);
-        return null;
-    }
-};
-
-/** Fetcha točke LPP route
- * @param {string} routeId - ID route
- * @returns Tabelo s točkami route
- */
-const fetchLppPoints = async (routeId) => {
-    if (!routeId) return null;
-    try {
-        const raw = await fetchJson(lppRoutePointsLink + routeId);
-        console.log("Raw LPP points:", raw);
-        const points = raw.data
-            ?.filter((point) => point.geojson_shape != null) // Filter out points with null geojson_shape
-            .map((point) => {
-                // Additional safety check for geojson_shape.type
-                if (!point.geojson_shape || !point.geojson_shape.type) {
-                    console.warn(
-                        "Skipping point with missing geojson_shape:",
-                        point
-                    );
-                    return null;
-                }
-
-                return {
-                    tripId: point.trip_id,
-                    routeNumber: point.route_number,
-                    routeName: point.route_name,
-                    points:
-                        point.geojson_shape.type === "LineString"
-                            ? point.geojson_shape.coordinates.map((coord) => [
-                                  coord[1],
-                                  coord[0],
-                              ])
-                            : point.geojson_shape.type === "MultiLineString"
-                            ? point.geojson_shape.coordinates.flatMap(
-                                  (lineString) =>
-                                      lineString.map((coord) => [
-                                          coord[1],
-                                          coord[0],
-                                      ])
-                              )
-                            : [],
-                };
-            })
-            .filter(Boolean); // Remove any null entries from the map
-        return points && points.length > 0 ? points : null;
-    } catch (error) {
-        console.error("Error fetching LPP route points:", error);
-        return null;
-    }
-};
-
-/**
- * Fetcha pot SZ linije
- * @param {string} tripId - ID poti
- * @returns Podrobnosti o routi vlaka
- */
-const fetchSzTrip = async (tripId) => {
-    if (!tripId) return null;
-    try {
-        const fetched = await fetchJson(szRouteLink + tripId);
-        const raw = fetched?.legs || null;
-        const data = Array.isArray(raw)
-            ? {
-                  from: {
-                      name: raw[0]?.from?.name || "",
-                      stopId: raw[0]?.from?.stopId || "",
-                      gpsLocation: [
-                          raw[0]?.from?.lat || 0,
-                          raw[0]?.from?.lon || 0,
-                      ],
-                      departure: raw[0]?.from?.departure || "",
-                  },
-
-                  to: {
-                      name: raw[0]?.to?.name || "",
-                      stopId: raw[0]?.to?.stopId || "",
-                      gpsLocation: [raw[0]?.to?.lat || 0, raw[0]?.to?.lon || 0],
-                      arrival: raw[0]?.to?.arrival || "",
-                  },
-
-                  tripName: raw[0]?.headsign || "",
-                  duration: raw[0]?.duration || "",
-                  startTime: raw[0]?.startTime || "",
-                  endTime: raw[0]?.endTime || "",
-                  realTime: raw[0]?.realTime || false,
-                  tripId: raw[0]?.tripId || "",
-                  shortName: raw[0]?.routeShortName || "",
-                  stops:
-                      raw[0]?.intermediateStops?.map((stop) => ({
-                          name: stop?.name || "",
-                          stopId: stop?.stopId || "",
-                          gpsLocation: [stop?.lat || 0, stop?.lon || 0],
-                          arrival: stop?.arrival || "",
-                          departure: stop?.departure || "",
-                      })) || [],
-                  geometry: raw[0]?.legGeometry
-                      ? decodePolylineToPoints(
-                            raw[0]?.legGeometry?.points || "",
-                            6
-                        )
-                      : [],
-              }
-            : null;
-        console.log("Fetched SZ trip data:", data);
-        return data;
-    } catch (error) {
-        console.error("Error fetching SZ trip:", error);
-        return null;
-    }
-};
-
-/**
- * Fetcha točke poti za pot vlaka
- * @param {*} routeId
- * @returns Tabelo točk poti
- */
-const szRoutePoints = async (routeId) => {
-    {
-        if (!routeId) return [];
-        try {
-            const response = await fetchJson(
-                szRouteLink + routeId + "&joinInterlinedLegs=false&language=en"
-            );
-
-            console.log(response);
-            return response;
-        } catch (error) {
-            console.error("Error fetching SZ route points:", error);
-            return [];
-        }
-    }
-};
-
-/**
- *  Helper za dekodirat routo vlaka iz polylina
- * @param {string} polyline - Polyline tekst
- * @param {Array} points - Tabelo točk
- */
-function decodePolylineOnce(str, precision) {
-    const factor = Math.pow(10, precision);
-    let index = 0;
-    let lat = 0;
-    let lng = 0;
-    const pts = [];
-    while (index < str.length) {
-        let result = 0;
-        let shift = 0;
-        let byte;
-        do {
-            byte = str.charCodeAt(index++) - 63;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-        } while (byte >= 0x20);
-        const dlat = result & 1 ? ~(result >> 1) : result >> 1;
-        lat += dlat;
-
-        result = 0;
-        shift = 0;
-        do {
-            byte = str.charCodeAt(index++) - 63;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-        } while (byte >= 0x20);
-        const dlng = result & 1 ? ~(result >> 1) : result >> 1;
-        lng += dlng;
-
-        const latitude = lat / factor;
-        const longitude = lng / factor;
-        pts.push([longitude, latitude]);
-    }
-    return pts;
-}
-
-/**
- * Še en helper
- */
-function isValidCoord([lon, lat]) {
-    return (
-        Number.isFinite(lat) &&
-        Number.isFinite(lon) &&
-        Math.abs(lat) <= 90 &&
-        Math.abs(lon) <= 180
-    );
-}
-
-/**
- * Dejanska helper funkcija za dekodiranje polylina
- **/
-export function decodePolylineToPoints(str, precision) {
-    if (!str || typeof str !== "string") return [];
-    let pts = decodePolylineOnce(str, precision);
-    // If decoded points look implausible (e.g., 3 digits before decimal), try precision+1 (common 1e6 factor)
-    const first = pts[0];
-    if (!first || !isValidCoord(first)) {
-        const alt = decodePolylineOnce(str, precision + 1);
-        if (alt[0] && isValidCoord(alt[0])) pts = alt;
-    }
-    // Filter to valid coordinate range just in case
-    return pts.filter(isValidCoord);
-}
-
-/**
- * Fetcha postaje vlakov
- * @returns Tabelo s postajami
- */
-const fetchSzStops = async () => {
-    try {
-        const raw = await fetchJson(szStopsLink);
-        return raw;
-    } catch (error) {
-        console.error("Error fetching SZ stops:", error);
         return [];
     }
 };
@@ -609,7 +646,14 @@ const fetchSzArrivals = async (stationCode) => {
     try {
         const url = szArrivalsLink + `${encodeURIComponent(stationCode)}&n=100`;
         const raw = await fetchJson(url);
-        return raw;
+        const arrivals = (raw?.stopTimes || []).map((arrival) => ({
+            headsign: arrival?.headsign,
+            tripId: arrival?.tripId,
+            scheduledDeparture: arrival?.place?.scheduledDeparture,
+            actualDeparture: arrival?.place?.actualDeparture,
+            routeShortName: arrival?.routeShortName,
+        }));
+        return arrivals;
     } catch (error) {
         console.error("Error fetching SZ arrivals:", error);
         return [];
@@ -617,12 +661,6 @@ const fetchSzArrivals = async (stationCode) => {
 };
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
-export {
-    fetchLppArrivals,
-    fetchIjppArrivals,
-    fetchLppRoute,
-    fetchIJPPTrip,
-    fetchLppPoints,
-};
-export { fetchSzStops, fetchSzTrip, fetchSzArrivals, szRoutePoints };
+export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
+export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };

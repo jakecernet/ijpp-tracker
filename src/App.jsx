@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
-import { Map, Clock, MapPin, ArrowRightLeft } from "lucide-react";
+import { Map, MapPin, Route as RouteIcon, Settings2 } from "lucide-react";
 import "./App.css";
 
 import {
@@ -18,16 +18,15 @@ import {
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
-const ArrivalsTab = lazy(() => import("./tabs/arrivals"));
-const NearMeTab = lazy(() => import("./tabs/nearMe"));
-const RouteTab = lazy(() => import("./tabs/route.jsx"));
+const StationsTab = lazy(() => import("./tabs/stations"));
+const LinesTab = lazy(() => import("./tabs/lines"));
+const SettingsTab = lazy(() => import("./tabs/settings"));
 
 if (typeof window !== "undefined") {
-    // Preload components to avoid lag on first navigation
     import("./tabs/map");
-    import("./tabs/arrivals");
-    import("./tabs/nearMe");
-    import("./tabs/route.jsx");
+    import("./tabs/stations");
+    import("./tabs/lines");
+    import("./tabs/settings");
 }
 
 function App() {
@@ -46,24 +45,63 @@ function App() {
         localStorage.getItem("theme") || "light"
     );
 
+    const [visibility, setVisibility] = useState(() => {
+        try {
+            const saved = localStorage.getItem("mapLayerSettings");
+            if (saved) {
+                const settings = JSON.parse(saved);
+                if (settings.visibility) {
+                    return settings.visibility;
+                }
+            }
+        } catch {}
+        return {
+            buses: true,
+            busStops: true,
+            trainPositions: true,
+            trainStops: true,
+        };
+    });
+
+    const [busOperators, setBusOperators] = useState(() => {
+        try {
+            const saved = localStorage.getItem("mapLayerSettings");
+            if (saved) {
+                const settings = JSON.parse(saved);
+                if (settings.busOperators) {
+                    return settings.busOperators;
+                }
+            }
+        } catch {}
+        return {
+            arriva: true,
+            lpp: true,
+            nomago: true,
+            marprom: true,
+            murska: true,
+            generic: true,
+        };
+    });
+
     useEffect(() => {
         localStorage.getItem("theme")
             ? setTheme(localStorage.getItem("theme"))
             : localStorage.setItem("theme", "light");
     }, [theme]);
 
+    useEffect(() => {
+        try {
+            const payload = {
+                visibility,
+                busOperators,
+            };
+            localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
+        } catch {}
+    }, [visibility, busOperators]);
+
     const [gpsPositions, setGpsPositions] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
-    const [selectedVehicle, setSelectedVehicle] = useState(() => {
-        if (typeof window === "undefined") return null;
-        try {
-            const raw = window.localStorage.getItem("selectedBusRoute");
-            return raw ? JSON.parse(raw) : null;
-        } catch (error) {
-            console.warn("Neveljavni podatki o izbranem vozilu:", error);
-            return null;
-        }
-    });
+    const [selectedVehicle, setSelectedVehicle] = useState(null);
 
     const [busStops, setBusStops] = useState([]);
     const [szStops, setSzStops] = useState([]);
@@ -71,17 +109,6 @@ function App() {
     const [ijppArrivals, setIjppArrivals] = useState([]);
     const [lppArrivals, setLppArrivals] = useState([]);
     const [szArrivals, setSzArrivals] = useState([]);
-
-    const [lppRoute, setLppRoute] = useState([]);
-    const [szRoute, setSzRoute] = useState([]);
-    const [ijppTrip, setIjppTrip] = useState(null);
-
-    // Redirecta na zemljevid, če ni izbrane postaje
-    useEffect(() => {
-        if (!activeStation || activeStation.length === 0) {
-            document.location.href = "/#/map";
-        }
-    }, [activeStation]);
 
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
@@ -213,130 +240,68 @@ function App() {
         load();
     }, [activeStation]);
 
-    // LPP route
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const route = await fetchLppRoute(
-                    selectedVehicle.tripId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.tripId,
-
-                    selectedVehicle.routeId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.routeId ||
-                        JSON.parse(localStorage.getItem("selectedBusRoute"))
-                            ?.lineId
-                );
-                setLppRoute(route);
-                console.log("Loaded LPP route:", route);
-            } catch (error) {
-                console.error("Error loading LPP route:", error);
-            }
-        };
-        load();
-    }, [selectedVehicle]);
-
-    // Za fetchanje SZ tripov iz prihodov
-    const getSzTripFromId = async (tripId) => {
+    // Za fetchanje tripa iz ID-ja
+    const getTripFromId = async (tripData, type) => {
         try {
-            const route = await fetchSzTrip(tripId);
-            setSzRoute(route ?? []);
-            localStorage.setItem(
-                "selectedBusRoute",
-                JSON.stringify({
-                    tripId: tripId,
-                    tripName: route[0]?.tripName,
-                    shortName: route[0]?.shortName,
-                })
-            );
+            let route = null;
+            const tripId =
+                typeof tripData === "object" ? tripData.tripId : tripData;
+
+            if (type === "LPP") {
+                const param =
+                    typeof tripData === "object"
+                        ? tripData
+                        : { tripId: tripData };
+                route = await fetchLppRoute(param);
+            } else if (type === "SZ") {
+                route = await fetchSzTrip(tripId);
+            } else {
+                route = await fetchIJPPTrip(tripId);
+            }
+
+            if (route) {
+                setSelectedVehicle((prev) => {
+                    // Merge if enriching same vehicle, else replace
+                    if (prev && prev.tripId === route.tripId) {
+                        return { ...prev, ...route };
+                    }
+                    return route;
+                });
+                return route;
+            }
         } catch (error) {
-            console.error("Error loading SZ trip from ID:", error);
+            console.error("Error loading trip from ID:", error);
         }
     };
 
-    // Dobi LPP routo iz prihodov (na isto foro kot SZ)
-    const setLppRouteArrival = async (arrival) => {
-        try {
-            const route = await fetchLppRoute(arrival.tripId);
-            setLppRoute(route);
-            setSelectedVehicle({
-                tripId: arrival.tripId,
-                lineNumber: arrival.routeName,
-                lineName: arrival.tripName,
-                routeId: arrival.routeId,
-                routeName: arrival.routeName,
-                operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
-            });
-            localStorage.setItem(
-                "selectedBusRoute",
-                JSON.stringify({
-                    tripId: arrival.tripId,
-                    tripName: arrival.tripName,
-                    routeName: arrival.routeName,
-                    routeId: arrival.routeId,
-                    operator:
-                        "Javno podjetje Ljubljanski potniški promet d.o.o.",
-                })
-            );
-        } catch (error) {
-            console.error("Error loading LPP route:", error);
-        }
-    };
-
-    // Dobi IJPP trip iz prihodov
-    const setIjppRouteFromArrival = (arrival) => {
-        if (!arrival?.tripId) return;
-        const vehicle = {
-            tripId: arrival.tripId,
-            lineName: arrival.tripName,
-            operator: arrival.operatorName,
-        };
-        setSelectedVehicle(vehicle);
-        localStorage.setItem("selectedBusRoute", JSON.stringify(vehicle));
-    };
-
-    // Fetcha SZ routo
-    useEffect(() => {
-        const load = async () => {
-            if (!selectedVehicle) return;
-            try {
-                const route = await fetchSzTrip(selectedVehicle.tripId);
-                setSzRoute(route ?? []);
-            } catch (error) {
-                console.error("Error loading SZ route:", error);
-                setSzRoute([]);
-            }
-        };
-        load();
-    }, [selectedVehicle]);
-
-    // Fetcha IJPP pot
+    // Fetch full route details when a vehicle is selected
     useEffect(() => {
         if (!selectedVehicle) return;
-        const isLPP = selectedVehicle?.lineNumber != null;
-        const isSZ = Boolean(selectedVehicle?.from && selectedVehicle?.to);
-        if (isLPP || isSZ) {
-            setIjppTrip(null);
-            return;
+
+        if (selectedVehicle.geometry && selectedVehicle.stops) return;
+
+        let type = "IJPP";
+        if (
+            selectedVehicle.lineId ||
+            (selectedVehicle.operator &&
+                selectedVehicle.operator
+                    .toLowerCase()
+                    .includes("ljubljanski potniški promet"))
+        ) {
+            type = "LPP";
+        } else if (
+            selectedVehicle.tripShort ||
+            (selectedVehicle.operator &&
+                selectedVehicle.operator
+                    .toLowerCase()
+                    .includes("slovenske železnice"))
+        ) {
+            type = "SZ";
         }
-        const tripId = selectedVehicle?.tripId;
-        if (!tripId) {
-            setIjppTrip(null);
-            return;
+
+        if (selectedVehicle.tripId || selectedVehicle.lineId) {
+            getTripFromId(selectedVehicle, type);
         }
-        let cancelled = false;
-        (async () => {
-            try {
-                const trip = await fetchIJPPTrip(tripId);
-                if (!cancelled) setIjppTrip(trip);
-            } catch (err) {
-                if (!cancelled) setIjppTrip(null);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
     }, [selectedVehicle]);
 
     return (
@@ -372,11 +337,13 @@ function App() {
                                         userLocation={userLocation}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
-                                        ijppTrip={ijppTrip}
-                                        lppRoute={lppRoute}
-                                        szRoute={szRoute}
+                                        selectedVehicle={selectedVehicle}
                                         theme={theme}
                                         setTheme={setTheme}
+                                        visibility={visibility}
+                                        setVisibility={setVisibility}
+                                        busOperators={busOperators}
+                                        setBusOperators={setBusOperators}
                                     />
                                 }
                             />
@@ -392,36 +359,20 @@ function App() {
                                         userLocation={userLocation}
                                         trainPositions={trainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
-                                        ijppTrip={ijppTrip}
-                                        lppRoute={lppRoute}
-                                        szRoute={szRoute}
+                                        selectedVehicle={selectedVehicle}
                                         theme={theme}
                                         setTheme={setTheme}
-                                    />
-                                }
-                            />
-                            <Route
-                                path="/arrivals"
-                                element={
-                                    <ArrivalsTab
-                                        activeStation={activeStation}
-                                        ijppArrivals={ijppArrivals}
-                                        lppArrivals={lppArrivals}
-                                        szArrivals={szArrivals}
-                                        getSzTripFromId={getSzTripFromId}
-                                        setLppRouteFromArrival={
-                                            setLppRouteArrival
-                                        }
-                                        setIjppRouteFromArrival={
-                                            setIjppRouteFromArrival
-                                        }
+                                        visibility={visibility}
+                                        setVisibility={setVisibility}
+                                        busOperators={busOperators}
+                                        setBusOperators={setBusOperators}
                                     />
                                 }
                             />
                             <Route
                                 path="/stations"
                                 element={
-                                    <NearMeTab
+                                    <StationsTab
                                         setActiveStation={setActiveStation}
                                         busStops={busStops}
                                         szStops={szStops}
@@ -430,14 +381,27 @@ function App() {
                                 }
                             />
                             <Route
-                                path="/route"
+                                path="/lines"
                                 element={
-                                    <RouteTab
-                                        selectedVehicle={selectedVehicle}
-                                        lppRoute={lppRoute}
-                                        szRoute={szRoute}
-                                        ijppTrip={ijppTrip}
-                                        setActiveStation={setActiveStation}
+                                    <LinesTab
+                                        gpsPositions={gpsPositions}
+                                        activeStation={activeStation}
+                                        ijppArrivals={ijppArrivals}
+                                        lppArrivals={lppArrivals}
+                                        szArrivals={szArrivals}
+                                        getTripFromId={getTripFromId}
+                                    />
+                                }
+                            />
+                            <Route
+                                path="/settings"
+                                element={
+                                    <SettingsTab
+                                        visibility={visibility}
+                                        setVisibility={setVisibility}
+                                        busOperators={busOperators}
+                                        setBusOperators={setBusOperators}
+                                        setTheme={setTheme}
                                     />
                                 }
                             />
@@ -451,22 +415,22 @@ function App() {
                             <h3>Zemljevid</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/arrivals">
-                        <button>
-                            <Clock size={24} />
-                            <h3>Prihodi</h3>
-                        </button>
-                    </NavLink>
                     <NavLink to="/stations">
                         <button>
                             <MapPin size={24} />
-                            <h3>V bližini</h3>
+                            <h3>Postaje</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/route">
+                    <NavLink to="/lines">
                         <button>
-                            <ArrowRightLeft size={24} />
-                            <h3>Pot</h3>
+                            <RouteIcon size={24} />
+                            <h3>Linije</h3>
+                        </button>
+                    </NavLink>
+                    <NavLink to="/settings">
+                        <button>
+                            <Settings2 size={24} />
+                            <h3>Nastavitve</h3>
                         </button>
                     </NavLink>
                 </nav>
