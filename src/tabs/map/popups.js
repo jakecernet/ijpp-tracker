@@ -134,13 +134,13 @@ export function renderTrainPopup(properties) {
 }
 
 export function createBusStopPopup(
-    { name, id, ref_id, gtfs_id },
+    { name, id, ref_id, gtfs_id, vCenter },
     coordinates,
     onSelect
 ) {
     const wrapper = document.createElement("div");
     const title = document.createElement("h3");
-    title.textContent = name || "";
+    title.textContent = (name || "") + (vCenter ? " (Proti centru)" : "");
     const button = document.createElement("button");
     button.textContent = "Tukaj sem";
     button.className = "popup-button";
@@ -154,6 +154,7 @@ export function createBusStopPopup(
             gpsLocation: coordinates,
             ref_id: ref_id ?? null,
             gtfs_id: gtfs_id ?? null,
+            vCenter: Boolean(vCenter),
         });
     });
 

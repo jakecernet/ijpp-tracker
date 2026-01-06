@@ -435,36 +435,37 @@ body {
                     gap: 10px;
                     flex: 1;
                     min-width: 0;
+                    flex-wrap: wrap;
 
                     .name {
-                        flex: 1;
+                        flex: 0 0 auto;
                         min-width: 0;
                         display: flex;
                         flex-direction: row;
                         gap: 10px;
                     }
-                }
 
-                .station-info {
-                    list-style: none;
-                    padding: 0;
-                    margin: 0;
-                    display: flex;
-                    flex-direction: row;
-                    align-items: center;
-                    gap: 4px;
-                    flex-wrap: wrap;
-
-                    li {
-                        border: 1px solid var(--selector-border);
-                        border-radius: 4px;
-                        color: var(--active-color);
-                        font-weight: 600;
-                        font-size: 0.75em;
-                        padding: 2px 6px;
+                    .station-info {
+                        list-style: none;
+                        padding: 0;
+                        margin: 0;
                         display: flex;
+                        flex-direction: row;
                         align-items: center;
-                        justify-content: center;
+                        justify-content: flex-end;
+                        gap: 4px;
+
+                        li {
+                            border: 1px solid var(--selector-border);
+                            border-radius: 4px;
+                            color: var(--active-color);
+                            font-weight: 600;
+                            font-size: 0.75em;
+                            padding: 2px 6px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        }
                     }
                 }
 
@@ -733,7 +734,7 @@ body {
                     }
                 }
 
-                .about{
+                .about {
                     text-align: center;
                     padding: 10px;
                     margin: 10px;

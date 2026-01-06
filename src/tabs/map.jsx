@@ -432,6 +432,7 @@ const Map = React.memo(function Map({
                     icon: "bus-stop",
                     ref_id: stop?.ref_id ?? stop?.refID ?? null,
                     gtfs_id: stop?.gtfs_id ?? null,
+                    vCenter: stop?.vCenter ?? false,
                 })
             ),
         [busStops]
@@ -706,13 +707,6 @@ const Map = React.memo(function Map({
             );
         }
     }, [selectedVehicle, isMapLoaded]);
-
-    // Update map center
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map || !center) return;
-        map.easeTo({ center: [center[1], center[0]], duration: 500 });
-    }, [center]);
 
     // Update markers
     useEffect(() => {

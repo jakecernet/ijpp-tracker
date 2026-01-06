@@ -7,11 +7,21 @@ import {
     createTrainStopPopup,
 } from "./popups";
 
+const currentPopupRef = { popup: null };
+
 function attachPopup(map, layerId, formatter, afterOpen) {
     map.on("click", layerId, (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
         const content = formatter(feature.properties || {});
+        const previousZoom = map.getZoom();
+
+        // Close previous popup without triggering zoom animation
+        if (currentPopupRef.popup) {
+            currentPopupRef.popup.remove();
+            currentPopupRef.popup = null;
+        }
+
         const popup = new maplibregl.Popup({ closeButton: false }).setLngLat(
             event.lngLat
         );
@@ -23,8 +33,25 @@ function attachPopup(map, layerId, formatter, afterOpen) {
         }
 
         popup.addTo(map);
+        currentPopupRef.popup = popup;
+
+        popup.on("close", () => {
+            if (currentPopupRef.popup === popup) {
+                currentPopupRef.popup = null;
+            }
+            map.flyTo({
+                center: map.getCenter(),
+                zoom: previousZoom,
+                duration: 1000,
+            });
+        });
         if (typeof afterOpen === "function") {
-            afterOpen(popup, feature.properties || {}, event.lngLat);
+            afterOpen(
+                popup,
+                feature.properties || {},
+                event.lngLat,
+                previousZoom
+            );
         }
     });
 
@@ -48,10 +75,37 @@ export function configureBusStopPopup({ map, onSelectStop }) {
             onSelectStop
         );
 
-        new maplibregl.Popup({ closeButton: false })
+        const previousZoom = map.getZoom();
+
+        // Close previous popup without triggering zoom animation
+        if (currentPopupRef.popup) {
+            currentPopupRef.popup.remove();
+            currentPopupRef.popup = null;
+        }
+
+        const popup = new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setDOMContent(popupContent)
             .addTo(map);
+
+        currentPopupRef.popup = popup;
+
+        popup.on("close", () => {
+            if (currentPopupRef.popup === popup) {
+                currentPopupRef.popup = null;
+            }
+            map.flyTo({
+                center: map.getCenter(),
+                zoom: previousZoom,
+                duration: 1000,
+            });
+        });
+
+        map.flyTo({
+            center: [lng, lat],
+            zoom: Math.max(map.getZoom(), 16),
+            duration: 1000,
+        });
     });
 }
 
@@ -76,10 +130,37 @@ export function configureTrainStopPopup({ map, onSelectStop }) {
             onSelectStop
         );
 
-        new maplibregl.Popup({ closeButton: false })
+        const previousZoom = map.getZoom();
+
+        // Close previous popup without triggering zoom animation
+        if (currentPopupRef.popup) {
+            currentPopupRef.popup.remove();
+            currentPopupRef.popup = null;
+        }
+
+        const popup = new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setDOMContent(popupContent)
             .addTo(map);
+
+        currentPopupRef.popup = popup;
+
+        popup.on("close", () => {
+            if (currentPopupRef.popup === popup) {
+                currentPopupRef.popup = null;
+            }
+            map.flyTo({
+                center: map.getCenter(),
+                zoom: previousZoom,
+                duration: 1000,
+            });
+        });
+
+        map.flyTo({
+            center: [lng, lat],
+            zoom: Math.max(map.getZoom(), 16),
+            duration: 1000,
+        });
     });
 }
 
@@ -88,8 +169,15 @@ export function configureTrainPopup({ map, onSelectVehicle }) {
         map,
         "trainPositions-points",
         renderTrainPopup,
-        (popup, properties) => {
+        (popup, properties, lngLat) => {
             if (!properties) return;
+
+            map.flyTo({
+                center: lngLat,
+                zoom: Math.max(map.getZoom(), 16),
+                duration: 1000,
+            });
+
             const container = popup.getElement();
             if (!container) return;
             const button = container.querySelector(
@@ -163,8 +251,15 @@ export function configureBusPopup({ map, onSelectVehicle }) {
                 return renderIjppPopup(properties);
             return `<div style="min-width:180px">Ni podatkov</div>`;
         },
-        (popup, properties) => {
+        (popup, properties, lngLat) => {
             if (!properties) return;
+
+            map.flyTo({
+                center: lngLat,
+                zoom: Math.max(map.getZoom(), 16),
+                duration: 1000,
+            });
+
             const container = popup.getElement();
             if (!container) return;
 
@@ -227,9 +322,36 @@ export function configureTripStopsPopup(map, layerId) {
         const [lng, lat] = feature.geometry.coordinates;
         const name = props?.name || "Postaja";
         const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        new maplibregl.Popup({ closeButton: false })
+        const previousZoom = map.getZoom();
+
+        // Close previous popup without triggering zoom animation
+        if (currentPopupRef.popup) {
+            currentPopupRef.popup.remove();
+            currentPopupRef.popup = null;
+        }
+
+        const popup = new maplibregl.Popup({ closeButton: false })
             .setLngLat([lng, lat])
             .setHTML(html)
             .addTo(map);
+
+        currentPopupRef.popup = popup;
+
+        popup.on("close", () => {
+            if (currentPopupRef.popup === popup) {
+                currentPopupRef.popup = null;
+            }
+            map.flyTo({
+                center: map.getCenter(),
+                zoom: previousZoom,
+                duration: 1000,
+            });
+        });
+
+        map.flyTo({
+            center: [lng, lat],
+            zoom: Math.max(map.getZoom(), 16),
+            duration: 1000,
+        });
     });
 }

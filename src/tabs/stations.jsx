@@ -147,18 +147,35 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                             <Bus size={24} />
                         )}
                         <h3>{station?.name}</h3>
+                        {station?.vCenter && (
+                            <span
+                                style={{
+                                    fontSize: "11px",
+                                    backgroundColor: "darkgreen",
+                                    color: "var(--text-color)",
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    height: "fit-content",
+                                    marginTop: "auto",
+                                    marginBottom: "auto",
+                                    textWrap: "nowrap",
+                                }}
+                            >
+                                V center
+                            </span>
+                        )}
                     </div>
                     <ul className="station-info">
                         {station?.routes_on_stop
-                            ?.slice(0, 4)
+                            ?.slice(0, 6)
                             .map((route, index) => (
                                 <li key={index}>
                                     <p>{route}</p>
                                 </li>
                             ))}
-                        {station?.routes_on_stop?.length > 4 && (
+                        {station?.routes_on_stop?.length > 6 && (
                             <li>
-                                <p>+ {station.routes_on_stop.length - 4}</p>
+                                <p>+ {station.routes_on_stop.length - 6}</p>
                             </li>
                         )}
                     </ul>

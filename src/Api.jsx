@@ -188,7 +188,7 @@ const fetchAllBusStops = async () => {
                 const gpsLocation = Array.isArray(stop.gpsLocation)
                     ? stop.gpsLocation
                     : [latitude, longitude];
-
+                const vCenter = stop.ref_id % 2 === 1;
                 if (
                     !Number.isFinite(gpsLocation?.[0]) ||
                     !Number.isFinite(gpsLocation?.[1])
@@ -210,10 +210,9 @@ const fetchAllBusStops = async () => {
                     gpsLocation: gpsLocation,
                     coordinates: gpsLocation,
                     ref_id: refId,
-                    refID: refId,
                     ijpp_id: ijppId,
-                    ijppID: ijppId,
                     routes_on_stop: routesOnStop,
+                    vCenter: vCenter,
                 };
             })
             .filter(Boolean);
@@ -515,18 +514,17 @@ const fetchSzTrip = async (tripId) => {
                   realTime: raw[0]?.realTime || false,
                   tripId: raw[0]?.tripId || "",
                   shortName: raw[0]?.routeShortName || "",
-                  stops:
-                      [
-                          startStop,
-                          ...(raw[0]?.intermediateStops?.map((stop) => ({
-                              name: stop?.name || "",
-                              stopId: stop?.stopId || "",
-                              gpsLocation: [stop?.lat || 0, stop?.lon || 0],
-                              arrival: stop?.arrival || "",
-                              departure: stop?.departure || "",
-                          })) || []),
-                          endStop,
-                      ],
+                  stops: [
+                      startStop,
+                      ...(raw[0]?.intermediateStops?.map((stop) => ({
+                          name: stop?.name || "",
+                          stopId: stop?.stopId || "",
+                          gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+                          arrival: stop?.arrival || "",
+                          departure: stop?.departure || "",
+                      })) || []),
+                      endStop,
+                  ],
                   geometry: raw[0]?.legGeometry
                       ? decodePolylineToPoints(
                             raw[0]?.legGeometry?.points || "",
