@@ -112,6 +112,7 @@ function App() {
 
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
+        if (visibility.busStops === false) return;
         const loadBusStops = async () => {
             try {
                 const stops = await fetchAllBusStops();
@@ -122,10 +123,11 @@ function App() {
             }
         };
         loadBusStops();
-    }, []);
+    }, [visibility.busStops]);
 
     // Fetcha SZ postaje ob zagonu
     useEffect(() => {
+        if (visibility.trainStops === false) return;
         const load = async () => {
             try {
                 const stops = await fetchSzStops();
@@ -135,10 +137,12 @@ function App() {
             }
         };
         load();
-    }, []);
+    }, [visibility.trainStops]);
 
     // Na 15 sekund fetcha pozicije vlakov + busov
     useEffect(() => {
+        if (visibility.buses === false && visibility.trainPositions === false)
+            return;
         const fetchPositions = async () => {
             try {
                 const [lpp, ijpp, trains] = await Promise.all([
