@@ -685,6 +685,7 @@ body {
                     align-self: center;
                     gap: 12px;
                     margin: 0;
+                    color: var(--text-color);
 
                     button {
                         width: 42px;

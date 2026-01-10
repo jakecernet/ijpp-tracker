@@ -188,7 +188,7 @@ const fetchAllBusStops = async () => {
                 const gpsLocation = Array.isArray(stop.gpsLocation)
                     ? stop.gpsLocation
                     : [latitude, longitude];
-                const vCenter = stop.ref_id % 2 === 1;
+                const vCenter = stop.ref_id % 2 === 1 ? true : false;
                 if (
                     !Number.isFinite(gpsLocation?.[0]) ||
                     !Number.isFinite(gpsLocation?.[1])
@@ -212,7 +212,7 @@ const fetchAllBusStops = async () => {
                     ref_id: refId,
                     ijpp_id: ijppId,
                     routes_on_stop: routesOnStop,
-                    vCenter: vCenter,
+                    vCenter: refId ? vCenter : null
                 };
             })
             .filter(Boolean);

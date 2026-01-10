@@ -4,11 +4,10 @@ import nomagoPNG from "../../img/nomago.png";
 import marpromPNG from "../../img/marprom.png";
 import murskaPNG from "../../img/murska.png";
 import userPNG from "../../img/user.png";
-import busStopPNG from "../../img/busStop.png";
+import busStopPNG from "../../img/routeStop2.png";
 import trainStopPNG from "../../img/trainStop.png";
 import szPNG from "../../img/sz.png";
 import locationPNG from "../../img/location.png";
-import routeStop from "../../img/routeStop2.png";
 
 export const DEFAULT_CENTER = [46.0569, 14.5058];
 export const DEFAULT_ZOOM = 13;
@@ -64,12 +63,11 @@ export const ICON_SOURCES = [
     { id: "murska", image: murskaPNG },
     { id: "bus-generic", image: locationPNG },
     { id: "train-generic", image: locationPNG },
-    { id: "route-stop", image: routeStop },
 ];
 
 export const CLUSTER_CONFIG = {
-    buses: { radius: 80, maxZoom: 15, color: "#4CAF50" },
-    busStops: { radius: 70, maxZoom: 14, color: "#7E57C2" },
+    buses: { radius: 50, maxZoom: 14, color: "#4CAF50" },
+    busStops: { radius: 60, maxZoom: 14, color: "#7E57C2" },
     trainPositions: { radius: 90, maxZoom: 14, color: "#0091EA" },
     trainStops: { radius: 70, maxZoom: 14, color: "#FF7043" },
 };

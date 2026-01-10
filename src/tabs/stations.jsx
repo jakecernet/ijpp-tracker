@@ -147,23 +147,29 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                             <Bus size={24} />
                         )}
                         <h3>{station?.name}</h3>
-                        {station?.vCenter && (
-                            <span
-                                style={{
-                                    fontSize: "11px",
-                                    backgroundColor: "darkgreen",
-                                    color: "var(--text-color)",
-                                    padding: "2px 6px",
-                                    borderRadius: "4px",
-                                    height: "fit-content",
-                                    marginTop: "auto",
-                                    marginBottom: "auto",
-                                    textWrap: "nowrap",
-                                }}
-                            >
-                                V center
-                            </span>
-                        )}
+                        {station?.vCenter !== null &&
+                            station?.type !== "sz" && (
+                                <span
+                                    style={{
+                                        fontSize: "11px",
+                                        backgroundColor:
+                                            station?.vCenter === true
+                                                ? "darkgreen"
+                                                : "#BA8E23",
+                                        color: "var(--text-color)",
+                                        padding: "2px 6px",
+                                        borderRadius: "4px",
+                                        height: "fit-content",
+                                        marginTop: "auto",
+                                        marginBottom: "auto",
+                                        textWrap: "nowrap",
+                                    }}
+                                >
+                                    {station?.vCenter === true
+                                        ? "V center"
+                                        : "Iz centra"}
+                                </span>
+                            )}
                     </div>
                     <ul className="station-info">
                         {station?.routes_on_stop
