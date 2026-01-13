@@ -11,3 +11,5 @@
 [![GitHub Issues](https://img.shields.io/github/issues/jakecernet/ijpp-tracker?style=for-the-badge)](https://github.com/jakecernet/ijpp-tracker/issues)
 
 [![Visit Site](https://img.shields.io/badge/Visit-IJPP%20Tracker-blue?style=for-the-badge)](https://tracker.cernetic.cc/)
+
+[![Free BigMac](https://img.shields.io/badge/Free%20BigMac-yellow?style=for-the-badge)](https://mcdonalds.si/zaposlitev)
