@@ -131,9 +131,60 @@ const LinesTab = ({
         return "var(--default-color)";
     };
 
-    const formatArrivalTime = (arrivalTime) => {
+    const formatTime = (arrivalTime) => {
         if (!arrivalTime) return "N/A";
-        return format(arrivalTime, "HH:mm", { locale: sl });
+        try {
+            const date = new Date(arrivalTime);
+            if (isNaN(date.getTime())) return "N/A";
+            return format(date, "HH:mm", { locale: sl });
+        } catch {
+            return "N/A";
+        }
+    };
+
+    const formatArrivalWithEta = (arrival) => {
+        if (!arrival) return "";
+
+        let etaMin = arrival.etaMinutes ?? arrival.eta_min;
+        let actualTime =
+            arrival.realtimeDeparture ||
+            arrival.actualDeparture ||
+            arrival.scheduledDeparture ||
+            arrival.estimated_arrival_time ||
+            arrival.arrival_time;
+
+        console.log(actualTime);
+
+        let actualDate = null;
+        if (actualTime) {
+            actualDate = new Date(actualTime);
+            // If parsing failed or if it looks like a time-only string, try prepending today's date
+            if (isNaN(actualDate.getTime()) && typeof actualTime === "string" && actualTime.match(/^\d{2}:\d{2}(:\d{2})?$/)) {
+                const today = new Date().toISOString().split("T")[0];
+                actualDate = new Date(`${today}T${actualTime}`);
+            }
+        }
+        console.log(actualDate);
+        if (actualDate && isNaN(actualDate.getTime())) {
+            actualDate = null;
+        }
+
+        // Generate ETA if missing
+        if (etaMin === undefined && actualDate) {
+            const now = new Date();
+            etaMin = Math.max(
+                0,
+                Math.round((actualDate.getTime() - now.getTime()) / 60000)
+            );
+        }
+
+        // Generate actual time if missing
+        if (!actualDate && etaMin !== undefined) {
+            actualDate = new Date(new Date().getTime() + etaMin * 60000);
+        }
+
+        const timeStr = actualDate ? formatTime(actualDate) : "N/A";
+        return `${etaMin ?? "?"} min (${timeStr})`;
     };
 
     const formatDelay = (scheduledDeparture, actualDeparture) => {
@@ -314,15 +365,7 @@ const LinesTab = ({
                 </div>
                 <h3>{arrival.tripName || arrival.headsign}</h3>
             </div>
-            <p>
-                {arrival.type === "SZ"
-                    ? formatArrivalTime(
-                          arrival?.actualDeparture || arrival.scheduledDeparture
-                      )
-                    : arrival.type === "LPP"
-                    ? arrival.etaMinutes + " min"
-                    : arrival?.realtimeDeparture?.slice(0, -3)}
-            </p>
+            <p>{formatArrivalWithEta(arrival)}</p>
             {arrival.type === "SZ" && (
                 <p>
                     {"Zamuda: " +
