@@ -493,7 +493,8 @@ const Map = React.memo(function Map({
             style: STYLE,
             center: [initialCenterRef.current[1], initialCenterRef.current[0]],
             zoom: DEFAULT_ZOOM,
-            attributionControl: false,
+            attributionControl: true,
+            maxZoom: 22,
         });
 
         mapInstanceRef.current = map;
@@ -575,9 +576,8 @@ const Map = React.memo(function Map({
                 onSelectVehicle: (vehicle) => {
                     handlersRef.current.setSelectedVehicle(vehicle);
                     // Enable route-only SZ view and hide buses & stations
-                    prevVisibilityRef.current = visibility;
                     setFilterByRoute(true);
-                    setVisibility({
+                    setRouteVisibilityOverride({
                         buses: false,
                         busStops: false,
                         trainPositions: true,
@@ -591,9 +591,8 @@ const Map = React.memo(function Map({
                 onSelectVehicle: (vehicle) => {
                     handlersRef.current.setSelectedVehicle(vehicle);
                     // Enable route-only bus view and hide stations & SZ markers
-                    prevVisibilityRef.current = visibility;
                     setFilterByRoute(true);
-                    setVisibility({
+                    setRouteVisibilityOverride({
                         buses: true,
                         busStops: false,
                         trainPositions: false,
@@ -614,7 +613,12 @@ const Map = React.memo(function Map({
             map.remove();
             mapInstanceRef.current = null;
         };
-    }, []);
+    }, [
+        busStopsGeoJSON,
+        busesGeoJSON,
+        trainStopsGeoJSON,
+        trainPositionsGeoJSON,
+    ]);
 
     // Update GeoJSON sources
     useEffect(() => {
@@ -631,7 +635,7 @@ const Map = React.memo(function Map({
         trainStopsGeoJSON,
     ]);
 
-    // Apply layer visibility
+    // Apply layer visibility (use override when route is selected)
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
