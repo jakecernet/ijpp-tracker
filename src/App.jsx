@@ -89,16 +89,6 @@ function App() {
             : localStorage.setItem("theme", "light");
     }, [theme]);
 
-    useEffect(() => {
-        try {
-            const payload = {
-                visibility,
-                busOperators,
-            };
-            localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
-        } catch {}
-    }, [visibility, busOperators]);
-
     const [gpsPositions, setGpsPositions] = useState([]);
     const [trainPositions, setTrainPositions] = useState([]);
     const [selectedVehicle, setSelectedVehicle] = useState(null);
@@ -109,6 +99,16 @@ function App() {
     const [ijppArrivals, setIjppArrivals] = useState([]);
     const [lppArrivals, setLppArrivals] = useState([]);
     const [szArrivals, setSzArrivals] = useState([]);
+
+    useEffect(() => {
+        try {
+            const payload = {
+                visibility,
+                busOperators,
+            };
+            localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
+        } catch {}
+    }, [visibility, busOperators]);
 
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
@@ -415,19 +415,28 @@ function App() {
                             <h3>Zemljevid</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/stations">
+                    <NavLink
+                        to="/stations"
+                        onClick={() => setSelectedVehicle(null)}
+                    >
                         <button>
                             <MapPin size={24} />
                             <h3>Postaje</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/lines">
+                    <NavLink
+                        to="/lines"
+                        onClick={() => setSelectedVehicle(null)}
+                    >
                         <button>
                             <RouteIcon size={24} />
                             <h3>Linije</h3>
                         </button>
                     </NavLink>
-                    <NavLink to="/settings">
+                    <NavLink
+                        to="/settings"
+                        onClick={() => setSelectedVehicle(null)}
+                    >
                         <button>
                             <Settings2 size={24} />
                             <h3>Nastavitve</h3>
