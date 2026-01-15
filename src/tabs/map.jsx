@@ -84,7 +84,6 @@ const Map = React.memo(function Map({
     trainPositions,
     setSelectedVehicle,
     selectedVehicle,
-    setTheme,
     visibility,
     setVisibility,
     busOperators,
@@ -104,7 +103,8 @@ const Map = React.memo(function Map({
     const [routeDrawerSnap, setRouteDrawerSnap] = useState("peek");
     const [routeDrawerHeight, setRouteDrawerHeight] = useState(0);
     const [routeDrawerTranslateY, setRouteDrawerTranslateY] = useState(null);
-    const prevVisibilityRef = useRef(null);
+    const [routeVisibilityOverride, setRouteVisibilityOverride] =
+        useState(null);
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
     useEffect(() => {
@@ -166,8 +166,10 @@ const Map = React.memo(function Map({
     // When the drawer is open for a selected route, show only the route path + route stops overlays.
     // (Arrivals selection bypasses map popups that normally set this up.)
     useEffect(() => {
-        if (!routeDrawerOpen) return;
-        if (!selectedVehicle) return;
+        if (!routeDrawerOpen || !selectedVehicle) {
+            setRouteVisibilityOverride(null);
+            return;
+        }
 
         const operatorText =
             typeof selectedVehicle?.operator === "string"
@@ -182,26 +184,11 @@ const Map = React.memo(function Map({
                 selectedVehicle?.lineId == null);
 
         setFilterByRoute(true);
-        setVisibility((current) => {
-            const target = {
-                buses: !isTrainRoute,
-                busStops: false,
-                trainPositions: isTrainRoute,
-                trainStops: false,
-            };
-
-            const isAlreadyFocused =
-                current &&
-                current.buses === target.buses &&
-                current.busStops === target.busStops &&
-                current.trainPositions === target.trainPositions &&
-                current.trainStops === target.trainStops;
-
-            if (!isAlreadyFocused) {
-                prevVisibilityRef.current = current;
-            }
-
-            return target;
+        setRouteVisibilityOverride({
+            buses: !isTrainRoute,
+            busStops: false,
+            trainPositions: isTrainRoute,
+            trainStops: false,
         });
     }, [routeDrawerOpen, selectedVehicleKey, selectedVehicle]);
 
@@ -329,7 +316,7 @@ const Map = React.memo(function Map({
                 }
             }
         } catch {}
-    }, []);
+    }, [setVisibility, setBusOperators]);
 
     const selectedVehicleCoords = useMemo(() => {
         if (!selectedVehicle || !gpsPositions) return null;
@@ -613,12 +600,7 @@ const Map = React.memo(function Map({
             map.remove();
             mapInstanceRef.current = null;
         };
-    }, [
-        busStopsGeoJSON,
-        busesGeoJSON,
-        trainStopsGeoJSON,
-        trainPositionsGeoJSON,
-    ]);
+    }, []);
 
     // Update GeoJSON sources
     useEffect(() => {
@@ -639,21 +621,16 @@ const Map = React.memo(function Map({
     useEffect(() => {
         const map = mapInstanceRef.current;
         if (!map) return;
-        setPrefixVisible(map, "buses", visibility.buses);
-        setPrefixVisible(map, "busStops", visibility.busStops);
-        setPrefixVisible(map, "trainStops", visibility.trainStops);
-        setPrefixVisible(map, "trainPositions", visibility.trainPositions);
-    }, [visibility, isMapLoaded]);
-
-    useEffect(() => {
-        try {
-            const payload = {
-                visibility,
-                busOperators,
-            };
-            localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
-        } catch {}
-    }, [visibility, busOperators, filterByRoute]);
+        const effectiveVisibility = routeVisibilityOverride || visibility;
+        setPrefixVisible(map, "buses", effectiveVisibility.buses);
+        setPrefixVisible(map, "busStops", effectiveVisibility.busStops);
+        setPrefixVisible(map, "trainStops", effectiveVisibility.trainStops);
+        setPrefixVisible(
+            map,
+            "trainPositions",
+            effectiveVisibility.trainPositions
+        );
+    }, [visibility, routeVisibilityOverride, isMapLoaded]);
 
     // Update all trip overlays in a single effect
     useEffect(() => {
@@ -750,17 +727,7 @@ const Map = React.memo(function Map({
 
     const resetRouteView = () => {
         setFilterByRoute(false);
-        const prev = prevVisibilityRef.current;
-        if (prev && typeof prev === "object") {
-            setVisibility(prev);
-        } else {
-            setVisibility({
-                buses: true,
-                busStops: true,
-                trainPositions: true,
-                trainStops: true,
-            });
-        }
+        setRouteVisibilityOverride(null);
         clearPathOverlays();
         setSelectedVehicle(null);
     };

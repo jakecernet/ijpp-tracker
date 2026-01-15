@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 import { Bus, Train, Heart } from "lucide-react";
 
 const LIKED_STATIONS_KEY = "likedStations";
@@ -24,50 +24,47 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
     const [likedStations, setLikedStations] = useState(() =>
         loadLikedItems(LIKED_STATIONS_KEY)
     );
-    const [distancesCalculated, setDistancesCalculated] = useState(false);
     const [radius] = useState(() => {
         const stored = localStorage.getItem("stationRadius");
         return stored ? JSON.parse(stored) : { busRadius: 5, szRadius: 20 };
     });
 
-    // Calculate distances for near me
-    useEffect(() => {
-        setDistancesCalculated(false);
-
+    // Calculate distances and create allStations in one memo
+    const allStations = useMemo(() => {
         const toRadians = (degrees) => degrees * (Math.PI / 180);
         const earthRadius = 6371;
 
-        const calculate = (stops) => {
-            stops.forEach((stop) => {
-                const lat1 = userLocation[0];
-                const lon1 = userLocation[1];
-                const lat2 = stop.gpsLocation?.[0] ?? stop.lat;
-                const lon2 = stop.gpsLocation?.[1] ?? stop.lon;
-                const dLat = toRadians(lat2 - lat1);
-                const dLon = toRadians(lon2 - lon1);
+        const calculateDistance = (stop) => {
+            const lat1 = userLocation[0];
+            const lon1 = userLocation[1];
+            const lat2 = stop.gpsLocation?.[0] ?? stop.lat;
+            const lon2 = stop.gpsLocation?.[1] ?? stop.lon;
+            const dLat = toRadians(lat2 - lat1);
+            const dLon = toRadians(lon2 - lon1);
 
-                const a =
-                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(toRadians(lat1)) *
-                        Math.cos(toRadians(lat2)) *
-                        Math.sin(dLon / 2) *
-                        Math.sin(dLon / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                stop.distance = earthRadius * c;
-            });
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRadians(lat1)) *
+                    Math.cos(toRadians(lat2)) *
+                    Math.sin(dLon / 2) *
+                    Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return earthRadius * c;
         };
 
-        calculate(busStops);
-        calculate(szStops);
-        setDistancesCalculated(true);
-    }, [userLocation, busStops, szStops]);
-
-    const allStations = useMemo(() => {
         return [
-            ...busStops.map((stop) => ({ ...stop, type: "bus" })),
-            ...szStops.map((stop) => ({ ...stop, type: "sz" })),
+            ...busStops.map((stop) => ({
+                ...stop,
+                type: "bus",
+                distance: calculateDistance(stop),
+            })),
+            ...szStops.map((stop) => ({
+                ...stop,
+                type: "sz",
+                distance: calculateDistance(stop),
+            })),
         ];
-    }, [busStops, szStops]);
+    }, [busStops, szStops, userLocation]);
 
     // Get unique station ID for liking
     const getStationId = useCallback((station) => {
@@ -100,7 +97,6 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 
     // Filtered stations for "Near Me"
     const nearMeStations = useMemo(() => {
-        if (!distancesCalculated) return [];
         return allStations
             .filter((stop) => {
                 const maxDistance =
@@ -111,7 +107,7 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                 stop.name.toLowerCase().includes(searchTerm.toLowerCase())
             )
             .sort((a, b) => a.distance - b.distance);
-    }, [allStations, searchTerm, distancesCalculated]);
+    }, [allStations, searchTerm, radius]);
 
     // Filtered stations for "All"
     const filteredAllStations = useMemo(() => {

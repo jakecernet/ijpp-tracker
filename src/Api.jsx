@@ -212,7 +212,7 @@ const fetchAllBusStops = async () => {
                     ref_id: refId,
                     ijpp_id: ijppId,
                     routes_on_stop: routesOnStop,
-                    vCenter: refId ? vCenter : null
+                    vCenter: refId ? vCenter : null,
                 };
             })
             .filter(Boolean);

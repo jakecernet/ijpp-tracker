@@ -61,8 +61,8 @@ export const ICON_SOURCES = [
     { id: "nomago", image: nomagoPNG },
     { id: "marprom", image: marpromPNG },
     { id: "murska", image: murskaPNG },
-    { id: "bus-generic", image: locationPNG },
-    { id: "train-generic", image: locationPNG },
+    { id: "bus-generic", image: busStopPNG },
+    { id: "train-generic", image: szPNG },
 ];
 
 export const CLUSTER_CONFIG = {
