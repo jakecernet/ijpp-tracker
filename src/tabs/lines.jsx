@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Heart } from "lucide-react";
-import { format } from "date-fns";
-import { sl } from "date-fns/locale";
+import { formatPrecomputedArrival } from "../Api";
 
 const LIKED_ROUTES_KEY = "likedRoutes";
 const lppRoutesApiUrl = "https://tracker.cernetic.cc/api/lpp-all-routes";
@@ -130,7 +129,7 @@ const LinesTab = ({
 
         if (type === "LPP" || operator?.includes("Ljubljanski potniški promet"))
             return "var(--lpp-color)";
-        if (type === "SZ" || operator?.includes("Slovenske železnice"))
+        if (type === "SZ" || operator?.includes("slovenske železnice"))
             return "var(--sz-color)";
         if (operator?.includes("Nomago")) return "var(--nomago-color)";
         if (operator?.includes("Marprom")) return "var(--marprom-color)";
@@ -138,66 +137,6 @@ const LinesTab = ({
         if (operator?.includes("Murska")) return "var(--murska-color)";
 
         return "var(--default-color)";
-    };
-
-    const formatTime = (arrivalTime) => {
-        if (!arrivalTime) return "N/A";
-        try {
-            const date = new Date(arrivalTime);
-            if (isNaN(date.getTime())) return "N/A";
-            return format(date, "HH:mm", { locale: sl });
-        } catch {
-            return "N/A";
-        }
-    };
-
-    const formatArrivalWithEta = (arrival) => {
-        if (!arrival) return "";
-
-        let etaMin = arrival.etaMinutes ?? arrival.eta_min;
-        let actualTime =
-            arrival.realtimeDeparture ||
-            arrival.actualDeparture ||
-            arrival.scheduledDeparture ||
-            arrival.estimated_arrival_time ||
-            arrival.arrival_time;
-
-        console.log(actualTime);
-
-        let actualDate = null;
-        if (actualTime) {
-            actualDate = new Date(actualTime);
-            // If parsing failed or if it looks like a time-only string, try prepending today's date
-            if (
-                isNaN(actualDate.getTime()) &&
-                typeof actualTime === "string" &&
-                actualTime.match(/^\d{2}:\d{2}(:\d{2})?$/)
-            ) {
-                const today = new Date().toISOString().split("T")[0];
-                actualDate = new Date(`${today}T${actualTime}`);
-            }
-        }
-        console.log(actualDate);
-        if (actualDate && isNaN(actualDate.getTime())) {
-            actualDate = null;
-        }
-
-        // Generate ETA if missing
-        if (etaMin === undefined && actualDate) {
-            const now = new Date();
-            etaMin = Math.max(
-                0,
-                Math.round((actualDate.getTime() - now.getTime()) / 60000),
-            );
-        }
-
-        // Generate actual time if missing
-        if (!actualDate && etaMin !== undefined) {
-            actualDate = new Date(new Date().getTime() + etaMin * 60000);
-        }
-
-        const timeStr = actualDate ? formatTime(actualDate) : "N/A";
-        return `${etaMin ?? "?"} min (${timeStr})`;
     };
 
     const formatDelay = (scheduledDeparture, actualDeparture) => {
@@ -221,6 +160,14 @@ const LinesTab = ({
             .filter(
                 (arrival) =>
                     arrival?.operatorName !== "Ljubljanski Potniški Promet",
+            )
+            .filter(
+                (arrival) =>
+                    !(
+                        arrival?.operatorName ==
+                            "Ljubljanski potniški promet, d.o.o." &&
+                        arrival?.etaMinutes < 60
+                    ),
             )
             .map((arrival) => ({ ...arrival, type: "IJPP" }));
 
@@ -378,7 +325,7 @@ const LinesTab = ({
                 </div>
                 <h3>{arrival.tripName || arrival.headsign}</h3>
             </div>
-            <p>{formatArrivalWithEta(arrival)}</p>
+            <p>{formatPrecomputedArrival(arrival)}</p>
             {arrival.type === "SZ" && (
                 <p>
                     {"Zamuda: " +
