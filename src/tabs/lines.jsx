@@ -30,11 +30,20 @@ const LinesTab = ({
     getTripFromId,
 }) => {
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [page, setPage] = useState("arrivals"); // all, arrivals, liked
     const [likedRoutes, setLikedRoutes] = useState(() =>
-        loadLikedItems(LIKED_ROUTES_KEY)
+        loadLikedItems(LIKED_ROUTES_KEY),
     );
     const [lppNumberedRoutes, setLppNumberedRoutes] = useState([]);
+
+    // Debounce search term for better performance
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     // Fetch LPP routes
     useEffect(() => {
@@ -84,7 +93,7 @@ const LinesTab = ({
             const id = getRouteId(route);
             return likedRoutes.some((r) => r.id === id);
         },
-        [likedRoutes, getRouteId]
+        [likedRoutes, getRouteId],
     );
 
     const toggleLikeRoute = useCallback(
@@ -112,7 +121,7 @@ const LinesTab = ({
                 return newLiked;
             });
         },
-        [getRouteId]
+        [getRouteId],
     );
 
     const bgColorMap = (item) => {
@@ -159,7 +168,11 @@ const LinesTab = ({
         if (actualTime) {
             actualDate = new Date(actualTime);
             // If parsing failed or if it looks like a time-only string, try prepending today's date
-            if (isNaN(actualDate.getTime()) && typeof actualTime === "string" && actualTime.match(/^\d{2}:\d{2}(:\d{2})?$/)) {
+            if (
+                isNaN(actualDate.getTime()) &&
+                typeof actualTime === "string" &&
+                actualTime.match(/^\d{2}:\d{2}(:\d{2})?$/)
+            ) {
                 const today = new Date().toISOString().split("T")[0];
                 actualDate = new Date(`${today}T${actualTime}`);
             }
@@ -174,7 +187,7 @@ const LinesTab = ({
             const now = new Date();
             etaMin = Math.max(
                 0,
-                Math.round((actualDate.getTime() - now.getTime()) / 60000)
+                Math.round((actualDate.getTime() - now.getTime()) / 60000),
             );
         }
 
@@ -203,11 +216,11 @@ const LinesTab = ({
             .filter((arrival) =>
                 arrival?.tripName
                     ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase())
+                    .includes(debouncedSearchTerm.toLowerCase()),
             )
             .filter(
                 (arrival) =>
-                    arrival?.operatorName !== "Ljubljanski Potniški Promet"
+                    arrival?.operatorName !== "Ljubljanski Potniški Promet",
             )
             .map((arrival) => ({ ...arrival, type: "IJPP" }));
 
@@ -216,10 +229,10 @@ const LinesTab = ({
                 (arrival) =>
                     arrival.tripName
                         ?.toLowerCase()
-                        .includes(searchTerm.toLowerCase()) ||
+                        .includes(debouncedSearchTerm.toLowerCase()) ||
                     arrival.routeName
                         ?.toLowerCase()
-                        .includes(searchTerm.toLowerCase())
+                        .includes(debouncedSearchTerm.toLowerCase()),
             )
             .map((arrival) => ({ ...arrival, type: "LPP" }));
 
@@ -227,18 +240,18 @@ const LinesTab = ({
             .filter((arrival) =>
                 arrival.headsign
                     ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase())
+                    .includes(debouncedSearchTerm.toLowerCase()),
             )
             .map((arrival) => ({ ...arrival, type: "SZ" }));
 
         return [...ijppFiltered, ...lppFiltered, ...szFiltered];
-    }, [ijppArrivals, lppArrivals, szArrivals, searchTerm]);
+    }, [ijppArrivals, lppArrivals, szArrivals, debouncedSearchTerm]);
 
     // Filtered routes for "All" - combines LPP numbered routes and active routes
     const filteredAllRoutes = useMemo(() => {
-        if (searchTerm.length < 1) return [];
+        if (debouncedSearchTerm.length < 1) return [];
 
-        const term = searchTerm.toLowerCase();
+        const term = debouncedSearchTerm.toLowerCase();
 
         // Search in LPP numbered routes (works with short queries)
         const filteredLpp = lppNumberedRoutes
@@ -248,7 +261,7 @@ const LinesTab = ({
                         ?.toString()
                         .toLowerCase()
                         .includes(term) ||
-                    route?.route_name?.toLowerCase().includes(term)
+                    route?.route_name?.toLowerCase().includes(term),
             )
             .map((route) => ({
                 lineName: route.route_name,
@@ -260,11 +273,11 @@ const LinesTab = ({
             }));
 
         // For longer searches, also include active routes
-        if (searchTerm.length >= 3) {
+        if (debouncedSearchTerm.length >= 3) {
             const filteredActive = allActiveRoutes.filter((route) =>
                 (route.lineName || route.route_name || route.lineNumber)
                     ?.toLowerCase()
-                    .includes(term)
+                    .includes(term),
             );
 
             // Combine and deduplicate
@@ -283,16 +296,16 @@ const LinesTab = ({
         }
 
         return filteredLpp;
-    }, [searchTerm, lppNumberedRoutes, allActiveRoutes, getRouteId]);
+    }, [debouncedSearchTerm, lppNumberedRoutes, allActiveRoutes, getRouteId]);
 
     // Filtered liked routes
     const filteredLikedRoutes = useMemo(() => {
         return likedRoutes.filter((liked) =>
             (liked.name || liked.lineNumber || "")
                 .toLowerCase()
-                .includes(searchTerm.toLowerCase())
+                .includes(debouncedSearchTerm.toLowerCase()),
         );
-    }, [likedRoutes, searchTerm]);
+    }, [likedRoutes, debouncedSearchTerm]);
 
     const handleRouteClick = async (item, type) => {
         // Don't try to fetch if there's no valid ID
@@ -306,8 +319,8 @@ const LinesTab = ({
             (item.operator?.includes("Slovenske železnice")
                 ? "SZ"
                 : item.operator?.includes("Ljubljanski potniški promet")
-                ? "LPP"
-                : "IJPP");
+                  ? "LPP"
+                  : "IJPP");
         const route = await getTripFromId(item, operatorType);
         if (route) {
             try {
@@ -371,7 +384,7 @@ const LinesTab = ({
                     {"Zamuda: " +
                         formatDelay(
                             arrival.scheduledDeparture,
-                            arrival.actualDeparture
+                            arrival.actualDeparture,
                         )}
                 </p>
             )}
@@ -465,7 +478,7 @@ const LinesTab = ({
                         <ul className="route-list">
                             {filteredLikedRoutes.map((liked, index) => {
                                 const activeRoute = allActiveRoutes.find(
-                                    (r) => getRouteId(r) === liked.id
+                                    (r) => getRouteId(r) === liked.id,
                                 );
                                 const routeData = activeRoute || {
                                     lineName: liked.name,

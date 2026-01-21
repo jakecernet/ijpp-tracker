@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, memo } from "react";
+import { useState, useMemo, useCallback, memo, useEffect, useRef } from "react";
 import { Bus, Train, Heart } from "lucide-react";
+import { VariableSizeList as List } from "react-window";
 
 const LIKED_STATIONS_KEY = "likedStations";
 
@@ -20,14 +21,23 @@ const saveLikedItems = (key, items) => {
 
 const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [page, setPage] = useState("nearMe"); // nearMe, all, liked
     const [likedStations, setLikedStations] = useState(() =>
-        loadLikedItems(LIKED_STATIONS_KEY)
+        loadLikedItems(LIKED_STATIONS_KEY),
     );
     const [radius] = useState(() => {
         const stored = localStorage.getItem("stationRadius");
         return stored ? JSON.parse(stored) : { busRadius: 5, szRadius: 20 };
     });
+
+    // Debounce search term for better performance
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     // Calculate distances and create allStations in one memo
     const allStations = useMemo(() => {
@@ -76,7 +86,7 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
             const id = getStationId(station);
             return likedStations.some((s) => s.id === id);
         },
-        [likedStations, getStationId]
+        [likedStations, getStationId],
     );
 
     const toggleLikeStation = useCallback(
@@ -92,7 +102,7 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                 return newLiked;
             });
         },
-        [getStationId]
+        [getStationId],
     );
 
     // Filtered stations for "Near Me"
@@ -104,33 +114,125 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                 return stop.distance <= maxDistance && stop.distance > 0;
             })
             .filter((stop) =>
-                stop.name.toLowerCase().includes(searchTerm.toLowerCase())
+                stop.name
+                    .toLowerCase()
+                    .includes(debouncedSearchTerm.toLowerCase()),
             )
             .sort((a, b) => a.distance - b.distance);
-    }, [allStations, searchTerm, radius]);
+    }, [allStations, debouncedSearchTerm, radius]);
 
     // Filtered stations for "All"
     const filteredAllStations = useMemo(() => {
-        if (searchTerm.length < 3) return [];
+        if (debouncedSearchTerm.length < 3) return [];
         return allStations
             .filter((stop) =>
-                stop.name.toLowerCase().includes(searchTerm.toLowerCase())
+                stop.name
+                    .toLowerCase()
+                    .includes(debouncedSearchTerm.toLowerCase()),
             )
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [allStations, searchTerm]);
+    }, [allStations, debouncedSearchTerm]);
 
     // Filtered stations for "Liked"
     const filteredLikedStations = useMemo(() => {
         return likedStations.filter((liked) =>
-            liked.name.toLowerCase().includes(searchTerm.toLowerCase())
+            liked.name
+                .toLowerCase()
+                .includes(debouncedSearchTerm.toLowerCase()),
         );
-    }, [likedStations, searchTerm]);
+    }, [likedStations, debouncedSearchTerm]);
 
-    const handleStationSelect = (station) => {
-        setActiveStation(station);
-        window.location.hash = "/lines";
-        localStorage.setItem("activeStation", JSON.stringify(station));
-    };
+    const handleStationSelect = useCallback(
+        (station) => {
+            setActiveStation(station);
+            window.location.hash = "/lines";
+            localStorage.setItem("activeStation", JSON.stringify(station));
+        },
+        [setActiveStation],
+    );
+
+    // Ref for measuring container height for virtualization
+    const listContainerRef = useRef(null);
+    const [listHeight, setListHeight] = useState(400);
+
+    // Refs for VariableSizeList instances to reset when data changes
+    const nearMeListRef = useRef(null);
+    const allListRef = useRef(null);
+    const likedListRef = useRef(null);
+
+    // Cache for measured item heights
+    const itemHeightsCache = useRef({});
+
+    // Measure container height for virtualized list
+    useEffect(() => {
+        const updateHeight = () => {
+            if (listContainerRef.current) {
+                const rect = listContainerRef.current.getBoundingClientRect();
+                // Account for padding/margins, use available height
+                const availableHeight = window.innerHeight - rect.top - 80;
+                setListHeight(Math.max(200, availableHeight));
+            }
+        };
+
+        updateHeight();
+        window.addEventListener("resize", updateHeight);
+        return () => window.removeEventListener("resize", updateHeight);
+    }, []);
+
+    // Reset list cache when data changes
+    useEffect(() => {
+        itemHeightsCache.current = {};
+        nearMeListRef.current?.resetAfterIndex(0);
+    }, [nearMeStations]);
+
+    useEffect(() => {
+        itemHeightsCache.current = {};
+        allListRef.current?.resetAfterIndex(0);
+    }, [filteredAllStations]);
+
+    useEffect(() => {
+        itemHeightsCache.current = {};
+        likedListRef.current?.resetAfterIndex(0);
+    }, [filteredLikedStations]);
+
+    // Estimate item height based on content
+    const getItemHeight = useCallback((station, listKey, index) => {
+        const cacheKey = `${listKey}-${index}`;
+        if (itemHeightsCache.current[cacheKey]) {
+            return itemHeightsCache.current[cacheKey];
+        }
+        // Base height: padding (20px) + icon/text row (~30px) + border (1px)
+        let height = 52;
+        // Add height for routes if present
+        const routeCount = station?.routes_on_stop?.length || 0;
+        if (routeCount > 0) {
+            height += 26; // Route badges row
+        }
+        itemHeightsCache.current[cacheKey] = height;
+        return height;
+    }, []);
+
+    const getNearMeItemSize = useCallback(
+        (index) => {
+            return getItemHeight(nearMeStations[index], "nearMe", index);
+        },
+        [nearMeStations, getItemHeight],
+    );
+
+    const getAllItemSize = useCallback(
+        (index) => {
+            return getItemHeight(filteredAllStations[index], "all", index);
+        },
+        [filteredAllStations, getItemHeight],
+    );
+
+    const getLikedItemSize = useCallback(
+        (index) => {
+            const liked = filteredLikedStations[index];
+            return getItemHeight(liked?.data, "liked", index);
+        },
+        [filteredLikedStations, getItemHeight],
+    );
 
     const StationItem = memo(
         ({ station, onSelect, isLiked, onToggleLike, showDistance }) => (
@@ -199,7 +301,7 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                     <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
                 </button>
             </div>
-        )
+        ),
     );
 
     return (
@@ -237,7 +339,7 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                 </button>
             </div>
 
-            <div className="results station-list">
+            <div className="results station-list" ref={listContainerRef}>
                 {page === "nearMe" && (
                     <>
                         {nearMeStations.length === 0 && (
@@ -245,22 +347,42 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                                 Ni postaj v bližini.
                             </p>
                         )}
-                        <ul>
-                            {nearMeStations.map((station, index) => (
-                                <StationItem
-                                    key={`near-${index}`}
-                                    station={station}
-                                    isLiked={isStationLiked(station)}
-                                    onToggleLike={(e) =>
-                                        toggleLikeStation(station, e)
-                                    }
-                                    onSelect={() =>
-                                        handleStationSelect(station)
-                                    }
-                                    showDistance={true}
-                                />
-                            ))}
-                        </ul>
+                        {nearMeStations.length > 0 && (
+                            <List
+                                ref={nearMeListRef}
+                                height={listHeight}
+                                itemCount={nearMeStations.length}
+                                itemSize={getNearMeItemSize}
+                                estimatedItemSize={50}
+                                width="100%"
+                                overscanCount={5}
+                            >
+                                {({ index, style }) => {
+                                    const station = nearMeStations[index];
+                                    return (
+                                        <div style={style}>
+                                            <StationItem
+                                                key={`near-${index}`}
+                                                station={station}
+                                                isLiked={isStationLiked(
+                                                    station,
+                                                )}
+                                                onToggleLike={(e) =>
+                                                    toggleLikeStation(
+                                                        station,
+                                                        e,
+                                                    )
+                                                }
+                                                onSelect={() =>
+                                                    handleStationSelect(station)
+                                                }
+                                                showDistance={true}
+                                            />
+                                        </div>
+                                    );
+                                }}
+                            </List>
+                        )}
                     </>
                 )}
 
@@ -275,22 +397,42 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                             filteredAllStations.length === 0 && (
                                 <p className="empty-message">Ni rezultatov.</p>
                             )}
-                        <ul>
-                            {filteredAllStations.map((station, index) => (
-                                <StationItem
-                                    key={`all-${index}`}
-                                    station={station}
-                                    isLiked={isStationLiked(station)}
-                                    onToggleLike={(e) =>
-                                        toggleLikeStation(station, e)
-                                    }
-                                    onSelect={() =>
-                                        handleStationSelect(station)
-                                    }
-                                    showDistance={false}
-                                />
-                            ))}
-                        </ul>
+                        {filteredAllStations.length > 0 && (
+                            <List
+                                ref={allListRef}
+                                height={listHeight}
+                                itemCount={filteredAllStations.length}
+                                itemSize={getAllItemSize}
+                                estimatedItemSize={50}
+                                width="100%"
+                                overscanCount={5}
+                            >
+                                {({ index, style }) => {
+                                    const station = filteredAllStations[index];
+                                    return (
+                                        <div style={style}>
+                                            <StationItem
+                                                key={`all-${index}`}
+                                                station={station}
+                                                isLiked={isStationLiked(
+                                                    station,
+                                                )}
+                                                onToggleLike={(e) =>
+                                                    toggleLikeStation(
+                                                        station,
+                                                        e,
+                                                    )
+                                                }
+                                                onSelect={() =>
+                                                    handleStationSelect(station)
+                                                }
+                                                showDistance={false}
+                                            />
+                                        </div>
+                                    );
+                                }}
+                            </List>
+                        )}
                     </>
                 )}
 
@@ -302,22 +444,42 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
                                 dodajanje.
                             </p>
                         )}
-                        <ul>
-                            {filteredLikedStations.map((liked, index) => (
-                                <StationItem
-                                    key={`liked-${index}`}
-                                    station={liked.data}
-                                    isLiked={true}
-                                    onToggleLike={(e) =>
-                                        toggleLikeStation(liked.data, e)
-                                    }
-                                    onSelect={() =>
-                                        handleStationSelect(liked.data)
-                                    }
-                                    showDistance={false}
-                                />
-                            ))}
-                        </ul>
+                        {filteredLikedStations.length > 0 && (
+                            <List
+                                ref={likedListRef}
+                                height={listHeight}
+                                itemCount={filteredLikedStations.length}
+                                itemSize={getLikedItemSize}
+                                estimatedItemSize={50}
+                                width="100%"
+                                overscanCount={5}
+                            >
+                                {({ index, style }) => {
+                                    const liked = filteredLikedStations[index];
+                                    return (
+                                        <div style={style}>
+                                            <StationItem
+                                                key={`liked-${index}`}
+                                                station={liked.data}
+                                                isLiked={true}
+                                                onToggleLike={(e) =>
+                                                    toggleLikeStation(
+                                                        liked.data,
+                                                        e,
+                                                    )
+                                                }
+                                                onSelect={() =>
+                                                    handleStationSelect(
+                                                        liked.data,
+                                                    )
+                                                }
+                                                showDistance={false}
+                                            />
+                                        </div>
+                                    );
+                                }}
+                            </List>
+                        )}
                     </>
                 )}
             </div>

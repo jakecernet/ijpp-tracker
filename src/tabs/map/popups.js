@@ -8,7 +8,7 @@ export function createImage(src) {
     const author = name === "-U1" ? "Doris Kordić" : "DWProski";
 
     return `<div class="popup-image-wrapper">
-              <img src="https://mestnipromet.cyou/tracker/img/avtobusi/${name}.jpg" alt="Slika" />
+              <img loading="lazy" src="https://mestnipromet.cyou/tracker/img/avtobusi/${name}.jpg" alt="Slika" />
               <p>
                 <img src="${Camera}" alt="Camera" />
                 ${escapeHTML(author)}
@@ -22,7 +22,7 @@ export function createRow(label, value) {
         `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
         `<span style="opacity:0.7">${escapeHTML(label)}</span>` +
         `<span style="font-weight:600; text-align:right">${escapeHTML(
-            String(value)
+            String(value),
         )}</span>` +
         `</div>`
     );
@@ -52,7 +52,7 @@ export function renderLppPopup(properties) {
             ? ""
             : createRow(
                   "Vžig",
-                  properties.ignition ? "Vključen" : "Izključen"
+                  properties.ignition ? "Vključen" : "Izključen",
               ));
 
     return (
@@ -78,13 +78,13 @@ export function renderIjppPopup(properties) {
         properties.stopStatus === "STOPPED_AT"
             ? "Na postaji: "
             : "Naslednja postaja: ",
-        properties.stop
+        properties.stop,
     );
 
     return (
         `<div style="min-width:240px">` +
         `<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
-            String(heading)
+            String(heading),
         )}</div>` +
         operator +
         stop +
@@ -101,7 +101,7 @@ export function renderTrainPopup(properties) {
         `<div style="min-width:220px">` +
         (number
             ? `<div style="font-weight:600; font-size:16px; margin-bottom:4px">${escapeHTML(
-                  number
+                  number,
               )}</div>`
             : "") +
         (departure
@@ -136,7 +136,7 @@ export function renderTrainPopup(properties) {
 export function createBusStopPopup(
     { name, id, ref_id, gtfs_id, vCenter },
     coordinates,
-    onSelect
+    onSelect,
 ) {
     const wrapper = document.createElement("div");
     const title = document.createElement("h3");
@@ -164,7 +164,7 @@ export function createBusStopPopup(
 export function createTrainStopPopup(
     { name, stopId, id },
     coordinates,
-    onSelect
+    onSelect,
 ) {
     const wrapper = document.createElement("div");
     const title = document.createElement("h3");

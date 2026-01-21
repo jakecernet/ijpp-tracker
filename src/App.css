@@ -427,6 +427,8 @@ body {
                 transition: background 0.2s ease;
                 color: var(--text-color);
                 cursor: pointer;
+                box-sizing: border-box;
+                height: 100%;
 
                 .station-content {
                     display: flex;
@@ -443,6 +445,7 @@ body {
                         display: flex;
                         flex-direction: row;
                         gap: 10px;
+                        align-items: center;
                     }
 
                     .station-info {

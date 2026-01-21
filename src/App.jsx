@@ -1,5 +1,11 @@
-import { useState, useEffect, lazy, Suspense } from "react";
-import { HashRouter as Router, NavLink, Routes, Route } from "react-router-dom";
+import { useState, useEffect, lazy, Suspense, useCallback } from "react";
+import {
+    HashRouter as Router,
+    NavLink,
+    Routes,
+    Route,
+    useLocation,
+} from "react-router-dom";
 import { Map, MapPin, Route as RouteIcon, Settings2 } from "lucide-react";
 import "./App.css";
 
@@ -33,17 +39,19 @@ function App() {
     const [activeStation, setActiveStation] = useState(
         localStorage.getItem("activeStation")
             ? JSON.parse(localStorage.getItem("activeStation"))
-            : { name: "Vrhnika", coordinates: [46.057, 14.295], id: 123456789 }
+            : { name: "Vrhnika", coordinates: [46.057, 14.295], id: 123456789 },
     );
     const [userLocation, setUserLocation] = useState(
         localStorage.getItem("userLocation")
             ? JSON.parse(localStorage.getItem("userLocation"))
-            : [46.056, 14.5058]
+            : [46.056, 14.5058],
     );
 
     const [theme, setTheme] = useState(
-        localStorage.getItem("theme") || "light"
+        localStorage.getItem("theme") || "light",
     );
+
+    const [isOnMapTab, setIsOnMapTab] = useState(true);
 
     const [visibility, setVisibility] = useState(() => {
         try {
@@ -137,7 +145,7 @@ function App() {
         load();
     }, []);
 
-    // Na 15 sekund fetcha pozicije vlakov + busov
+    // Na par sekund fetcha pozicije vlakov + busov (z visibility-based polling)
     useEffect(() => {
         const fetchPositions = async () => {
             try {
@@ -158,13 +166,49 @@ function App() {
             }
         };
 
-        //začetn fetch
+        // Don't poll if not on the map tab
+        if (!isOnMapTab) {
+            return;
+        }
+
+        // začetni fetch
         fetchPositions();
 
-        // fetchanje vsakih 5 sekund
-        const intervalId = setInterval(fetchPositions, 5000);
-        return () => clearInterval(intervalId);
-    }, []);
+        // Visibility-based polling - pause when tab is hidden
+        let intervalId;
+        const POLLING_INTERVAL = 5000;
+
+        const startPolling = () => {
+            intervalId = setInterval(fetchPositions, POLLING_INTERVAL);
+        };
+
+        const stopPolling = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                fetchPositions(); // Fetch immediately when returning
+                startPolling();
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        startPolling();
+
+        return () => {
+            stopPolling();
+            document.removeEventListener(
+                "visibilitychange",
+                handleVisibilityChange,
+            );
+        };
+    }, [isOnMapTab]);
 
     // Dobi userjevo lokacijo
     useEffect(() => {
@@ -175,12 +219,12 @@ function App() {
                     setUserLocation([latitude, longitude]);
                     localStorage.setItem(
                         "userLocation",
-                        JSON.stringify([latitude, longitude])
+                        JSON.stringify([latitude, longitude]),
                     );
                 },
                 (error) => {
                     console.error("Error getting user's location:", error);
-                }
+                },
             );
         } else {
             console.error("Geolocation is not supported by this browser.");
@@ -304,8 +348,22 @@ function App() {
         }
     }, [selectedVehicle]);
 
+    // Component to track route changes and update isOnMapTab
+    const RouteTracker = useCallback(() => {
+        const location = useLocation();
+
+        useEffect(() => {
+            const path = location.pathname;
+            const onMap = path === "/" || path === "/map" || path === "";
+            setIsOnMapTab(onMap);
+        }, [location.pathname]);
+
+        return null;
+    }, []);
+
     return (
         <Router>
+            <RouteTracker />
             <div className={`container ${theme}`}>
                 <div className="content">
                     <Suspense
