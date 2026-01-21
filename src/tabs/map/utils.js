@@ -57,7 +57,7 @@ export function ensureIcons(map, iconSources) {
 
 /**
  * Extract coordinates from a stop object with various possible formats.
- * Returns [lat, lon] or null if invalid.
+ * @returns [lat, lon] or null if invalid.
  */
 export function extractStopCoord(stop) {
     if (!stop) return null;

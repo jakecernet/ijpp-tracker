@@ -473,15 +473,36 @@ const fetchIJPPTrip = async (trip) => {
 
 /** Fetcha točke LPP route
  * @param {string} routeId - ID route
+ * @param {string} tripId - Optional trip ID to filter by specific trip
  * @returns Tabelo s točkami route
  */
-const fetchLppPoints = async (routeId) => {
+const fetchLppPoints = async (routeId, tripId = null) => {
     if (!routeId) return null;
     try {
         const raw = await fetchJson(lppRoutePointsLink + routeId);
-        const points = raw.data
-            ?.filter((point) => point.geojson_shape != null) // Filter out points with null geojson_shape
-            .map((point) => {
+        let data = raw.data?.filter(
+            (point) => point.geojson_shape != null,
+        );
+
+        // If tripId is provided, filter to only include that specific trip's geometry
+        if (tripId && data) {
+            const matchingTrip = data.find(
+                (point) => point.trip_id === tripId,
+            );
+            // If we found a matching trip, use only that one; otherwise fall back to first trip
+            if (matchingTrip) {
+                data = [matchingTrip];
+            } else if (data.length > 0) {
+                // Fall back to first trip if no exact match (different trip on same route)
+                data = [data[0]];
+            }
+        } else if (data && data.length > 0) {
+            // No tripId provided - use only the first trip to avoid mixed paths
+            data = [data[0]];
+        }
+
+        const points = data
+            ?.map((point) => {
                 // Additional safety check for geojson_shape.type
                 if (!point.geojson_shape || !point.geojson_shape.type) {
                     console.warn(
@@ -531,6 +552,7 @@ const fetchLppRoute = async (lppRoute) => {
         const raw = await fetchJson(lppRouteLink + lppRoute.tripId);
         const geometry = await fetchLppPoints(
             lppRoute.lineId || lppRoute.routeId,
+            lppRoute.tripId,
         );
 
         const lineNumber = lppRoute.lineNumber || lppRoute.routeName || "";
