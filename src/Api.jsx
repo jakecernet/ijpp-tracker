@@ -54,6 +54,20 @@ async function fetchJson(url) {
     return response.json();
 }
 
+const cache = new Map();
+
+/**
+ * Helper za fetchanje s cachingom
+ * @returns
+ */
+async function cachedFetch(key, ttl, fetcher) {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.time < ttl) return cached.data;
+    const data = await fetcher();
+    cache.set(key, { data, time: Date.now() });
+    return data;
+}
+
 /**
  * Helper za dekodiranje nekega sranja za dobit lokacije vlakov
  * @param {string} str - Polyline tekst
@@ -258,7 +272,9 @@ export function decodePolylineToPoints(str, precision) {
  */
 const fetchAllBusStops = async () => {
     try {
-        const raw = await fetchJson(busStopsLink);
+        const raw = await cachedFetch(busStopsLink, 300000, () =>
+            fetchJson(busStopsLink),
+        );
         const list = Array.isArray(raw) ? raw : [];
 
         return list
@@ -312,7 +328,9 @@ const fetchAllBusStops = async () => {
  */
 const fetchSzStops = async () => {
     try {
-        const raw = await fetchJson(szStopsLink);
+        const raw = await cachedFetch(szStopsLink, 300000, () =>
+            fetchJson(szStopsLink),
+        );
         return raw;
     } catch (error) {
         console.error("Error fetching SZ stops:", error);
@@ -356,21 +374,21 @@ const fetchIJPPPositions = async () => {
         const data = await fetchJson(ijppLocationsLink);
         const ijppPositions = Array.isArray(data)
             ? data
-                .filter(
-                    (vehicle) =>
-                        vehicle?.vehicle?.operator_name !=
-                        "Ljubljanski Potniški Promet",
-                )
-                .map((vehicle) => ({
-                    gpsLocation: [vehicle?.lat || 0, vehicle?.lon || 0],
-                    heading: vehicle?.heading || 0,
-                    operator: vehicle?.vehicle?.operator_name || "/",
-                    lineName: vehicle?.trip_headsign,
-                    tripId: vehicle?.trip_id,
-                    vehicleId: vehicle?.vehicle?.id,
-                    stop: vehicle && vehicle.stop ? vehicle.stop.name : "/",
-                    stopStatus: vehicle?.stop_status,
-                }))
+                  .filter(
+                      (vehicle) =>
+                          vehicle?.vehicle?.operator_name !=
+                          "Ljubljanski Potniški Promet",
+                  )
+                  .map((vehicle) => ({
+                      gpsLocation: [vehicle?.lat || 0, vehicle?.lon || 0],
+                      heading: vehicle?.heading || 0,
+                      operator: vehicle?.vehicle?.operator_name || "/",
+                      lineName: vehicle?.trip_headsign,
+                      tripId: vehicle?.trip_id,
+                      vehicleId: vehicle?.vehicle?.id,
+                      stop: vehicle && vehicle.stop ? vehicle.stop.name : "/",
+                      stopStatus: vehicle?.stop_status,
+                  }))
             : [];
         return ijppPositions;
     } catch (error) {
@@ -450,14 +468,14 @@ const fetchIJPPTrip = async (trip) => {
             tripId: raw?.gtfs_id || "",
             stops: raw?.stop_times
                 ? raw.stop_times.map((stop) => ({
-                    arrival: seconds2time(stop.arrival_realtime),
-                    departure: seconds2time(stop.departure_realtime),
-                    realtime: stop.realtime,
-                    passed: stop.passed,
-                    name: stop.stop.name,
-                    gtfsId: stop.stop.gtfs_id,
-                    gpsLocation: [stop.stop.lat || 0, stop.stop.lon || 0],
-                }))
+                      arrival: seconds2time(stop.arrival_realtime),
+                      departure: seconds2time(stop.departure_realtime),
+                      realtime: stop.realtime,
+                      passed: stop.passed,
+                      name: stop.stop.name,
+                      gtfsId: stop.stop.gtfs_id,
+                      gpsLocation: [stop.stop.lat || 0, stop.stop.lon || 0],
+                  }))
                 : [],
             geometry: pointsResponse.coordinates || [],
             operator: await operator,
@@ -480,15 +498,11 @@ const fetchLppPoints = async (routeId, tripId = null) => {
     if (!routeId) return null;
     try {
         const raw = await fetchJson(lppRoutePointsLink + routeId);
-        let data = raw.data?.filter(
-            (point) => point.geojson_shape != null,
-        );
+        let data = raw.data?.filter((point) => point.geojson_shape != null);
 
         // If tripId is provided, filter to only include that specific trip's geometry
         if (tripId && data) {
-            const matchingTrip = data.find(
-                (point) => point.trip_id === tripId,
-            );
+            const matchingTrip = data.find((point) => point.trip_id === tripId);
             // If we found a matching trip, use only that one; otherwise fall back to first trip
             if (matchingTrip) {
                 data = [matchingTrip];
@@ -519,18 +533,18 @@ const fetchLppPoints = async (routeId, tripId = null) => {
                     points:
                         point.geojson_shape.type === "LineString"
                             ? point.geojson_shape.coordinates.map((coord) => [
-                                coord[1],
-                                coord[0],
-                            ])
+                                  coord[1],
+                                  coord[0],
+                              ])
                             : point.geojson_shape.type === "MultiLineString"
-                                ? point.geojson_shape.coordinates.flatMap(
+                              ? point.geojson_shape.coordinates.flatMap(
                                     (lineString) =>
                                         lineString.map((coord) => [
                                             coord[1],
                                             coord[0],
                                         ]),
                                 )
-                                : [],
+                              : [],
                 };
             })
             .filter(Boolean); // Remove any null entries from the map
@@ -567,13 +581,13 @@ const fetchLppRoute = async (lppRoute) => {
             operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
             stops: Array.isArray(raw.data)
                 ? raw.data.map((stop) => ({
-                    name: stop.name || "",
-                    stopId: stop.station_code || "",
-                    gpsLocation: [stop.latitude || 0, stop.longitude || 0],
-                    arrivals: stop?.arrivals.map((arrival) => ({
-                        eta_min: arrival.eta_min,
-                    })),
-                }))
+                      name: stop.name || "",
+                      stopId: stop.station_code || "",
+                      gpsLocation: [stop.latitude || 0, stop.longitude || 0],
+                      arrivals: stop?.arrivals.map((arrival) => ({
+                          eta_min: arrival.eta_min,
+                      })),
+                  }))
                 : [],
             geometry: geometry || [],
         };
@@ -598,49 +612,49 @@ const fetchSzTrip = async (tripId) => {
         const endStop = raw && raw[0] ? raw[0].to : null;
         selectedRoute = Array.isArray(raw)
             ? {
-                from: {
-                    name: raw[0]?.from?.name || "",
-                    stopId: raw[0]?.from?.stopId || "",
-                    gpsLocation: [
-                        raw[0]?.from?.lat || 0,
-                        raw[0]?.from?.lon || 0,
-                    ],
-                    departure: raw[0]?.from?.departure || "",
-                },
-                to: {
-                    name: raw[0]?.to?.name || "",
-                    stopId: raw[0]?.to?.stopId || "",
-                    gpsLocation: [raw[0]?.to?.lat || 0, raw[0]?.to?.lon || 0],
-                    arrival: raw[0]?.to?.arrival || "",
-                },
-                tripName: raw[0]?.headsign || "",
-                duration: raw[0]?.duration || "",
-                startTime: raw[0]?.startTime || "",
-                endTime: raw[0]?.endTime || "",
-                realTime: raw[0]?.realTime || false,
-                tripId: raw[0]?.tripId || "",
-                shortName: raw[0]?.routeShortName || "",
-                stops: [
-                    startStop,
-                    ...(raw[0]?.intermediateStops?.map((stop) => ({
-                        name: stop?.name || "",
-                        stopId: stop?.stopId || "",
-                        gpsLocation: [stop?.lat || 0, stop?.lon || 0],
-                        arrival: stop?.arrival || "",
-                        departure: stop?.departure || "",
-                    })) || []),
-                    endStop,
-                ],
-                geometry: raw[0]?.legGeometry
-                    ? decodePolylineToPoints(
-                        raw[0]?.legGeometry?.points || "",
-                        6,
-                    )
-                    : [],
-                operator: "Slovenske železnice d.o.o.",
-                isLPP: false,
-                isSZ: true,
-            }
+                  from: {
+                      name: raw[0]?.from?.name || "",
+                      stopId: raw[0]?.from?.stopId || "",
+                      gpsLocation: [
+                          raw[0]?.from?.lat || 0,
+                          raw[0]?.from?.lon || 0,
+                      ],
+                      departure: raw[0]?.from?.departure || "",
+                  },
+                  to: {
+                      name: raw[0]?.to?.name || "",
+                      stopId: raw[0]?.to?.stopId || "",
+                      gpsLocation: [raw[0]?.to?.lat || 0, raw[0]?.to?.lon || 0],
+                      arrival: raw[0]?.to?.arrival || "",
+                  },
+                  tripName: raw[0]?.headsign || "",
+                  duration: raw[0]?.duration || "",
+                  startTime: raw[0]?.startTime || "",
+                  endTime: raw[0]?.endTime || "",
+                  realTime: raw[0]?.realTime || false,
+                  tripId: raw[0]?.tripId || "",
+                  shortName: raw[0]?.routeShortName || "",
+                  stops: [
+                      startStop,
+                      ...(raw[0]?.intermediateStops?.map((stop) => ({
+                          name: stop?.name || "",
+                          stopId: stop?.stopId || "",
+                          gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+                          arrival: stop?.arrival || "",
+                          departure: stop?.departure || "",
+                      })) || []),
+                      endStop,
+                  ],
+                  geometry: raw[0]?.legGeometry
+                      ? decodePolylineToPoints(
+                            raw[0]?.legGeometry?.points || "",
+                            6,
+                        )
+                      : [],
+                  operator: "Slovenske železnice d.o.o.",
+                  isLPP: false,
+                  isSZ: true,
+              }
             : null;
         return selectedRoute;
     } catch (error) {
@@ -698,39 +712,30 @@ const fetchIjppArrivals = async (ijppId) => {
             ijppArrivalsLink + ijppId + "?current=true",
         );
         const list = Array.isArray(raw?.arrivals) ? raw.arrivals : [];
-        const arrivals = list
-            .map((arrival) => {
-                const etaData = computeEtaAndTime({
-                    etaMinutes: undefined,
-                    realtimeDeparture: seconds2time(
-                        arrival?.departure_realtime,
-                    ),
-                    scheduledDeparture: seconds2time(
-                        arrival?.departure_scheduled,
-                    ),
-                });
-                return {
-                    operatorName: arrival?.agency_name,
-                    tripName: arrival?.trip_headsign,
-                    passed: arrival?.passed,
-                    realTime: arrival?.realtime,
-                    scheduledArrival: seconds2time(arrival?.arrival_scheduled),
-                    realtimeArrival: seconds2time(arrival?.arrival_realtime),
-                    arrivalDelay: arrival?.arrival_delay,
-                    scheduledDeparture: seconds2time(
-                        arrival?.departure_scheduled,
-                    ),
-                    realtimeDeparture: seconds2time(
-                        arrival?.departure_realtime,
-                    ),
-                    departureDelay: arrival?.departure_delay,
-                    tripId: arrival?.trip_id,
-                    routeId: arrival?.route_id,
-                    routeShortName: arrival?.route_short_name,
-                    etaMinutes: etaData.etaMinutes,
-                    arrivalTime: etaData.arrivalTime,
-                };
-            })
+        const arrivals = list.map((arrival) => {
+            const etaData = computeEtaAndTime({
+                etaMinutes: undefined,
+                realtimeDeparture: seconds2time(arrival?.departure_realtime),
+                scheduledDeparture: seconds2time(arrival?.departure_scheduled),
+            });
+            return {
+                operatorName: arrival?.agency_name,
+                tripName: arrival?.trip_headsign,
+                passed: arrival?.passed,
+                realTime: arrival?.realtime,
+                scheduledArrival: seconds2time(arrival?.arrival_scheduled),
+                realtimeArrival: seconds2time(arrival?.arrival_realtime),
+                arrivalDelay: arrival?.arrival_delay,
+                scheduledDeparture: seconds2time(arrival?.departure_scheduled),
+                realtimeDeparture: seconds2time(arrival?.departure_realtime),
+                departureDelay: arrival?.departure_delay,
+                tripId: arrival?.trip_id,
+                routeId: arrival?.route_id,
+                routeShortName: arrival?.route_short_name,
+                etaMinutes: etaData.etaMinutes,
+                arrivalTime: etaData.arrivalTime,
+            };
+        });
         return arrivals;
     } catch (error) {
         console.error("Error fetching IJPP arrivals:", error);
