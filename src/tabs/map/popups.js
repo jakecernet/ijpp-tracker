@@ -10,7 +10,7 @@ export function createImage(src) {
     return `<div class="popup-image-wrapper">
               <img loading="lazy" src="https://mestnipromet.cyou/tracker/img/avtobusi/${name}.jpg" alt="Slika" />
               <p>
-                <img src="${Camera}" alt="Camera" />
+                <img src="${Camera}" alt="Author" />
                 ${escapeHTML(author)}
               </p>
             </div>`;
