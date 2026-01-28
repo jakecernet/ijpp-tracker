@@ -56,6 +56,13 @@ async function fetchJson(url) {
 
 const cache = new Map();
 
+// Cache TTL values in milliseconds
+const CACHE_TTL = {
+    stops: 5 * 60 * 1000, // 5 minutes - static data, rarely changes
+    positions: 5 * 1000, // 5 seconds - real-time positions
+    arrivals: 15 * 1000, // 15 seconds - arrival predictions
+};
+
 /**
  * Helper za fetchanje s cachingom
  * @returns
@@ -66,6 +73,27 @@ async function cachedFetch(key, ttl, fetcher) {
     const data = await fetcher();
     cache.set(key, { data, time: Date.now() });
     return data;
+}
+
+/**
+ * Prefetch static data (bus stops, train stops) on app initialization
+ * Call this early to warm the cache before user needs the data
+ */
+export async function prefetchStaticData() {
+    try {
+        // Fetch both in parallel to speed up initial load
+        await Promise.all([
+            cachedFetch(busStopsLink, CACHE_TTL.stops, () =>
+                fetchJson(busStopsLink),
+            ),
+            cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
+                fetchJson(szStopsLink),
+            ),
+        ]);
+        console.log("Static data prefetched successfully");
+    } catch (error) {
+        console.warn("Prefetch failed, will fetch on demand:", error);
+    }
 }
 
 /**
@@ -272,7 +300,7 @@ export function decodePolylineToPoints(str, precision) {
  */
 const fetchAllBusStops = async () => {
     try {
-        const raw = await cachedFetch(busStopsLink, 300000, () =>
+        const raw = await cachedFetch(busStopsLink, CACHE_TTL.stops, () =>
             fetchJson(busStopsLink),
         );
         const list = Array.isArray(raw) ? raw : [];
@@ -328,7 +356,7 @@ const fetchAllBusStops = async () => {
  */
 const fetchSzStops = async () => {
     try {
-        const raw = await cachedFetch(szStopsLink, 300000, () =>
+        const raw = await cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
             fetchJson(szStopsLink),
         );
         return raw;

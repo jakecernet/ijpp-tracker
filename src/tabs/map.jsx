@@ -65,8 +65,8 @@ function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
     if (popup) {
         marker.setPopup(
             new maplibregl.Popup({ closeButton: false }).setHTML(
-                `<h4>${popup}</h4>`
-            )
+                `<h4>${popup}</h4>`,
+            ),
         );
         element.style.cursor = "pointer";
     }
@@ -88,14 +88,19 @@ const Map = React.memo(function Map({
     setVisibility,
     busOperators,
     setBusOperators,
+    onZoomChange,
 }) {
     const mapRef = useRef(null);
     const mapInstanceRef = useRef(null);
     const markersRef = useRef({ user: null, active: null });
-    const handlersRef = useRef({ setActiveStation, setSelectedVehicle });
+    const handlersRef = useRef({
+        setActiveStation,
+        setSelectedVehicle,
+        onZoomChange,
+    });
     const routeDrawerRef = useRef(null);
     const initialCenterRef = useRef(
-        userLocation || activeStation?.coordinates || DEFAULT_CENTER
+        userLocation || activeStation?.coordinates || DEFAULT_CENTER,
     );
 
     const [filterByRoute, setFilterByRoute] = useState(false);
@@ -108,8 +113,12 @@ const Map = React.memo(function Map({
     const [isMapLoaded, setIsMapLoaded] = useState(false);
 
     useEffect(() => {
-        handlersRef.current = { setActiveStation, setSelectedVehicle };
-    }, [setActiveStation, setSelectedVehicle]);
+        handlersRef.current = {
+            setActiveStation,
+            setSelectedVehicle,
+            onZoomChange,
+        };
+    }, [setActiveStation, setSelectedVehicle, onZoomChange]);
 
     useEffect(() => {
         try {
@@ -118,7 +127,7 @@ const Map = React.memo(function Map({
             sessionStorage.removeItem("openRouteDrawer");
             setRouteDrawerOpen(true);
             setRouteDrawerSnap("peek");
-        } catch { }
+        } catch {}
     }, []);
 
     const selectedVehicleKey = useMemo(() => {
@@ -247,8 +256,8 @@ const Map = React.memo(function Map({
             routeDrawerTranslateY != null
                 ? routeDrawerTranslateY
                 : routeDrawerSnap === "full"
-                    ? 0
-                    : routeDrawerPeekTranslateY;
+                  ? 0
+                  : routeDrawerPeekTranslateY;
 
         dragStateRef.current = {
             dragging: true,
@@ -258,7 +267,7 @@ const Map = React.memo(function Map({
 
         try {
             e.currentTarget.setPointerCapture(e.pointerId);
-        } catch { }
+        } catch {}
     };
 
     const onRouteDrawerPointerMove = (e) => {
@@ -315,7 +324,7 @@ const Map = React.memo(function Map({
                     }));
                 }
             }
-        } catch { }
+        } catch {}
     }, [setVisibility, setBusOperators]);
 
     const selectedVehicleCoords = useMemo(() => {
@@ -349,7 +358,7 @@ const Map = React.memo(function Map({
 
     const center = useMemo(
         () => selectedVehicleCoords || userLocation || DEFAULT_CENTER,
-        [selectedVehicleCoords, userLocation]
+        [selectedVehicleCoords, userLocation],
     );
 
     const busesGeoJSON = useMemo(() => {
@@ -399,7 +408,7 @@ const Map = React.memo(function Map({
                     brand: icon === "bus-generic" ? "generic" : icon,
                     operator: pos?.operator || "",
                 };
-            }
+            },
         );
     }, [gpsPositions, busOperators, filterByRoute, selectedVehicle]);
 
@@ -421,9 +430,9 @@ const Map = React.memo(function Map({
                     gtfs_id: stop?.gtfs_id ?? null,
                     vCenter: stop?.vCenter ?? false,
                     routes_on_stop: JSON.stringify(stop?.routes_on_stop ?? []),
-                })
+                }),
             ),
-        [busStops]
+        [busStops],
     );
 
     const trainStopsGeoJSON = useMemo(
@@ -439,15 +448,15 @@ const Map = React.memo(function Map({
                     lon: coord?.[1] ?? null,
                 };
             }),
-        [trainStops]
+        [trainStops],
     );
 
     const trainPositionsGeoJSON = useMemo(() => {
         const filtered =
             filterByRoute && selectedVehicle?.tripId
                 ? (trainPositions || []).filter(
-                    (t) => t.tripId === selectedVehicle.tripId
-                )
+                      (t) => t.tripId === selectedVehicle.tripId,
+                  )
                 : trainPositions || [];
 
         return toGeoJSONPoints(
@@ -469,7 +478,7 @@ const Map = React.memo(function Map({
                 realTime: train?.realtime ?? false,
                 from: JSON.stringify(train?.from ?? null),
                 to: JSON.stringify(train?.to ?? null),
-            })
+            }),
         );
     }, [trainPositions, filterByRoute, selectedVehicle?.tripId]);
 
@@ -488,7 +497,7 @@ const Map = React.memo(function Map({
         mapInstanceRef.current = map;
         map.addControl(
             new maplibregl.NavigationControl({ showCompass: true }),
-            "top-right"
+            "top-right",
         );
 
         map.on("load", async () => {
@@ -503,8 +512,13 @@ const Map = React.memo(function Map({
 
             // Setup trip overlays for all providers
             ["ijpp", "lpp", "sz"].forEach((prefix) =>
-                setupTripOverlay(map, prefix, BRAND_COLOR_EXPR)
+                setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
             );
+
+            // Notify parent of initial zoom level
+            if (handlersRef.current.onZoomChange) {
+                handlersRef.current.onZoomChange(Math.round(map.getZoom()));
+            }
 
             // Configure all popups
             configureBusStopPopup({
@@ -521,7 +535,7 @@ const Map = React.memo(function Map({
                     handlersRef.current.setActiveStation(payload);
                     localStorage.setItem(
                         "activeStation",
-                        JSON.stringify(payload)
+                        JSON.stringify(payload),
                     );
                     window.location.hash = "/lines";
                 },
@@ -553,7 +567,7 @@ const Map = React.memo(function Map({
                     handlersRef.current.setActiveStation(payload);
                     localStorage.setItem(
                         "activeStation",
-                        JSON.stringify(payload)
+                        JSON.stringify(payload),
                     );
                     window.location.hash = "/lines";
                 },
@@ -591,10 +605,17 @@ const Map = React.memo(function Map({
 
             // Configure trip stops popups for all providers
             ["ijpp", "lpp", "sz"].forEach((prefix) =>
-                configureTripStopsPopup(map, `${prefix}-trip-stops-points`)
+                configureTripStopsPopup(map, `${prefix}-trip-stops-points`),
             );
 
             setIsMapLoaded(true);
+        });
+
+        // Track zoom changes for adaptive polling
+        map.on("zoomend", () => {
+            if (handlersRef.current.onZoomChange) {
+                handlersRef.current.onZoomChange(Math.round(map.getZoom()));
+            }
         });
 
         return () => {
@@ -629,7 +650,7 @@ const Map = React.memo(function Map({
         setPrefixVisible(
             map,
             "trainPositions",
-            effectiveVisibility.trainPositions
+            effectiveVisibility.trainPositions,
         );
     }, [visibility, routeVisibilityOverride, isMapLoaded]);
 
@@ -662,7 +683,7 @@ const Map = React.memo(function Map({
                 "lpp",
                 lineCoords,
                 stopsToFeatures(selectedVehicle.stops, "lpp"),
-                "lpp"
+                "lpp",
             );
         } else if (isSz) {
             const lineCoords = geo.filter(validCoord);
@@ -674,9 +695,9 @@ const Map = React.memo(function Map({
                     selectedVehicle.stops,
                     "sz",
                     selectedVehicle.from,
-                    selectedVehicle.to
+                    selectedVehicle.to,
                 ),
-                "sz"
+                "sz",
             );
         } else if (selectedVehicle.tripId !== undefined) {
             const lineCoords = geo.filter(validCoord);
@@ -685,7 +706,7 @@ const Map = React.memo(function Map({
                 "ijpp",
                 lineCoords,
                 stopsToFeatures(selectedVehicle.stops, brand),
-                brand
+                brand,
             );
         }
     }, [selectedVehicle, isMapLoaded]);
@@ -721,7 +742,7 @@ const Map = React.memo(function Map({
         const map = mapInstanceRef.current;
         if (map) {
             ["ijpp", "lpp", "sz"].forEach((prefix) =>
-                clearTripOverlay(map, prefix)
+                clearTripOverlay(map, prefix),
             );
         }
     };
@@ -755,10 +776,11 @@ const Map = React.memo(function Map({
                     style={
                         routeDrawerOpen
                             ? {
-                                transform: `translateY(${routeDrawerTranslateY ??
-                                    routeDrawerPeekTranslateY
-                                    }px)`,
-                            }
+                                  transform: `translateY(${
+                                      routeDrawerTranslateY ??
+                                      routeDrawerPeekTranslateY
+                                  }px)`,
+                              }
                             : undefined
                     }
                     role="dialog"

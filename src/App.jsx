@@ -1,4 +1,11 @@
-import { useState, useEffect, lazy, Suspense, useCallback } from "react";
+import {
+    useState,
+    useEffect,
+    lazy,
+    Suspense,
+    useCallback,
+    useDeferredValue,
+} from "react";
 import {
     HashRouter as Router,
     NavLink,
@@ -21,6 +28,7 @@ import {
     fetchSzTrip,
     fetchSzArrivals,
     fetchIJPPTrip,
+    prefetchStaticData,
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -108,6 +116,13 @@ function App() {
     const [lppArrivals, setLppArrivals] = useState([]);
     const [szArrivals, setSzArrivals] = useState([]);
 
+    // Track map zoom level for adaptive polling
+    const [mapZoom, setMapZoom] = useState(13);
+
+    // Use deferred values for positions to prevent blocking UI during rapid updates
+    const deferredGpsPositions = useDeferredValue(gpsPositions);
+    const deferredTrainPositions = useDeferredValue(trainPositions);
+
     useEffect(() => {
         try {
             const payload = {
@@ -117,6 +132,11 @@ function App() {
             localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
         } catch {}
     }, [visibility, busOperators]);
+
+    // Prefetch static data on mount
+    useEffect(() => {
+        prefetchStaticData();
+    }, []);
 
     // Fetcha busne postaje ob zagonu
     useEffect(() => {
@@ -174,9 +194,15 @@ function App() {
         // začetni fetch
         fetchPositions();
 
-        // Visibility-based polling - pause when tab is hidden
+        // Adaptive polling - slower when zoomed out, faster when zoomed in
         let intervalId;
-        const POLLING_INTERVAL = 5000;
+        const getPollingInterval = () => {
+            if (mapZoom < 10) return 15000; // Very zoomed out - 15s
+            if (mapZoom < 12) return 10000; // Zoomed out - 10s
+            if (mapZoom < 14) return 7000; // Medium zoom - 7s
+            return 5000; // Zoomed in - 5s
+        };
+        const POLLING_INTERVAL = getPollingInterval();
 
         const startPolling = () => {
             intervalId = setInterval(fetchPositions, POLLING_INTERVAL);
@@ -208,7 +234,7 @@ function App() {
                 handleVisibilityChange,
             );
         };
-    }, [isOnMapTab]);
+    }, [isOnMapTab, mapZoom]);
 
     // Dobi userjevo lokacijo
     useEffect(() => {
@@ -387,13 +413,13 @@ function App() {
                                 path="/*"
                                 element={
                                     <MapTab
-                                        gpsPositions={gpsPositions}
+                                        gpsPositions={deferredGpsPositions}
                                         busStops={busStops}
                                         trainStops={szStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        trainPositions={trainPositions}
+                                        trainPositions={deferredTrainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                         selectedVehicle={selectedVehicle}
                                         theme={theme}
@@ -402,6 +428,7 @@ function App() {
                                         setVisibility={setVisibility}
                                         busOperators={busOperators}
                                         setBusOperators={setBusOperators}
+                                        onZoomChange={setMapZoom}
                                     />
                                 }
                             />
@@ -409,13 +436,13 @@ function App() {
                                 path="/map"
                                 element={
                                     <MapTab
-                                        gpsPositions={gpsPositions}
+                                        gpsPositions={deferredGpsPositions}
                                         busStops={busStops}
                                         trainStops={szStops}
                                         activeStation={activeStation}
                                         setActiveStation={setActiveStation}
                                         userLocation={userLocation}
-                                        trainPositions={trainPositions}
+                                        trainPositions={deferredTrainPositions}
                                         setSelectedVehicle={setSelectedVehicle}
                                         selectedVehicle={selectedVehicle}
                                         theme={theme}
@@ -424,6 +451,7 @@ function App() {
                                         setVisibility={setVisibility}
                                         busOperators={busOperators}
                                         setBusOperators={setBusOperators}
+                                        onZoomChange={setMapZoom}
                                     />
                                 }
                             />
