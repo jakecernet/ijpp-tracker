@@ -1,5 +1,6 @@
 import { escapeHTML } from "./utils";
 import Camera from "../../img/camera.svg";
+import Center from "../../img/center.svg";
 
 export function createImage(src) {
     if (!src) return "";
@@ -51,9 +52,9 @@ export function renderLppPopup(properties) {
         (isUrban
             ? ""
             : createRow(
-                  "Vžig",
-                  properties.ignition ? "Vključen" : "Izključen",
-              ));
+                "Vžig",
+                properties.ignition ? "Vključen" : "Izključen",
+            ));
 
     return (
         `<div style="min-width:240px">` +
@@ -101,8 +102,8 @@ export function renderTrainPopup(properties) {
         `<div style="min-width:220px">` +
         (number
             ? `<div style="font-weight:600; font-size:16px; margin-bottom:4px">${escapeHTML(
-                  number,
-              )}</div>`
+                number,
+            )}</div>`
             : "") +
         (departure
             ? `<div style="display:flex; justify-content:space-between; margin-top:6px">
@@ -134,17 +135,53 @@ export function renderTrainPopup(properties) {
 }
 
 export function createBusStopPopup(
-    { name, id, ref_id, gtfs_id, vCenter },
+    { name, id, ref_id, gtfs_id, vCenter, routes_on_stop },
     coordinates,
     onSelect,
 ) {
     const wrapper = document.createElement("div");
     const title = document.createElement("h3");
-    title.textContent = (name || "") + (vCenter ? " (Proti centru)" : "");
+    title.innerHTML = (name || "") + (vCenter ? `<img src="${Center}" alt="Center" />` : "");
+    wrapper.appendChild(title);
+
+    // Parse routes (may be JSON string from GeoJSON properties)
+    let routes = [];
+    try {
+        routes = typeof routes_on_stop === "string"
+            ? JSON.parse(routes_on_stop)
+            : (routes_on_stop || []);
+    } catch (e) {
+        routes = [];
+    }
+
+    // Display routes if available
+    if (routes.length > 0) {
+        const routesContainer = document.createElement("div");
+        routesContainer.style.cssText = "display:flex; flex-wrap:wrap; gap:4px; margin:8px 0;";
+
+        const maxDisplay = 5;
+        const displayRoutes = routes.slice(0, maxDisplay);
+
+        displayRoutes.forEach(route => {
+            const badge = document.createElement("span");
+            badge.textContent = route;
+            badge.style.cssText = "background:#2a9d8f; color:white; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600;";
+            routesContainer.appendChild(badge);
+        });
+
+        if (routes.length > maxDisplay) {
+            const more = document.createElement("span");
+            more.textContent = `+${routes.length - maxDisplay}`;
+            more.style.cssText = "background:#6c757d; color:white; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600;";
+            routesContainer.appendChild(more);
+        }
+
+        wrapper.appendChild(routesContainer);
+    }
+
     const button = document.createElement("button");
     button.textContent = "Tukaj sem";
     button.className = "popup-button";
-    wrapper.appendChild(title);
     wrapper.appendChild(button);
 
     button.addEventListener("click", () => {

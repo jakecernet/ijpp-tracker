@@ -17,7 +17,7 @@ const loadLikedItems = (key) => {
 const saveLikedItems = (key, items) => {
     try {
         localStorage.setItem(key, JSON.stringify(items));
-    } catch {}
+    } catch { }
 };
 
 const LinesTab = ({
@@ -104,18 +104,18 @@ const LinesTab = ({
                 const newLiked = exists
                     ? prev.filter((r) => r.id !== id)
                     : [
-                          ...prev,
-                          {
-                              id,
-                              name: route.lineName || route.route_name,
-                              lineNumber: route.lineNumber || route.routeName,
-                              operator: route.operator || route.operatorName,
-                              headsign: route.headsign || route.tripName,
-                              tripId: route.tripId,
-                              lineId: route.lineId,
-                              routeId: route.routeId,
-                          },
-                      ];
+                        ...prev,
+                        {
+                            id,
+                            name: route.lineName || route.route_name,
+                            lineNumber: route.lineNumber || route.routeName,
+                            operator: route.operator || route.operatorName,
+                            headsign: route.headsign || route.tripName,
+                            tripId: route.tripId,
+                            lineId: route.lineId,
+                            routeId: route.routeId,
+                        },
+                    ];
                 saveLikedItems(LIKED_ROUTES_KEY, newLiked);
                 return newLiked;
             });
@@ -159,15 +159,8 @@ const LinesTab = ({
             )
             .filter(
                 (arrival) =>
-                    arrival?.operatorName !== "Ljubljanski Potniški Promet",
-            )
-            .filter(
-                (arrival) =>
-                    !(
-                        arrival?.operatorName ==
-                            "Ljubljanski potniški promet, d.o.o." &&
-                        arrival?.etaMinutes < 60
-                    ),
+                    !arrival?.operatorName?.toLowerCase().includes("ljubljanski potniški promet") ||
+                    arrival?.etaMinutes > 60,
             )
             .map((arrival) => ({ ...arrival, type: "IJPP" }));
 
@@ -191,7 +184,9 @@ const LinesTab = ({
             )
             .map((arrival) => ({ ...arrival, type: "SZ" }));
 
-        return [...ijppFiltered, ...lppFiltered, ...szFiltered];
+        return [...ijppFiltered, ...lppFiltered, ...szFiltered].sort(
+            (a, b) => (a.etaMinutes ?? Infinity) - (b.etaMinutes ?? Infinity)
+        );
     }, [ijppArrivals, lppArrivals, szArrivals, debouncedSearchTerm]);
 
     // Filtered routes for "All" - combines LPP numbered routes and active routes
@@ -266,13 +261,13 @@ const LinesTab = ({
             (item.operator?.includes("Slovenske železnice")
                 ? "SZ"
                 : item.operator?.includes("Ljubljanski potniški promet")
-                  ? "LPP"
-                  : "IJPP");
+                    ? "LPP"
+                    : "IJPP");
         const route = await getTripFromId(item, operatorType);
         if (route) {
             try {
                 sessionStorage.setItem("openRouteDrawer", "1");
-            } catch {}
+            } catch { }
             window.location.hash = "/map";
         }
     };

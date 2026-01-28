@@ -1,20 +1,16 @@
 .dark {
     --nav-bg: rgba(15, 23, 42, 0.95);
-    --content-bg: linear-gradient(
-        135deg,
-        #0f172a 0%,
-        #1e293b 50%,
-        #0f172a 100%
-    );
+    --content-bg: linear-gradient(135deg,
+            #0f172a 0%,
+            #1e293b 50%,
+            #0f172a 100%);
     --text-color: #e2e8f0;
     --active-color: #60a5fa;
     --hover-color: #94a3b8;
     --selector-border: rgba(96, 165, 250, 0.3);
-    --circle-bg: linear-gradient(
-        135deg,
-        rgba(51, 65, 85, 0.6),
-        rgba(71, 85, 105, 0.4)
-    );
+    --circle-bg: linear-gradient(135deg,
+            rgba(51, 65, 85, 0.6),
+            rgba(71, 85, 105, 0.4));
     --button-bg: rgba(30, 41, 59, 0.9);
     --popup-bg: rgba(30, 41, 59, 0.95);
     --x-bg: rgba(0, 0, 0, 0.6);
@@ -24,21 +20,17 @@
 
 .light {
     --nav-bg: rgba(243, 244, 246, 0.95);
-    --content-bg: linear-gradient(
-        135deg,
-        #f3f4f6 0%,
-        #e5e7eb 50%,
-        #f3f4f6 100%
-    );
+    --content-bg: linear-gradient(135deg,
+            #f3f4f6 0%,
+            #e5e7eb 50%,
+            #f3f4f6 100%);
     --text-color: #1e293b;
     --active-color: #2563eb;
     --hover-color: #475569;
     --selector-border: rgba(37, 99, 235, 0.3);
-    --circle-bg: linear-gradient(
-        135deg,
-        rgba(203, 213, 225, 0.6),
-        rgba(148, 163, 184, 0.4)
-    );
+    --circle-bg: linear-gradient(135deg,
+            rgba(203, 213, 225, 0.6),
+            rgba(148, 163, 184, 0.4));
     --button-bg: rgba(243, 244, 246, 0.9);
     --popup-bg: rgba(243, 244, 246, 0.95);
     --x-bg: rgba(255, 255, 255, 0.6);
@@ -525,7 +517,7 @@ body {
                 .liked-section {
                     margin-bottom: 20px;
 
-                    > h3 {
+                    >h3 {
                         padding: 10px;
                         border-bottom: 1px solid var(--selector-border);
                         color: var(--active-color);
@@ -788,15 +780,25 @@ body {
     width: fit-content;
     border-radius: 8px;
 }
+
 .maplibregl-popup-tip {
     border-top-color: var(--popup-bg) !important;
     border-bottom-color: var(--popup-bg) !important;
 }
+
 .maplibregl-popup-content h3 {
     font-size: 15px;
-    margin: 8px 0 6px;
+    margin-bottom: 8px;
     color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    img{
+        filter: invert(1);
+    }
 }
+
 .maplibregl-popup-content button,
 .maplibregl-popup-content .popup-button {
     background: rgba(96, 165, 250, 0.15);

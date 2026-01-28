@@ -118,7 +118,7 @@ const Map = React.memo(function Map({
             sessionStorage.removeItem("openRouteDrawer");
             setRouteDrawerOpen(true);
             setRouteDrawerSnap("peek");
-        } catch {}
+        } catch { }
     }, []);
 
     const selectedVehicleKey = useMemo(() => {
@@ -247,8 +247,8 @@ const Map = React.memo(function Map({
             routeDrawerTranslateY != null
                 ? routeDrawerTranslateY
                 : routeDrawerSnap === "full"
-                ? 0
-                : routeDrawerPeekTranslateY;
+                    ? 0
+                    : routeDrawerPeekTranslateY;
 
         dragStateRef.current = {
             dragging: true,
@@ -258,7 +258,7 @@ const Map = React.memo(function Map({
 
         try {
             e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {}
+        } catch { }
     };
 
     const onRouteDrawerPointerMove = (e) => {
@@ -315,7 +315,7 @@ const Map = React.memo(function Map({
                     }));
                 }
             }
-        } catch {}
+        } catch { }
     }, [setVisibility, setBusOperators]);
 
     const selectedVehicleCoords = useMemo(() => {
@@ -420,6 +420,7 @@ const Map = React.memo(function Map({
                     ref_id: stop?.ref_id ?? stop?.refID ?? null,
                     gtfs_id: stop?.gtfs_id ?? null,
                     vCenter: stop?.vCenter ?? false,
+                    routes_on_stop: JSON.stringify(stop?.routes_on_stop ?? []),
                 })
             ),
         [busStops]
@@ -445,8 +446,8 @@ const Map = React.memo(function Map({
         const filtered =
             filterByRoute && selectedVehicle?.tripId
                 ? (trainPositions || []).filter(
-                      (t) => t.tripId === selectedVehicle.tripId
-                  )
+                    (t) => t.tripId === selectedVehicle.tripId
+                )
                 : trainPositions || [];
 
         return toGeoJSONPoints(
@@ -754,11 +755,10 @@ const Map = React.memo(function Map({
                     style={
                         routeDrawerOpen
                             ? {
-                                  transform: `translateY(${
-                                      routeDrawerTranslateY ??
-                                      routeDrawerPeekTranslateY
-                                  }px)`,
-                              }
+                                transform: `translateY(${routeDrawerTranslateY ??
+                                    routeDrawerPeekTranslateY
+                                    }px)`,
+                            }
                             : undefined
                     }
                     role="dialog"
