@@ -29,6 +29,7 @@ import {
     fetchSzArrivals,
     fetchIJPPTrip,
     prefetchStaticData,
+    prefetchRoutesForArrivals,
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -310,6 +311,17 @@ function App() {
         load();
     }, [activeStation]);
 
+    // Prefetch routes for all arrivals in the background
+    useEffect(() => {
+        if (!ijppArrivals.length && !lppArrivals.length && !szArrivals.length)
+            return;
+        // Small delay so we don't start heavy fetching right as arrivals render
+        const timer = setTimeout(() => {
+            prefetchRoutesForArrivals(ijppArrivals, lppArrivals, szArrivals);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [ijppArrivals, lppArrivals, szArrivals]);
+
     // Za fetchanje tripa iz ID-ja
     const getTripFromId = async (tripData, type) => {
         try {
@@ -402,12 +414,10 @@ function App() {
                                     height: "100%",
                                     fontSize: "14px",
                                     color: "#94a3b8",
-                                }}
-                            >
+                                }}>
                                 Nalaganje...
                             </div>
-                        }
-                    >
+                        }>
                         <Routes>
                             <Route
                                 path="/*"
@@ -503,8 +513,7 @@ function App() {
                     </NavLink>
                     <NavLink
                         to="/stations"
-                        onClick={() => setSelectedVehicle(null)}
-                    >
+                        onClick={() => setSelectedVehicle(null)}>
                         <button>
                             <MapPin size={24} />
                             <h3>Postaje</h3>
@@ -512,8 +521,7 @@ function App() {
                     </NavLink>
                     <NavLink
                         to="/lines"
-                        onClick={() => setSelectedVehicle(null)}
-                    >
+                        onClick={() => setSelectedVehicle(null)}>
                         <button>
                             <RouteIcon size={24} />
                             <h3>Linije</h3>
@@ -521,8 +529,7 @@ function App() {
                     </NavLink>
                     <NavLink
                         to="/settings"
-                        onClick={() => setSelectedVehicle(null)}
-                    >
+                        onClick={() => setSelectedVehicle(null)}>
                         <button>
                             <Settings2 size={24} />
                             <h3>Nastavitve</h3>

@@ -61,7 +61,27 @@ const CACHE_TTL = {
     stops: 5 * 60 * 1000, // 5 minutes - static data, rarely changes
     positions: 5 * 1000, // 5 seconds - real-time positions
     arrivals: 15 * 1000, // 15 seconds - arrival predictions
+    routes: 5 * 60 * 1000, // 5 minutes - route/trip data
 };
+
+// Dedicated route cache keyed by tripId
+const routeCache = new Map();
+// Track in-flight prefetch promises to avoid duplicate requests
+const routeInFlight = new Map();
+
+function getCachedRoute(tripId) {
+    const cached = routeCache.get(tripId);
+    if (cached && Date.now() - cached.time < CACHE_TTL.routes) {
+        return cached.data;
+    }
+    return null;
+}
+
+function setCachedRoute(tripId, data) {
+    if (tripId && data) {
+        routeCache.set(tripId, { data, time: Date.now() });
+    }
+}
 
 /**
  * Helper za fetchanje s cachingom
@@ -473,6 +493,8 @@ const fetchTrainPositions = async () => {
 const fetchIJPPTrip = async (trip) => {
     if (!trip) return null;
     const tripId = trip.tripId || trip;
+    const cached = getCachedRoute(tripId);
+    if (cached) return cached;
     try {
         const dateString = new Date().toISOString().split("T")[0];
         const raw = await fetchJson(
@@ -510,6 +532,7 @@ const fetchIJPPTrip = async (trip) => {
             isLPP: false,
             isSZ: false,
         };
+        setCachedRoute(tripId, selectedRoute);
         return selectedRoute;
     } catch (error) {
         console.error("Error fetching IJPP trip:", error);
@@ -590,6 +613,8 @@ const fetchLppPoints = async (routeId, tripId = null) => {
  */
 const fetchLppRoute = async (lppRoute) => {
     if (!lppRoute) return null;
+    const cached = getCachedRoute(lppRoute.tripId);
+    if (cached) return cached;
     try {
         const raw = await fetchJson(lppRouteLink + lppRoute.tripId);
         const geometry = await fetchLppPoints(
@@ -619,6 +644,7 @@ const fetchLppRoute = async (lppRoute) => {
                 : [],
             geometry: geometry || [],
         };
+        setCachedRoute(lppRoute.tripId, selectedRoute);
         return selectedRoute;
     } catch (error) {
         console.error("Error fetching LPP route:", error);
@@ -633,6 +659,8 @@ const fetchLppRoute = async (lppRoute) => {
  */
 const fetchSzTrip = async (tripId) => {
     if (!tripId) return null;
+    const cached = getCachedRoute(tripId);
+    if (cached) return cached;
     try {
         const fetched = await fetchJson(szRouteLink + tripId);
         const raw = fetched?.legs || null;
@@ -684,6 +712,7 @@ const fetchSzTrip = async (tripId) => {
                   isSZ: true,
               }
             : null;
+        setCachedRoute(tripId, selectedRoute);
         return selectedRoute;
     } catch (error) {
         console.error("Error fetching SZ trip:", error);
@@ -793,6 +822,90 @@ const fetchSzArrivals = async (stationCode) => {
         return [];
     }
 };
+
+/**
+ * Prefetch routes for all arrivals at the selected station in the background.
+ * Fetches in small batches to avoid overloading APIs.
+ * @param {Array} ijppArrivals - IJPP arrivals
+ * @param {Array} lppArrivals - LPP arrivals
+ * @param {Array} szArrivals - SZ arrivals
+ */
+export async function prefetchRoutesForArrivals(
+    ijppArrivals,
+    lppArrivals,
+    szArrivals,
+) {
+    const tasks = [];
+
+    for (const arrival of lppArrivals || []) {
+        if (arrival.tripId && !getCachedRoute(arrival.tripId)) {
+            tasks.push({
+                type: "LPP",
+                tripId: arrival.tripId,
+                data: arrival,
+            });
+        }
+    }
+
+    for (const arrival of ijppArrivals || []) {
+        if (arrival.tripId && !getCachedRoute(arrival.tripId)) {
+            tasks.push({
+                type: "IJPP",
+                tripId: arrival.tripId,
+                data: arrival,
+            });
+        }
+    }
+
+    for (const arrival of szArrivals || []) {
+        if (arrival.tripId && !getCachedRoute(arrival.tripId)) {
+            tasks.push({
+                type: "SZ",
+                tripId: arrival.tripId,
+                data: arrival,
+            });
+        }
+    }
+
+    if (tasks.length === 0) return;
+    console.log(
+        `[prefetch] Prefetching ${tasks.length} routes in background...`,
+    );
+
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+        const batch = tasks.slice(i, i + BATCH_SIZE);
+        await Promise.allSettled(
+            batch.map((task) => {
+                // Deduplicate in-flight requests
+                if (routeInFlight.has(task.tripId)) {
+                    return routeInFlight.get(task.tripId);
+                }
+                let promise;
+                if (task.type === "LPP") {
+                    promise = fetchLppRoute({
+                        tripId: task.data.tripId,
+                        lineId: task.data.routeId,
+                        lineNumber: task.data.routeName,
+                        lineName: task.data.tripName,
+                    });
+                } else if (task.type === "SZ") {
+                    promise = fetchSzTrip(task.tripId);
+                } else {
+                    promise = fetchIJPPTrip(task.tripId);
+                }
+                routeInFlight.set(task.tripId, promise);
+                promise.finally(() => routeInFlight.delete(task.tripId));
+                return promise;
+            }),
+        );
+        // Small delay between batches to be gentle on the APIs
+        if (i + BATCH_SIZE < tasks.length) {
+            await new Promise((r) => setTimeout(r, 300));
+        }
+    }
+    console.log(`[prefetch] Done prefetching routes.`);
+}
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
 export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
