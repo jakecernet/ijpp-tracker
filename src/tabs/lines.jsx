@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
 import { Heart } from "lucide-react";
 import { formatPrecomputedArrival } from "../Api";
 
@@ -249,7 +249,7 @@ const LinesTab = ({
         );
     }, [likedRoutes, debouncedSearchTerm]);
 
-    const handleRouteClick = async (item, type) => {
+    const handleRouteClick = useCallback(async (item, type) => {
         // Don't try to fetch if there's no valid ID
         if (!item.tripId && !item.lineId && !item.routeId) {
             console.warn("No valid trip/line ID for route", item);
@@ -270,9 +270,9 @@ const LinesTab = ({
             } catch { }
             window.location.hash = "/map";
         }
-    };
+    }, [getTripFromId]);
 
-    const RouteItem = ({ item, isLiked, onToggleLike, onClick }) => (
+    const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
         <div className="route-item" onClick={onClick}>
             <div className="circle" style={{ background: bgColorMap(item) }}>
                 {item.lineNumber ??
@@ -295,9 +295,9 @@ const LinesTab = ({
                 <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
             </button>
         </div>
-    );
+    ));
 
-    const ArrivalItem = ({ arrival }) => (
+    const ArrivalItem = memo(({ arrival }) => (
         <div
             className="arrival-item"
             onClick={() => handleRouteClick(arrival, arrival.type)}
@@ -331,7 +331,7 @@ const LinesTab = ({
                 </p>
             )}
         </div>
-    );
+    ));
 
     return (
         <div className="insideDiv">

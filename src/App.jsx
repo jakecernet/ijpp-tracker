@@ -323,7 +323,7 @@ function App() {
     }, [ijppArrivals, lppArrivals, szArrivals]);
 
     // Za fetchanje tripa iz ID-ja
-    const getTripFromId = async (tripData, type) => {
+    const getTripFromId = useCallback(async (tripData, type) => {
         try {
             let route = null;
             const tripId =
@@ -354,7 +354,7 @@ function App() {
         } catch (error) {
             console.error("Error loading trip from ID:", error);
         }
-    };
+    }, []);
 
     // Fetch full route details when a vehicle is selected
     useEffect(() => {
@@ -398,6 +398,8 @@ function App() {
 
         return null;
     }, []);
+
+    const clearSelectedVehicle = useCallback(() => setSelectedVehicle(null), []);
 
     return (
         <Router>
@@ -513,7 +515,7 @@ function App() {
                     </NavLink>
                     <NavLink
                         to="/stations"
-                        onClick={() => setSelectedVehicle(null)}>
+                        onClick={clearSelectedVehicle}>
                         <button>
                             <MapPin size={24} />
                             <h3>Postaje</h3>
@@ -521,7 +523,7 @@ function App() {
                     </NavLink>
                     <NavLink
                         to="/lines"
-                        onClick={() => setSelectedVehicle(null)}>
+                        onClick={clearSelectedVehicle}>
                         <button>
                             <RouteIcon size={24} />
                             <h3>Linije</h3>
@@ -529,7 +531,7 @@ function App() {
                     </NavLink>
                     <NavLink
                         to="/settings"
-                        onClick={() => setSelectedVehicle(null)}>
+                        onClick={clearSelectedVehicle}>
                         <button>
                             <Settings2 size={24} />
                             <h3>Nastavitve</h3>
