@@ -461,19 +461,21 @@ const fetchIJPPTrip = async (trip) => {
 	if (cached) return cached;
 	try {
 		const dateString = new Date().toISOString().split("T")[0];
-		const [raw, pointsResponse] = await Promise.all([
-			fetchJson(ijppRouteLink + tripId + `?date=${dateString}`),
-			fetchJson(ijppRouteLink + tripId + "/geometry"),
-		]);
-
-		// Use operator from the trip object if available, avoiding extra API calls
-		let operatorName = "";
-		if (typeof trip === "object") {
-			operatorName = trip.operator || trip.operatorName || "";
-		}
-		if (!operatorName) {
-			operatorName = raw?.agency_name || "";
-		}
+		const raw = await fetchJson(
+			ijppRouteLink + tripId + `?date=${dateString}`,
+		);
+		const pointsResponse = await fetchJson(
+			ijppRouteLink + tripId + "/geometry",
+		);
+		const operator = fetchIJPPPositions().then((positions) =>
+			fetchIjppArrivals(
+				JSON.parse(localStorage.getItem("activeStation")).gtfs_id,
+			).then((arrivals) => {
+				const vehicle = positions.find((pos) => pos.tripId === tripId);
+				const arrival = arrivals.find((arr) => arr.tripId === tripId);
+				return arrival?.operatorName || vehicle?.operator || "";
+			}),
+		);
 
 		selectedRoute = {
 			tripName: raw?.trip_headsign || "",
@@ -490,7 +492,7 @@ const fetchIJPPTrip = async (trip) => {
 					}))
 				: [],
 			geometry: pointsResponse.coordinates || [],
-			operator: operatorName,
+			operator: await operator,
 			isLPP: false,
 			isSZ: false,
 		};
