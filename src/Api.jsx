@@ -552,13 +552,15 @@ const fetchLppPoints = async (routeId, tripId = null) => {
 									coord[0],
 								])
 							: point.geojson_shape.type === "MultiLineString"
-								? point.geojson_shape.coordinates.flatMap(
-										(lineString) =>
-											lineString.map((coord) => [
-												coord[1],
-												coord[0],
-											]),
-									)
+								? point.geojson_shape.coordinates
+										.reduce(
+											(longest, seg) =>
+												seg.length > longest.length
+													? seg
+													: longest,
+											[],
+										)
+										.map((coord) => [coord[1], coord[0]])
 								: [],
 				};
 			})

@@ -881,3 +881,42 @@ body {
 		}
 	}
 }
+
+@keyframes map-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.map-route-loading {
+	position: absolute;
+	bottom: 20px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: var(--nav-bg);
+	backdrop-filter: blur(12px);
+	border: 1px solid var(--selector-border);
+	border-radius: 999px;
+	padding: 8px 18px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-color);
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+	pointer-events: none;
+	z-index: 8;
+	white-space: nowrap;
+}
+
+.map-route-loading__spinner {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--selector-border);
+	border-top-color: var(--active-color);
+	border-radius: 50%;
+	animation: map-spin 0.7s linear infinite;
+	flex-shrink: 0;
+}
