@@ -127,7 +127,10 @@ const SettingsTab = ({
                             try {
                                 localStorage.setItem("theme", next);
                             } catch {}
-                            window.location.reload();
+                            const container = document.querySelector('.container');
+                            if (container) {
+                                container.className = `container ${next}`;
+                            }
                         }}
                     >
                         <span aria-hidden />

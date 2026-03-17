@@ -104,7 +104,7 @@ function App() {
 		localStorage.getItem("theme")
 			? setTheme(localStorage.getItem("theme"))
 			: localStorage.setItem("theme", "light");
-	}, [theme]);
+	}, []);
 
 	const [gpsPositions, setGpsPositions] = useState([]);
 	const [trainPositions, setTrainPositions] = useState([]);
@@ -262,7 +262,7 @@ function App() {
 	// LPP prihodi
 	useEffect(() => {
 		const load = async () => {
-			const lppCode = activeStation?.ref_id || activeStation.station_code;
+			const lppCode = activeStation?.ref_id || activeStation?.station_code;
 			if (!lppCode) {
 				setLppArrivals([]);
 				return;

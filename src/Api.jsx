@@ -416,7 +416,7 @@ const fetchTrainPositions = async () => {
 	try {
 		const data = await fetchJson(buildSzLocationsLink());
 		const filteredData = data.filter(
-			(train) => train.routeColor == "29ace2",
+			(train) => train.routeColor === "29ace2",
 		);
 		const positions = filteredData.map((train) => {
 			const formatIso = (iso) => {

@@ -20,6 +20,9 @@
 	--x-bg: rgba(0, 0, 0, 0.6);
 	--changer-bg: #111827;
 	--changer-left: 2px;
+	--skeleton-base: rgba(51, 65, 85, 0.4);
+	--skeleton-highlight: rgba(71, 85, 105, 0.6);
+	--hover-bg: rgba(51, 65, 85, 0.3);
 }
 
 .light {
@@ -44,6 +47,9 @@
 	--x-bg: rgba(255, 255, 255, 0.6);
 	--changer-bg: #d1d5db;
 	--changer-left: 20px;
+	--skeleton-base: rgba(203, 213, 225, 0.4);
+	--skeleton-highlight: rgba(148, 163, 184, 0.6);
+	--hover-bg: rgba(203, 213, 225, 0.3);
 }
 
 :root {
@@ -54,6 +60,8 @@
 	--arriva-color: #00338081;
 	--murska-color: #00518081;
 	--default-color: #80808081;
+	--transition-speed: 0.2s;
+	--transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -61,6 +69,17 @@
 	padding: 0;
 	box-sizing: border-box;
 	-webkit-tap-highlight-color: transparent;
+}
+
+/* Improved focus states for accessibility */
+*:focus-visible {
+	outline: 2px solid var(--active-color);
+	outline-offset: 2px;
+}
+
+button:focus-visible {
+	outline: 2px solid var(--active-color);
+	outline-offset: 2px;
 }
 
 @font-face {
@@ -74,12 +93,15 @@ body {
 		"Proxima Nova Light", Inter, system-ui, Avenir, Helvetica, Arial,
 		sans-serif;
 	color: var(--text-color);
+	transition: background-color var(--transition-speed) var(--transition-ease),
+		color var(--transition-speed) var(--transition-ease);
 }
 
 .container {
 	height: 100vh;
 	display: flex;
 	flex-direction: column;
+	transition: background var(--transition-speed) var(--transition-ease);
 
 	nav {
 		position: absolute;
@@ -98,7 +120,7 @@ body {
 			justify-content: center;
 			padding: 10px 0;
 			border-top: 4px solid transparent;
-			transition: border-color 0.2s ease;
+			transition: border-color var(--transition-speed) var(--transition-ease);
 			touch-action: manipulation;
 
 			button {
@@ -111,11 +133,17 @@ body {
 				flex-direction: row;
 				gap: 20px;
 				color: var(--hover-color);
-				transition: color 0.3s ease;
+				transition: color var(--transition-speed) var(--transition-ease),
+					transform 0.1s var(--transition-ease);
+				cursor: pointer;
 			}
 
 			&:hover button {
 				color: var(--active-color);
+			}
+
+			&:active button {
+				transform: scale(0.97);
 			}
 		}
 
@@ -131,6 +159,16 @@ body {
 	.content {
 		height: calc(100vh - 80px);
 		background: var(--content-bg);
+		animation: fadeIn 0.3s var(--transition-ease);
+
+		@keyframes fadeIn {
+			from {
+				opacity: 0;
+			}
+			to {
+				opacity: 1;
+			}
+		}
 
 		.map-container {
 			overflow: hidden;
@@ -145,7 +183,7 @@ body {
 				display: flex;
 				flex-direction: column;
 				transform: translateY(100%);
-				transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+				transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 				background: var(--nav-bg);
 				border-top: 1px solid var(--selector-border);
 				will-change: transform;
@@ -187,6 +225,11 @@ body {
 			.route-drawer__close:hover {
 				background: var(--button-bg);
 				border-radius: 8px;
+				transition: background var(--transition-speed) var(--transition-ease);
+			}
+
+			.route-drawer__close:active {
+				transform: translateY(-50%) scale(0.95);
 			}
 
 			.route-drawer__header:active {
@@ -233,12 +276,43 @@ body {
 					align-items: center;
 					border-bottom: 1px solid var(--selector-border);
 					text-align: center;
-					transition: background 0.15s ease;
+					transition: background var(--transition-speed) var(--transition-ease),
+						transform 0.1s var(--transition-ease);
 					color: var(--text-color);
 					touch-action: manipulation;
+					cursor: pointer;
+					animation: slideIn 0.3s var(--transition-ease);
+					animation-fill-mode: both;
+
+					@keyframes slideIn {
+						from {
+							opacity: 0;
+							transform: translateY(10px);
+						}
+						to {
+							opacity: 1;
+							transform: translateY(0);
+						}
+					}
+
+					/* Staggered animation delays */
+					&:nth-child(1) { animation-delay: 0.03s; }
+					&:nth-child(2) { animation-delay: 0.06s; }
+					&:nth-child(3) { animation-delay: 0.09s; }
+					&:nth-child(4) { animation-delay: 0.12s; }
+					&:nth-child(5) { animation-delay: 0.15s; }
+					&:nth-child(6) { animation-delay: 0.18s; }
+					&:nth-child(7) { animation-delay: 0.21s; }
+					&:nth-child(8) { animation-delay: 0.24s; }
+					&:nth-child(9) { animation-delay: 0.27s; }
+					&:nth-child(10) { animation-delay: 0.30s; }
 
 					&:hover {
-						background: rgba(51, 65, 85, 0.3);
+						background: var(--hover-bg);
+					}
+
+					&:active {
+						transform: scale(0.99);
 					}
 
 					h2 {
@@ -281,14 +355,32 @@ body {
 				align-items: center;
 				border-bottom: 1px solid var(--selector-border);
 				text-align: center;
-				transition: background 0.15s ease;
+				transition: background var(--transition-speed) var(--transition-ease),
+					transform 0.1s var(--transition-ease);
 				color: var(--text-color);
 				gap: 12px;
 				cursor: pointer;
 				touch-action: manipulation;
+				animation: slideIn 0.3s var(--transition-ease);
+				animation-fill-mode: both;
+
+				@keyframes slideIn {
+					from {
+						opacity: 0;
+						transform: translateY(10px);
+					}
+					to {
+						opacity: 1;
+						transform: translateY(0);
+					}
+				}
 
 				&:hover {
-					background: rgba(51, 65, 85, 0.3);
+					background: var(--hover-bg);
+				}
+
+				&:active {
+					transform: scale(0.99);
 				}
 
 				h2 {
@@ -338,7 +430,20 @@ body {
 					align-items: center;
 					justify-content: space-between;
 					gap: 12px;
-					transition: background 0.2s ease;
+					transition: background var(--transition-speed) var(--transition-ease);
+					animation: slideIn 0.3s var(--transition-ease);
+					animation-fill-mode: both;
+
+					@keyframes slideIn {
+						from {
+							opacity: 0;
+							transform: translateY(10px);
+						}
+						to {
+							opacity: 1;
+							transform: translateY(0);
+						}
+					}
 
 					div {
 						display: flex;
@@ -372,7 +477,11 @@ body {
 					}
 
 					&:hover {
-						background: rgba(51, 65, 85, 0.3);
+						background: var(--hover-bg);
+					}
+
+					&:active {
+						transform: scale(0.99);
 					}
 				}
 			}
@@ -394,14 +503,19 @@ body {
 					padding: 15px 0;
 					color: var(--hover-color);
 					border: 1px solid transparent;
-					transition: all 0.2s ease;
+					transition: all var(--transition-speed) var(--transition-ease);
 					background: rgba(0, 0, 0, 0.3);
 					border-radius: 0px;
+					cursor: pointer;
 				}
 
 				button:hover {
 					color: var(--active-color);
 					background: rgba(0, 0, 0, 0.25);
+				}
+
+				button:active {
+					transform: scale(0.98);
 				}
 
 				button.active {
@@ -435,12 +549,26 @@ body {
 				align-items: center;
 				justify-content: space-between;
 				gap: 12px;
-				transition: background 0.15s ease;
+				transition: background var(--transition-speed) var(--transition-ease),
+					transform 0.1s var(--transition-ease);
 				color: var(--text-color);
 				cursor: pointer;
 				box-sizing: border-box;
 				height: 100%;
 				touch-action: manipulation;
+				animation: slideIn 0.3s var(--transition-ease);
+				animation-fill-mode: both;
+
+				@keyframes slideIn {
+					from {
+						opacity: 0;
+						transform: translateY(10px);
+					}
+					to {
+						opacity: 1;
+						transform: translateY(0);
+					}
+				}
 
 				.station-content {
 					display: flex;
@@ -485,7 +613,11 @@ body {
 				}
 
 				&:hover {
-					background: rgba(51, 65, 85, 0.3);
+					background: var(--hover-bg);
+				}
+
+				&:active {
+					transform: scale(0.99);
 				}
 			}
 
@@ -560,7 +692,7 @@ body {
 				padding: 8px;
 				cursor: pointer;
 				color: var(--hover-color);
-				transition: all 0.2s ease;
+				transition: all var(--transition-speed) var(--transition-ease);
 				border-radius: 50%;
 				display: flex;
 				align-items: center;
@@ -570,6 +702,10 @@ body {
 				&:hover {
 					color: #ef4444;
 					background: rgba(239, 68, 68, 0.1);
+				}
+
+				&:active {
+					transform: scale(0.9);
 				}
 
 				&.liked {
@@ -586,7 +722,7 @@ body {
 				padding: 10px;
 				background: var(--content-bg);
 				color: var(--text-color);
-				transition: all 0.3s ease;
+				transition: all var(--transition-speed) var(--transition-ease);
 
 				&::placeholder {
 					color: #64748b;
@@ -595,6 +731,7 @@ body {
 				&:focus {
 					background: rgba(30, 41, 59, 0.8);
 					border-color: var(--active-color);
+					box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
 				}
 			}
 		}
@@ -629,11 +766,30 @@ body {
 						justify-content: space-between;
 						border-bottom: 1px solid var(--selector-border);
 						padding: 10px 5px 10px 10px;
-						transition: background 0.15s ease;
+						transition: background var(--transition-speed) var(--transition-ease),
+							transform 0.1s var(--transition-ease);
 						touch-action: manipulation;
+						cursor: pointer;
+						animation: slideIn 0.3s var(--transition-ease);
+						animation-fill-mode: both;
+
+						@keyframes slideIn {
+							from {
+								opacity: 0;
+								transform: translateY(5px);
+							}
+							to {
+								opacity: 1;
+								transform: translateY(0);
+							}
+						}
 
 						&:hover {
-							background: rgba(51, 65, 85, 0.3);
+							background: var(--hover-bg);
+						}
+
+						&:active {
+							transform: scale(0.99);
 						}
 
 						&:last-child {
@@ -718,6 +874,11 @@ body {
 						padding: 0;
 						outline: none;
 						margin: 0;
+						transition: background var(--transition-speed) var(--transition-ease);
+
+						&:active {
+							transform: scale(0.95);
+						}
 
 						span {
 							position: absolute;
@@ -728,7 +889,7 @@ body {
 							background: #ffffff;
 							border-radius: 999px;
 							box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-							transition: left 0.2s ease;
+							transition: left var(--transition-speed) var(--transition-ease);
 						}
 					}
 				}
@@ -778,6 +939,7 @@ body {
 				button {
 					display: block;
 					font-size: 0.7em;
+					min-height: 44px; /* Ensure touch targets are at least 44px */
 				}
 			}
 		}
@@ -792,6 +954,15 @@ body {
 
 		.insideDiv .arrival-list .arrival-item {
 			font-size: 0.8em;
+			padding: 12px 8px; /* Better touch targets */
+		}
+
+		.insideDiv .route-item {
+			padding: 12px 8px; /* Better touch targets */
+		}
+
+		.insideDiv .station-item-search {
+			padding: 12px 8px; /* Better touch targets */
 		}
 	}
 }
@@ -804,6 +975,18 @@ body {
 	max-width: none;
 	width: fit-content;
 	border-radius: 8px;
+	animation: popupSlideIn 0.2s var(--transition-ease);
+
+	@keyframes popupSlideIn {
+		from {
+			opacity: 0;
+			transform: translateY(-10px) scale(0.95);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+		}
+	}
 }
 
 .maplibregl-popup-tip {
@@ -833,11 +1016,15 @@ body {
 	border-radius: 8px;
 	font-size: 12px;
 	cursor: pointer;
-	transition: all 0.2s ease;
+	transition: all var(--transition-speed) var(--transition-ease);
 
 	&:hover {
 		background: rgba(96, 165, 250, 0.25);
 		border-color: var(--active-color);
+	}
+
+	&:active {
+		transform: scale(0.97);
 	}
 }
 
@@ -885,6 +1072,98 @@ body {
 @keyframes map-spin {
 	to {
 		transform: rotate(360deg);
+	}
+}
+
+@keyframes skeleton-shimmer {
+	0% {
+		background-position: -200% 0;
+	}
+	100% {
+		background-position: 200% 0;
+	}
+}
+
+.skeleton {
+	background: linear-gradient(
+		90deg,
+		var(--skeleton-base) 25%,
+		var(--skeleton-highlight) 50%,
+		var(--skeleton-base) 75%
+	);
+	background-size: 200% 100%;
+	animation: skeleton-shimmer 1.5s ease-in-out infinite;
+	border-radius: 4px;
+}
+
+.skeleton-item {
+	padding: 10px;
+	border-bottom: 1px solid var(--selector-border);
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 12px;
+
+	.skeleton-circle {
+		width: 4rem;
+		height: 4rem;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.skeleton-text {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+
+		.skeleton-line {
+			height: 16px;
+			border-radius: 4px;
+
+			&.short {
+				width: 60%;
+			}
+
+			&.medium {
+				width: 80%;
+			}
+
+			&.long {
+				width: 100%;
+			}
+		}
+	}
+}
+
+.empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 20px;
+	text-align: center;
+	color: var(--hover-color);
+	gap: 12px;
+	animation: fadeIn 0.3s var(--transition-ease);
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	svg {
+		opacity: 0.5;
+	}
+
+	p {
+		margin: 0;
 	}
 }
 
