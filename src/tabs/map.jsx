@@ -492,6 +492,8 @@ const Map = React.memo(function Map({
 				realTime: train?.realtime ?? false,
 				from: JSON.stringify(train?.from ?? null),
 				to: JSON.stringify(train?.to ?? null),
+				bearing: train?.bearing ?? 0,
+				delay: train?.delay ?? 0,
 			}),
 		);
 	}, [trainPositions, filterByRoute, selectedVehicle?.tripId]);

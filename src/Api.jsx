@@ -410,7 +410,7 @@ const fetchIJPPPositions = async () => {
 
 /**
  * Fetcha pozicije vlakov
- * @returns Tabelo s pozicijami vlakov
+ * @returns Tabelo s pozicijami vlakov (vključno s celotno potjo za animacijo)
  */
 const fetchTrainPositions = async () => {
 	try {
@@ -418,36 +418,151 @@ const fetchTrainPositions = async () => {
 		const filteredData = data.filter(
 			(train) => train.routeColor === "29ace2",
 		);
-		const positions = filteredData.map((train) => {
-			const formatIso = (iso) => {
-				if (!iso) return null;
-				const d = new Date(iso);
-				if (Number.isNaN(d.getTime())) return iso;
-				const Y = d.getFullYear();
-				const M = String(d.getMonth() + 1).padStart(2, "0");
-				const D = String(d.getDate()).padStart(2, "0");
-				const h = String(d.getHours()).padStart(2, "0");
-				const m = String(d.getMinutes()).padStart(2, "0");
-				return `${Y}-${M}-${D} ${h}:${m}`;
-			};
 
-			return {
-				gpsLocation: decodePolylineOnce(train.polyline, 5)[0],
-				from: train.from,
-				to: train.to,
-				realtime: train.realTime,
-				departure: formatIso(train.scheduledDeparture),
-				arrival: formatIso(train.scheduledArrival),
-				tripId: train.trips[0]?.tripId,
-				tripShort: train.trips[0]?.routeShortName,
-			};
-		});
+		const formatIso = (iso) => {
+			if (!iso) return null;
+			const d = new Date(iso);
+			if (Number.isNaN(d.getTime())) return iso;
+			const Y = d.getFullYear();
+			const M = String(d.getMonth() + 1).padStart(2, "0");
+			const D = String(d.getDate()).padStart(2, "0");
+			const h = String(d.getHours()).padStart(2, "0");
+			const m = String(d.getMinutes()).padStart(2, "0");
+			return `${Y}-${M}-${D} ${h}:${m}`;
+		};
+
+		// Helper za izračun razdalje med koordinatami
+		const haversine = (c1, c2) => {
+			const R = 6371000;
+			const toRad = (d) => (d * Math.PI) / 180;
+			const dLat = toRad(c2[1] - c1[1]);
+			const dLon = toRad(c2[0] - c1[0]);
+			const a =
+				Math.sin(dLat / 2) ** 2 +
+				Math.cos(toRad(c1[1])) *
+					Math.cos(toRad(c2[1])) *
+					Math.sin(dLon / 2) ** 2;
+			return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		};
+
+		const positions = filteredData
+			.filter((train) => train.trips?.[0]?.tripId)
+			.map((train) => {
+				const coords = decodePolylineOnce(train.polyline, 5);
+				const departure = new Date(train.departure).getTime();
+				const arrival = new Date(train.arrival).getTime();
+				const scheduledDeparture = new Date(
+					train.scheduledDeparture,
+				).getTime();
+				const scheduledArrival = new Date(
+					train.scheduledArrival,
+				).getTime();
+				const departureDelay = departure - scheduledDeparture;
+				const arrivalDelay = arrival - scheduledArrival;
+				const delay = Math.max(departureDelay, arrivalDelay);
+
+				// Zgradi pot s časovnimi žigi
+				let path = [];
+				if (coords && coords.length >= 2) {
+					let totalDist = 0;
+					const dists = [0];
+					for (let i = 1; i < coords.length; i++) {
+						totalDist += haversine(coords[i - 1], coords[i]);
+						dists.push(totalDist);
+					}
+					if (totalDist > 0) {
+						const adjDep = departure + delay;
+						const duration = arrival + delay - adjDep;
+						path = coords.map((coord, i) => ({
+							coord,
+							time: adjDep + (dists[i] / totalDist) * duration,
+						}));
+					}
+				}
+
+				return {
+					gpsLocation: coords[0],
+					path,
+					from: train.from,
+					to: train.to,
+					realtime: train.realTime,
+					departure: formatIso(train.scheduledDeparture).slice(11, 16),
+					arrival: formatIso(train.scheduledArrival).slice(11, 16),
+					tripId: train.trips[0]?.tripId,
+					tripShort:
+						train.trips[0].routeShortName?.split(" ").join("") ||
+						"?",
+					delay,
+				};
+			});
 
 		return positions;
 	} catch (error) {
 		console.error("Error fetching train positions:", error);
+		return [];
 	}
 };
+
+/**
+ * Interpolira pozicijo vlaka na poti glede na trenutni čas
+ * @param {Array} path - Pot s časovnimi žigi
+ * @param {number} now - Trenutni čas (timestamp)
+ * @returns {Object} { coord: [lon, lat], bearing: number }
+ */
+function getInterpolatedPosition(path, now) {
+	if (!path || path.length === 0) {
+		return { coord: [0, 0], bearing: 0 };
+	}
+
+	// Helper za bearing
+	const calcBearing = (from, to) => {
+		const toRad = (d) => (d * Math.PI) / 180;
+		const toDeg = (r) => (r * 180) / Math.PI;
+		const dLon = toRad(to[0] - from[0]);
+		const lat1 = toRad(from[1]);
+		const lat2 = toRad(to[1]);
+		const x = Math.sin(dLon) * Math.cos(lat2);
+		const y =
+			Math.cos(lat1) * Math.sin(lat2) -
+			Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+		return (toDeg(Math.atan2(x, y)) + 360) % 360;
+	};
+
+	// Pred odhodom
+	if (now <= path[0].time) {
+		const bearing =
+			path.length > 1 ? calcBearing(path[0].coord, path[1].coord) : 0;
+		return { coord: path[0].coord, bearing };
+	}
+
+	// Po prihodu
+	if (now >= path[path.length - 1].time) {
+		const bearing =
+			path.length > 1
+				? calcBearing(
+						path[path.length - 2].coord,
+						path[path.length - 1].coord,
+					)
+				: 0;
+		return { coord: path[path.length - 1].coord, bearing };
+	}
+
+	// Najdi segment
+	for (let i = 1; i < path.length; i++) {
+		if (now <= path[i].time) {
+			const prev = path[i - 1];
+			const curr = path[i];
+			const t = (now - prev.time) / (curr.time - prev.time);
+			const coord = [
+				prev.coord[0] + (curr.coord[0] - prev.coord[0]) * t,
+				prev.coord[1] + (curr.coord[1] - prev.coord[1]) * t,
+			];
+			return { coord, bearing: calcBearing(prev.coord, curr.coord) };
+		}
+	}
+
+	return { coord: path[path.length - 1].coord, bearing: 0 };
+}
 
 /**
  *  Fetcha IJPP trip
@@ -880,3 +995,4 @@ export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
 export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
 export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };
+export { getInterpolatedPosition };

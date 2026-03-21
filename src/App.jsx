@@ -5,6 +5,7 @@ import {
 	Suspense,
 	useCallback,
 	useDeferredValue,
+	useRef,
 } from "react";
 import {
 	HashRouter as Router,
@@ -30,6 +31,7 @@ import {
 	fetchIJPPTrip,
 	prefetchStaticData,
 	prefetchRoutesForArrivals,
+	getInterpolatedPosition,
 } from "./Api.jsx";
 
 const MapTab = lazy(() => import("./tabs/map"));
@@ -121,6 +123,10 @@ function App() {
 	// Track map zoom level for adaptive polling
 	const [mapZoom, setMapZoom] = useState(13);
 
+	// Train animation refs
+	const tripsWithTimingRef = useRef([]);
+	const animationFrameRef = useRef(null);
+
 	// Use deferred values for positions to prevent blocking UI during rapid updates
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
 	const deferredTrainPositions = useDeferredValue(trainPositions);
@@ -171,18 +177,15 @@ function App() {
 	useEffect(() => {
 		const fetchPositions = async () => {
 			try {
-				const [lpp, ijpp, trains] = await Promise.all([
+				const [lpp, ijpp] = await Promise.all([
 					fetchLPPPositions(),
 					fetchIJPPPositions(),
-					fetchTrainPositions(),
 				]);
 
 				const lppPositions = Array.isArray(lpp) ? lpp : [];
 				const ijppPositions = Array.isArray(ijpp) ? ijpp : [];
-				const trainPositions = Array.isArray(trains) ? trains : [];
 
 				setGpsPositions([...lppPositions, ...ijppPositions]);
-				setTrainPositions(trainPositions);
 			} catch (error) {
 				console.error("Error fetching positions:", error);
 			}
@@ -238,6 +241,67 @@ function App() {
 		};
 	}, [isOnMapTab, mapZoom]);
 
+	// Fetch train trips and build timed paths for animation
+	useEffect(() => {
+		if (!isOnMapTab) return;
+
+		const fetchTrains = async () => {
+			try {
+				const data = await fetchTrainPositions();
+				tripsWithTimingRef.current = data;
+			} catch (error) {
+				console.error(
+					"Error fetching train trips for animation:",
+					error,
+				);
+			}
+		};
+
+		fetchTrains();
+		const intervalId = setInterval(fetchTrains, 30000);
+		return () => clearInterval(intervalId);
+	}, [isOnMapTab]);
+
+	// Animation loop for train positions
+	useEffect(() => {
+		if (!isOnMapTab) return;
+
+		const animate = () => {
+			const now = Date.now();
+			const features = tripsWithTimingRef.current.map((train) => {
+				const { coord, bearing } = getInterpolatedPosition(
+					train.path,
+					now,
+				);
+				return {
+					tripId: train.tripId,
+					gpsLocation: coord,
+					bearing,
+					tripShort: train.tripShort,
+					delay: train.delay,
+					from: train.from,
+					to: train.to,
+					realtime: train.realtime,
+					departure: train.departure,
+					arrival: train.arrival,
+				};
+			});
+			setTrainPositions(features);
+			animationFrameRef.current = setTimeout(
+				() => requestAnimationFrame(animate),
+				1000,
+			);
+		};
+
+		animate();
+
+		return () => {
+			if (animationFrameRef.current) {
+				clearTimeout(animationFrameRef.current);
+			}
+		};
+	}, [isOnMapTab]);
+
 	// Dobi userjevo lokacijo
 	useEffect(() => {
 		if (navigator.geolocation) {
@@ -262,7 +326,8 @@ function App() {
 	// LPP prihodi
 	useEffect(() => {
 		const load = async () => {
-			const lppCode = activeStation?.ref_id || activeStation?.station_code;
+			const lppCode =
+				activeStation?.ref_id || activeStation?.station_code;
 			if (!lppCode) {
 				setLppArrivals([]);
 				return;
