@@ -88,7 +88,8 @@ body {
 		"Proxima Nova Light", Inter, system-ui, Avenir, Helvetica, Arial,
 		sans-serif;
 	color: var(--text-color);
-	transition: background-color var(--transition-speed) var(--transition-ease),
+	transition:
+		background-color var(--transition-speed) var(--transition-ease),
 		color var(--transition-speed) var(--transition-ease);
 }
 
@@ -118,7 +119,8 @@ body {
 			justify-content: center;
 			padding: 10px 0;
 			border-top: 4px solid transparent;
-			transition: border-color var(--transition-speed) var(--transition-ease);
+			transition: border-color var(--transition-speed)
+				var(--transition-ease);
 			touch-action: manipulation;
 
 			button {
@@ -131,7 +133,8 @@ body {
 				flex-direction: row;
 				gap: 20px;
 				color: var(--hover-color);
-				transition: color var(--transition-speed) var(--transition-ease),
+				transition:
+					color var(--transition-speed) var(--transition-ease),
 					transform 0.1s var(--transition-ease);
 				cursor: pointer;
 			}
@@ -182,18 +185,24 @@ body {
 
 			.route-drawer {
 				position: absolute;
-				left: 0;
-				right: 0;
-				bottom: 0;
+				left: 5%;
+				right: 5%;
+				bottom: 120px;
 				z-index: 9;
 				display: flex;
 				flex-direction: column;
-				transform: translateY(100%);
+				transform: translateY(calc(100% + 120px));
 				transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 				background: var(--nav-bg);
-				border-top: 1px solid var(--selector-border);
+				backdrop-filter: blur(12px);
+				border: 1px solid var(--selector-border);
+				border-radius: 24px;
 				will-change: transform;
 				backface-visibility: hidden;
+				overflow: hidden;
+				box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+				max-width: 600px;
+				margin: 0 auto;
 			}
 
 			.route-drawer--open {
@@ -204,13 +213,30 @@ body {
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				padding: 10px 12px;
-				border-bottom: 1px solid var(--selector-border);
+				padding: 28px 16px 12px;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 				color: var(--text-color);
 				cursor: grab;
 				touch-action: none;
 				position: relative;
-				height: 40px;
+				min-height: 50px;
+
+				&::before {
+					content: "";
+					position: absolute;
+					top: 12px;
+					left: 50%;
+					transform: translateX(-50%);
+					width: 44px;
+					height: 5px;
+					border-radius: 999px;
+					background: var(--hover-color);
+					opacity: 0.5;
+				}
+
+				&:active {
+					cursor: grabbing;
+				}
 			}
 
 			.route-drawer__close {
@@ -231,7 +257,8 @@ body {
 			.route-drawer__close:hover {
 				background: var(--button-bg);
 				border-radius: 8px;
-				transition: background var(--transition-speed) var(--transition-ease);
+				transition: background var(--transition-speed)
+					var(--transition-ease);
 			}
 
 			.route-drawer__close:active {
@@ -243,20 +270,14 @@ body {
 			}
 
 			.route-drawer__grab {
-				position: absolute;
-				top: 18px;
-				left: 50%;
-				transform: translateX(-50%);
-				width: 44px;
-				height: 5px;
-				border-radius: 999px;
-				background: var(--selector-border);
+				display: none;
 			}
 
 			.route-drawer__content {
 				overflow-y: auto;
 				-webkit-overflow-scrolling: touch;
 				overscroll-behavior: contain;
+				max-height: calc(100vh - 280px);
 			}
 		}
 
@@ -282,7 +303,9 @@ body {
 					align-items: center;
 					border-bottom: 1px solid var(--selector-border);
 					text-align: center;
-					transition: background var(--transition-speed) var(--transition-ease),
+					transition:
+						background var(--transition-speed)
+							var(--transition-ease),
 						transform 0.1s var(--transition-ease);
 					color: var(--text-color);
 					touch-action: manipulation;
@@ -302,16 +325,36 @@ body {
 					}
 
 					/* Staggered animation delays */
-					&:nth-child(1) { animation-delay: 0.03s; }
-					&:nth-child(2) { animation-delay: 0.06s; }
-					&:nth-child(3) { animation-delay: 0.09s; }
-					&:nth-child(4) { animation-delay: 0.12s; }
-					&:nth-child(5) { animation-delay: 0.15s; }
-					&:nth-child(6) { animation-delay: 0.18s; }
-					&:nth-child(7) { animation-delay: 0.21s; }
-					&:nth-child(8) { animation-delay: 0.24s; }
-					&:nth-child(9) { animation-delay: 0.27s; }
-					&:nth-child(10) { animation-delay: 0.30s; }
+					&:nth-child(1) {
+						animation-delay: 0.03s;
+					}
+					&:nth-child(2) {
+						animation-delay: 0.06s;
+					}
+					&:nth-child(3) {
+						animation-delay: 0.09s;
+					}
+					&:nth-child(4) {
+						animation-delay: 0.12s;
+					}
+					&:nth-child(5) {
+						animation-delay: 0.15s;
+					}
+					&:nth-child(6) {
+						animation-delay: 0.18s;
+					}
+					&:nth-child(7) {
+						animation-delay: 0.21s;
+					}
+					&:nth-child(8) {
+						animation-delay: 0.24s;
+					}
+					&:nth-child(9) {
+						animation-delay: 0.27s;
+					}
+					&:nth-child(10) {
+						animation-delay: 0.3s;
+					}
 
 					&:hover {
 						background: var(--hover-bg);
@@ -361,7 +404,8 @@ body {
 				align-items: center;
 				border-bottom: 1px solid var(--selector-border);
 				text-align: center;
-				transition: background var(--transition-speed) var(--transition-ease),
+				transition:
+					background var(--transition-speed) var(--transition-ease),
 					transform 0.1s var(--transition-ease);
 				color: var(--text-color);
 				gap: 12px;
@@ -436,7 +480,8 @@ body {
 					align-items: center;
 					justify-content: space-between;
 					gap: 12px;
-					transition: background var(--transition-speed) var(--transition-ease);
+					transition: background var(--transition-speed)
+						var(--transition-ease);
 					animation: slideIn 0.3s var(--transition-ease);
 					animation-fill-mode: both;
 
@@ -509,7 +554,8 @@ body {
 					padding: 15px 0;
 					color: var(--hover-color);
 					border: 1px solid transparent;
-					transition: all var(--transition-speed) var(--transition-ease);
+					transition: all var(--transition-speed)
+						var(--transition-ease);
 					background: rgba(0, 0, 0, 0.3);
 					border-radius: 0px;
 					cursor: pointer;
@@ -555,7 +601,8 @@ body {
 				align-items: center;
 				justify-content: space-between;
 				gap: 12px;
-				transition: background var(--transition-speed) var(--transition-ease),
+				transition:
+					background var(--transition-speed) var(--transition-ease),
 					transform 0.1s var(--transition-ease);
 				color: var(--text-color);
 				cursor: pointer;
@@ -744,14 +791,22 @@ body {
 
 		.route {
 			.data {
-				background: var(--content-bg);
-				backdrop-filter: blur(8px);
-				padding: 14px 16px;
+				background: transparent;
+				padding: 16px 20px;
 				text-align: center;
 				color: var(--text-color);
-				border-bottom: 1px solid var(--selector-border);
 				cursor: grab;
 				touch-action: none;
+
+				h3 {
+					margin-bottom: 4px;
+					font-size: 1.1em;
+				}
+
+				p {
+					font-size: 0.85em;
+					color: var(--hover-color);
+				}
 			}
 
 			.stops {
@@ -760,8 +815,6 @@ body {
 					padding: 0;
 					display: flex;
 					flex-direction: column;
-					max-height: calc(100vh - 190px);
-					overflow-y: auto;
 					-webkit-overflow-scrolling: touch;
 					overscroll-behavior: contain;
 					color: var(--text-color);
@@ -771,8 +824,10 @@ body {
 						align-items: center;
 						justify-content: space-between;
 						border-bottom: 1px solid var(--selector-border);
-						padding: 10px 5px 10px 10px;
-						transition: background var(--transition-speed) var(--transition-ease),
+						padding: 14px 16px;
+						transition:
+							background var(--transition-speed)
+								var(--transition-ease),
 							transform 0.1s var(--transition-ease);
 						touch-action: manipulation;
 						cursor: pointer;
@@ -800,6 +855,15 @@ body {
 
 						&:last-child {
 							border-bottom: none;
+						}
+
+						h3 {
+							font-size: 0.95em;
+						}
+
+						p {
+							font-size: 0.85em;
+							color: var(--hover-color);
 						}
 					}
 				}
@@ -880,7 +944,8 @@ body {
 						padding: 0;
 						outline: none;
 						margin: 0;
-						transition: background var(--transition-speed) var(--transition-ease);
+						transition: background var(--transition-speed)
+							var(--transition-ease);
 
 						&:active {
 							transform: scale(0.95);
@@ -895,7 +960,8 @@ body {
 							background: #ffffff;
 							border-radius: 999px;
 							box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-							transition: left var(--transition-speed) var(--transition-ease);
+							transition: left var(--transition-speed)
+								var(--transition-ease);
 						}
 					}
 				}
