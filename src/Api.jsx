@@ -389,7 +389,9 @@ const fetchIJPPPositions = async () => {
 					.filter(
 						(vehicle) =>
 							vehicle?.vehicle?.operator_name !=
-							"Ljubljanski Potniški Promet",
+								"Ljubljanski Potniški Promet" &&
+							vehicle?.vehicle?.operator_name !==
+								"Slovenske železnice",
 					)
 					.map((vehicle) => ({
 						gpsLocation: [vehicle?.lat || 0, vehicle?.lon || 0],
@@ -486,7 +488,10 @@ const fetchTrainPositions = async () => {
 					from: train.from,
 					to: train.to,
 					realtime: train.realTime,
-					departure: formatIso(train.scheduledDeparture).slice(11, 16),
+					departure: formatIso(train.scheduledDeparture).slice(
+						11,
+						16,
+					),
 					arrival: formatIso(train.scheduledArrival).slice(11, 16),
 					tripId: train.trips[0]?.tripId,
 					tripShort:
@@ -893,13 +898,64 @@ const fetchSzArrivals = async (stationCode) => {
 	try {
 		const url = szArrivalsLink + `${encodeURIComponent(stationCode)}&n=100`;
 		const raw = await fetchJson(url);
-		const arrivals = (raw?.stopTimes || []).map((arrival) => ({
-			headsign: arrival?.headsign,
-			tripId: arrival?.tripId,
-			scheduledDeparture: arrival?.place?.scheduledDeparture,
-			actualDeparture: arrival?.place?.actualDeparture,
-			routeShortName: arrival?.routeShortName,
-		}));
+
+		// Get today's date in YYYY-MM-DD format
+		const today = new Date().toISOString().split("T")[0];
+
+		const arrivals = (raw?.stopTimes || [])
+			.filter((arrival) => {
+				// Filter to only include arrivals scheduled for today
+				const scheduledDeparture = arrival?.place?.scheduledDeparture;
+				if (!scheduledDeparture) return false;
+				const arrivalDate = scheduledDeparture.split("T")[0];
+				return arrivalDate === today;
+			})
+			.map((arrival) => {
+				const place = arrival?.place;
+				const realTime = arrival?.realTime || false;
+
+				// Extract times from the new nested structure
+				const scheduledArrival = place?.scheduledArrival;
+				const scheduledDeparture = place?.scheduledDeparture;
+				const actualArrival = place?.arrival;
+				const actualDeparture = place?.departure;
+
+				// Calculate delays in milliseconds
+				let arrivalDelay = 0;
+				let departureDelay = 0;
+				if (realTime && actualDeparture && scheduledDeparture) {
+					const actual = new Date(actualDeparture).getTime();
+					const scheduled = new Date(scheduledDeparture).getTime();
+					departureDelay = actual - scheduled;
+				}
+				if (realTime && actualArrival && scheduledArrival) {
+					const actual = new Date(actualArrival).getTime();
+					const scheduled = new Date(scheduledArrival).getTime();
+					arrivalDelay = actual - scheduled;
+				}
+
+				const etaData = computeEtaAndTime({
+					realtimeArrival: realTime ? actualArrival : null,
+					scheduledArrival: scheduledArrival,
+					realtimeDeparture: realTime ? actualDeparture : null,
+					scheduledDeparture: scheduledDeparture,
+				});
+
+				return {
+					headsign: arrival?.headsign,
+					tripId: arrival?.tripId,
+					routeShortName: arrival?.routeShortName,
+					realTime: realTime,
+					scheduledArrival: scheduledArrival,
+					scheduledDeparture: scheduledDeparture,
+					realtimeArrival: realTime ? actualArrival : null,
+					realtimeDeparture: realTime ? actualDeparture : null,
+					arrivalDelay: arrivalDelay,
+					departureDelay: departureDelay,
+					etaMinutes: etaData.etaMinutes,
+					arrivalTime: etaData.arrivalTime,
+				};
+			});
 		return arrivals;
 	} catch (error) {
 		console.error("Error fetching SZ arrivals:", error);

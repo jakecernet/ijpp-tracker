@@ -321,12 +321,12 @@ const LinesTab = ({
                 <h3>{arrival.tripName || arrival.headsign}</h3>
             </div>
             <p>{formatPrecomputedArrival(arrival)}</p>
-            {arrival.type === "SZ" && (
+            {arrival.type === "SZ" && arrival.realTime && (
                 <p>
                     {"Zamuda: " +
                         formatDelay(
                             arrival.scheduledDeparture,
-                            arrival.actualDeparture,
+                            arrival.realtimeDeparture,
                         )}
                 </p>
             )}
