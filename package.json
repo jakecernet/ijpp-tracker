@@ -1,43 +1,45 @@
 {
-    "name": "ijpp-tracker",
-    "private": true,
-    "version": "0.0.0",
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "lint": "eslint .",
-        "preview": "vite preview",
-        "predeploy": "vite build",
-        "deploy": "gh-pages -d build"
-    },
-    "dependencies": {
-        "@capacitor/android": "^8.2.0",
-        "@capacitor/cli": "^8.2.0",
-        "@capacitor/core": "^8.2.0",
-        "date-fns": "^4.1.0",
-        "gh-pages": "^6.2.0",
-        "lodash": "^4.17.23",
-        "lucide-react": "^0.469.0",
-        "maplibre-gl": "^5.9.0",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
-        "react-icons": "^5.4.0",
-        "react-router-dom": "^7.12.0",
-        "react-window": "^1.8.11"
-    },
-    "devDependencies": {
-        "@eslint/js": "^9.17.0",
-        "@types/react": "^18.3.17",
-        "@types/react-dom": "^18.3.5",
-        "@vitejs/plugin-react": "^4.3.4",
-        "eslint": "^9.17.0",
-        "eslint-plugin-react": "^7.37.2",
-        "eslint-plugin-react-hooks": "^5.0.0",
-        "eslint-plugin-react-refresh": "^0.4.16",
-        "globals": "^15.13.0",
-        "vite": "^6.0.3",
-        "vite-plugin-pwa": "^0.21.1"
-    },
-    "homepage": "./#/"
+	"name": "ijpp-tracker",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build",
+		"lint": "eslint .",
+		"preview": "vite preview",
+		"predeploy": "vite build",
+		"deploy": "gh-pages -d build",
+		"build:android": "vite build && npx cap sync android",
+		"open:android": "npx cap open android"
+	},
+	"dependencies": {
+		"@capacitor/android": "^8.2.0",
+		"@capacitor/cli": "^8.2.0",
+		"@capacitor/core": "^8.2.0",
+		"date-fns": "^4.1.0",
+		"gh-pages": "^6.2.0",
+		"lodash": "^4.17.23",
+		"lucide-react": "^0.469.0",
+		"maplibre-gl": "^5.9.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"react-icons": "^5.4.0",
+		"react-router-dom": "^7.12.0",
+		"react-window": "^1.8.11"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.17.0",
+		"@types/react": "^18.3.17",
+		"@types/react-dom": "^18.3.5",
+		"@vitejs/plugin-react": "^4.3.4",
+		"eslint": "^9.17.0",
+		"eslint-plugin-react": "^7.37.2",
+		"eslint-plugin-react-hooks": "^5.0.0",
+		"eslint-plugin-react-refresh": "^0.4.16",
+		"globals": "^15.13.0",
+		"vite": "^6.0.3",
+		"vite-plugin-pwa": "^0.19.8"
+	},
+	"homepage": "./#/"
 }
