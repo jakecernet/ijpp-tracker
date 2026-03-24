@@ -1,0 +1,12 @@
+{
+	"appId": "cc.cernetic.tracker",
+	"appName": "IJPP Tracker",
+	"webDir": "build",
+	"server": {
+		"androidScheme": "https",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true
+	}
+}
