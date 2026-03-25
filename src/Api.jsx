@@ -58,7 +58,6 @@ async function fetchJson(url) {
 
 const cache = new Map();
 
-// Cache TTL values in milliseconds
 const CACHE_TTL = {
 	stops: 5 * 60 * 1000, // 5 minutes - static data, rarely changes
 	positions: 5 * 1000, // 5 seconds - real-time positions
@@ -66,9 +65,7 @@ const CACHE_TTL = {
 	routes: 5 * 60 * 1000, // 5 minutes - route/trip data
 };
 
-// Dedicated route cache keyed by tripId
 const routeCache = new Map();
-// Track in-flight prefetch promises to avoid duplicate requests
 const routeInFlight = new Map();
 
 function getCachedRoute(tripId) {
@@ -778,7 +775,8 @@ const fetchSzTrip = async (tripId) => {
 					endTime: raw[0]?.endTime || "",
 					realTime: raw[0]?.realTime || false,
 					tripId: raw[0]?.tripId || "",
-					shortName: raw[0]?.routeShortName || "",
+					tripShort: raw[0]?.routeShortName || "",
+					brand: "sz",
 					stops: [
 						startStop,
 						...(raw[0]?.intermediateStops?.map((stop) => ({

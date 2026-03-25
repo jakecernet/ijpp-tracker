@@ -14,7 +14,7 @@ import {
 	Route,
 	useLocation,
 } from "react-router-dom";
-import { Map, MapPin, Route as RouteIcon, Settings2 } from "lucide-react";
+import { Map, BusFront, Route as RouteIcon, Settings2 } from "lucide-react";
 import "./App.css";
 
 import {
@@ -50,7 +50,11 @@ function App() {
 	const [activeStation, setActiveStation] = useState(
 		localStorage.getItem("activeStation")
 			? JSON.parse(localStorage.getItem("activeStation"))
-			: { name: "Vrhnika", coordinates: [46.057, 14.295], id: 123456789 },
+			: {
+					name: "Izberite postajo",
+					coordinates: [46.057, 14.295],
+					id: 123456789,
+				},
 	);
 	const [userLocation, setUserLocation] = useState(
 		localStorage.getItem("userLocation")
@@ -120,14 +124,11 @@ function App() {
 	const [lppArrivals, setLppArrivals] = useState([]);
 	const [szArrivals, setSzArrivals] = useState([]);
 
-	// Track map zoom level for adaptive polling
 	const [mapZoom, setMapZoom] = useState(13);
 
-	// Train animation refs
 	const tripsWithTimingRef = useRef([]);
 	const animationFrameRef = useRef(null);
 
-	// Use deferred values for positions to prevent blocking UI during rapid updates
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
 	const deferredTrainPositions = useDeferredValue(trainPositions);
 
@@ -141,7 +142,6 @@ function App() {
 		} catch {}
 	}, [visibility, busOperators]);
 
-	// Prefetch static data on mount
 	useEffect(() => {
 		prefetchStaticData();
 	}, []);
@@ -173,7 +173,7 @@ function App() {
 		load();
 	}, []);
 
-	// Na par sekund fetcha pozicije vlakov + busov (z visibility-based polling)
+	// Na par sekund fetcha pozicije vlakov + busov (hitrost odvisna od zooma)
 	useEffect(() => {
 		const fetchPositions = async () => {
 			try {
@@ -191,7 +191,6 @@ function App() {
 			}
 		};
 
-		// Don't poll if not on the map tab
 		if (!isOnMapTab) {
 			return;
 		}
@@ -199,13 +198,12 @@ function App() {
 		// začetni fetch
 		fetchPositions();
 
-		// Adaptive polling - slower when zoomed out, faster when zoomed in
 		let intervalId;
 		const getPollingInterval = () => {
 			if (mapZoom < 10) return 15000; // Very zoomed out - 15s
 			if (mapZoom < 12) return 10000; // Zoomed out - 10s
-			if (mapZoom < 14) return 7000; // Medium zoom - 7s
-			return 5000; // Zoomed in - 5s
+			if (mapZoom < 14) return 5000; // Medium zoom - 7s
+			return 2000; // Zoomed in - 5s
 		};
 		const POLLING_INTERVAL = getPollingInterval();
 
@@ -224,7 +222,7 @@ function App() {
 			if (document.hidden) {
 				stopPolling();
 			} else {
-				fetchPositions(); // Fetch immediately when returning
+				fetchPositions();
 				startPolling();
 			}
 		};
@@ -381,7 +379,6 @@ function App() {
 	useEffect(() => {
 		if (!ijppArrivals.length && !lppArrivals.length && !szArrivals.length)
 			return;
-		// Small delay so we don't start heavy fetching right as arrivals render
 		const timer = setTimeout(() => {
 			prefetchRoutesForArrivals(ijppArrivals, lppArrivals, szArrivals);
 		}, 500);
@@ -409,7 +406,6 @@ function App() {
 
 			if (route) {
 				setSelectedVehicle((prev) => {
-					// Merge if enriching same vehicle, else replace
 					if (prev && prev.tripId === route.tripId) {
 						return { ...prev, ...route };
 					}
@@ -527,30 +523,6 @@ function App() {
 								}
 							/>
 							<Route
-								path="/map"
-								element={
-									<MapTab
-										gpsPositions={deferredGpsPositions}
-										busStops={busStops}
-										trainStops={szStops}
-										activeStation={activeStation}
-										setActiveStation={setActiveStation}
-										userLocation={userLocation}
-										trainPositions={deferredTrainPositions}
-										setSelectedVehicle={setSelectedVehicle}
-										selectedVehicle={selectedVehicle}
-										routeLoading={routeLoading}
-										theme={theme}
-										setTheme={setTheme}
-										visibility={visibility}
-										setVisibility={setVisibility}
-										busOperators={busOperators}
-										setBusOperators={setBusOperators}
-										onZoomChange={setMapZoom}
-									/>
-								}
-							/>
-							<Route
 								path="/stations"
 								element={
 									<StationsTab
@@ -598,7 +570,7 @@ function App() {
 					</NavLink>
 					<NavLink to="/stations" onClick={clearSelectedVehicle}>
 						<button>
-							<MapPin size={24} />
+							<BusFront size={24} />
 							<h3>Postaje</h3>
 						</button>
 					</NavLink>

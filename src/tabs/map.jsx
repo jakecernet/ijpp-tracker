@@ -821,7 +821,7 @@ const Map = React.memo(function Map({
 				<div ref={mapRef} style={{ height: "100%", width: "100%" }} />
 				{routeLoading && (
 					<div className="map-route-loading">
-						<span className="map-route-loading__spinner" />
+						<span className="map-route-loading_spinner" />
 						Nalaganje poti...
 					</div>
 				)}
