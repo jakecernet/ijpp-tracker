@@ -36,5 +36,8 @@
 		"vite": "^6.0.3",
 		"vite-plugin-pwa": "^0.21.2"
 	},
+	"optionalDependencies": {
+		"@rollup/rollup-linux-x64-gnu": "4.6.1"
+	},
 	"homepage": "./#/"
 }
