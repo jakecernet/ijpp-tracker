@@ -5,12 +5,15 @@ const SettingsTab = ({
     setVisibility,
     busOperators,
     setBusOperators,
+    theme,
     setTheme,
 }) => {
-    const isDark =
-        typeof window !== "undefined"
-            ? (localStorage.getItem("theme") || "light") === "dark"
-            : false;
+    const isDark = theme === "dark";
+    const [mapTheme, setMapTheme] = useState(() => {
+        return typeof window !== "undefined"
+            ? localStorage.getItem("mapTheme") || "light"
+            : "light";
+    });
     const [radius, setRadius] = useState(() => {
         const stored = localStorage.getItem("stationRadius");
         return stored ? JSON.parse(stored) : { busRadius: 5, szRadius: 20 };
@@ -112,7 +115,7 @@ const SettingsTab = ({
                         borderTop: "1px solid var(--selector-border)",
                     }}
                 >
-                    Temni način
+                    Temni način (aplikacija)
                 </h3>
                 <div className="theme-switcher">
                     <p>Temno</p>
@@ -131,6 +134,35 @@ const SettingsTab = ({
                             if (container) {
                                 container.className = `container ${next}`;
                             }
+                        }}
+                    >
+                        <span aria-hidden />
+                    </button>
+                    <p>Svetlo</p>
+                </div>
+                <h3 style={
+                    {
+                        textAlign: "center",
+                        padding: "5px",
+                        borderTop: "1px solid var(--selector-border)",
+                    }
+                }>
+                    Temni način (zemljevid)
+                </h3>
+                <div className="theme-switcher">
+                    <p>Temno</p>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={mapTheme === "dark"}
+                        aria-label="Preklopi temni način zemljevida"
+                        onClick={() => {
+                            const next = mapTheme === "dark" ? "light" : "dark";
+                            setMapTheme(next);
+                            try {
+                                localStorage.setItem("mapTheme", next);
+                            } catch {}
+                            window.dispatchEvent(new Event("mapThemeChange"));
                         }}
                     >
                         <span aria-hidden />

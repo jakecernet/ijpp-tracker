@@ -44,12 +44,12 @@ import RouteTab from "./route.jsx";
 import userPNG from "../img/user.png";
 import locationPNG from "../img/location.png";
 
-const STYLE =
-	typeof window !== "undefined"
-		? localStorage.getItem("theme") === "dark"
-			? OSM_RASTER_STYLE_DARK
-			: OSM_RASTER_STYLE_LIGHT
+const getMapStyle = () => {
+	if (typeof window === "undefined") return OSM_RASTER_STYLE_LIGHT;
+	return localStorage.getItem("mapTheme") === "dark"
+		? OSM_RASTER_STYLE_DARK
 		: OSM_RASTER_STYLE_LIGHT;
+};
 
 function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
 	if (markersRef.current[key]) {
@@ -503,7 +503,7 @@ const Map = React.memo(function Map({
 
 		const map = new maplibregl.Map({
 			container: mapRef.current,
-			style: STYLE,
+			style: getMapStyle(),
 			center: [initialCenterRef.current[1], initialCenterRef.current[0]],
 			zoom: DEFAULT_ZOOM,
 			attributionControl: true,
@@ -634,7 +634,14 @@ const Map = React.memo(function Map({
 			}
 		});
 
+		// Listen for map theme changes
+		const handleMapThemeChange = () => {
+			map.setStyle(getMapStyle());
+		};
+		window.addEventListener("mapThemeChange", handleMapThemeChange);
+
 		return () => {
+			window.removeEventListener("mapThemeChange", handleMapThemeChange);
 			map.remove();
 			mapInstanceRef.current = null;
 		};

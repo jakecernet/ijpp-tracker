@@ -554,6 +554,7 @@ function App() {
 										setVisibility={setVisibility}
 										busOperators={busOperators}
 										setBusOperators={setBusOperators}
+										theme={theme}
 										setTheme={setTheme}
 									/>
 								}
