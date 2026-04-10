@@ -6,7 +6,7 @@ export function createImage(src) {
     if (!src) return "";
     const name =
         src.includes("U1") || src.includes("U2") ? "-U1" : src.slice(7);
-    const author = name === "-U1" ? "Doris Kordić" : "DWProski";
+    const author = name === "-U1" ? "Doris Kordić" : "DWProski / Bari";
 
     return `<div class="popup-image-wrapper">
               <img loading="lazy" src="https://mestnipromet.cyou/tracker/img/avtobusi/${name}.jpg" alt="Slika" />
