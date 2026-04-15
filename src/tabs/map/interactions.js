@@ -1,357 +1,385 @@
 import maplibregl from "maplibre-gl";
 import {
-    renderLppPopup,
-    renderIjppPopup,
-    renderTrainPopup,
-    createBusStopPopup,
-    createTrainStopPopup,
+	renderLppPopup,
+	renderIjppPopup,
+	renderTrainPopup,
+	createBusStopPopup,
+	createTrainStopPopup,
 } from "./popups";
 
 const currentPopupRef = { popup: null };
 
 function attachPopup(map, layerId, formatter, afterOpen) {
-    map.on("click", layerId, (event) => {
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const content = formatter(feature.properties || {});
-        const previousZoom = map.getZoom();
+	map.on("click", layerId, (event) => {
+		const feature = event.features?.[0];
+		if (!feature) return;
+		const content = formatter(feature.properties || {});
+		const previousZoom = map.getZoom();
 
-        // Close previous popup without triggering zoom animation
-        if (currentPopupRef.popup) {
-            currentPopupRef.popup.remove();
-            currentPopupRef.popup = null;
-        }
+		// Close previous popup without triggering zoom animation
+		if (currentPopupRef.popup) {
+			currentPopupRef.popup.remove();
+			currentPopupRef.popup = null;
+		}
 
-        const popup = new maplibregl.Popup({ closeButton: false }).setLngLat(
-            event.lngLat
-        );
+		const popup = new maplibregl.Popup({ closeButton: false }).setLngLat(
+			event.lngLat,
+		);
 
-        if (content && typeof content === "object" && content instanceof Node) {
-            popup.setDOMContent(content);
-        } else {
-            popup.setHTML(String(content ?? ""));
-        }
+		if (content && typeof content === "object" && content instanceof Node) {
+			popup.setDOMContent(content);
+		} else {
+			popup.setHTML(String(content ?? ""));
+		}
 
-        popup.addTo(map);
-        currentPopupRef.popup = popup;
+		popup.addTo(map);
+		currentPopupRef.popup = popup;
 
-        popup.on("close", () => {
-            if (currentPopupRef.popup === popup) {
-                currentPopupRef.popup = null;
-            }
-            map.flyTo({
-                center: map.getCenter(),
-                zoom: previousZoom,
-                duration: 1000,
-            });
-        });
-        if (typeof afterOpen === "function") {
-            afterOpen(
-                popup,
-                feature.properties || {},
-                event.lngLat,
-                previousZoom
-            );
-        }
-    });
+		popup.on("close", () => {
+			if (currentPopupRef.popup === popup) {
+				currentPopupRef.popup = null;
+			}
+			map.flyTo({
+				center: map.getCenter(),
+				zoom: previousZoom,
+				duration: 1000,
+			});
+		});
+		if (typeof afterOpen === "function") {
+			afterOpen(
+				popup,
+				feature.properties || {},
+				event.lngLat,
+				previousZoom,
+			);
+		}
+	});
 
-    map.on("mouseenter", layerId, () => {
-        map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", layerId, () => {
-        map.getCanvas().style.cursor = "";
-    });
+	map.on("mouseenter", layerId, () => {
+		map.getCanvas().style.cursor = "pointer";
+	});
+	map.on("mouseleave", layerId, () => {
+		map.getCanvas().style.cursor = "";
+	});
 }
 
 export function configureBusStopPopup({ map, onSelectStop }) {
-    map.on("click", "busStops-points", (event) => {
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const props = feature.properties || {};
-        const [lng, lat] = feature.geometry.coordinates;
-        const popupContent = createBusStopPopup(
-            props,
-            [lat, lng],
-            onSelectStop
-        );
+	map.on("click", "busStops-points", (event) => {
+		const feature = event.features?.[0];
+		if (!feature) return;
+		const props = feature.properties || {};
+		const [lng, lat] = feature.geometry.coordinates;
+		const popupContent = createBusStopPopup(
+			props,
+			[lat, lng],
+			onSelectStop,
+		);
 
-        const previousZoom = map.getZoom();
+		const previousZoom = map.getZoom();
 
-        // Close previous popup without triggering zoom animation
-        if (currentPopupRef.popup) {
-            currentPopupRef.popup.remove();
-            currentPopupRef.popup = null;
-        }
+		// Close previous popup without triggering zoom animation
+		if (currentPopupRef.popup) {
+			currentPopupRef.popup.remove();
+			currentPopupRef.popup = null;
+		}
 
-        const popup = new maplibregl.Popup({ closeButton: false })
-            .setLngLat([lng, lat])
-            .setDOMContent(popupContent)
-            .addTo(map);
+		const popup = new maplibregl.Popup({ closeButton: false })
+			.setLngLat([lng, lat])
+			.setDOMContent(popupContent)
+			.addTo(map);
 
-        currentPopupRef.popup = popup;
+		currentPopupRef.popup = popup;
 
-        popup.on("close", () => {
-            if (currentPopupRef.popup === popup) {
-                currentPopupRef.popup = null;
-            }
-            map.flyTo({
-                center: map.getCenter(),
-                zoom: previousZoom,
-                duration: 1000,
-            });
-        });
+		popup.on("close", () => {
+			if (currentPopupRef.popup === popup) {
+				currentPopupRef.popup = null;
+			}
+			map.flyTo({
+				center: map.getCenter(),
+				zoom: previousZoom,
+				duration: 1000,
+			});
+		});
 
-        map.flyTo({
-            center: [lng, lat],
-            zoom: Math.max(map.getZoom(), 16),
-            duration: 1000,
-        });
-    });
+		map.flyTo({
+			center: [lng, lat],
+			zoom: Math.max(map.getZoom(), 16),
+			duration: 1000,
+		});
+	});
 }
 
 export function configureTrainStopPopup({ map, onSelectStop }) {
-    map.on("click", "trainStops-points", (event) => {
-        // If SZ route stop is under cursor, prefer route-stop popup only
-        try {
-            const routeFeatures = map.queryRenderedFeatures(event.point, {
-                layers: ["sz-trip-stops-points"],
-            });
-            if (Array.isArray(routeFeatures) && routeFeatures.length > 0) {
-                return; // suppress normal train stop popup
-            }
-        } catch {}
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const props = feature.properties || {};
-        const [lng, lat] = feature.geometry.coordinates;
-        const popupContent = createTrainStopPopup(
-            props,
-            [lat, lng],
-            onSelectStop
-        );
+	map.on("click", "trainStops-points", (event) => {
+		// If SZ route stop is under cursor, prefer route-stop popup only
+		try {
+			const routeFeatures = map.queryRenderedFeatures(event.point, {
+				layers: ["sz-trip-stops-points"],
+			});
+			if (Array.isArray(routeFeatures) && routeFeatures.length > 0) {
+				return; // suppress normal train stop popup
+			}
+		} catch {}
+		const feature = event.features?.[0];
+		if (!feature) return;
+		const props = feature.properties || {};
+		const [lng, lat] = feature.geometry.coordinates;
+		const popupContent = createTrainStopPopup(
+			props,
+			[lat, lng],
+			onSelectStop,
+		);
 
-        const previousZoom = map.getZoom();
+		const previousZoom = map.getZoom();
 
-        // Close previous popup without triggering zoom animation
-        if (currentPopupRef.popup) {
-            currentPopupRef.popup.remove();
-            currentPopupRef.popup = null;
-        }
+		// Close previous popup without triggering zoom animation
+		if (currentPopupRef.popup) {
+			currentPopupRef.popup.remove();
+			currentPopupRef.popup = null;
+		}
 
-        const popup = new maplibregl.Popup({ closeButton: false })
-            .setLngLat([lng, lat])
-            .setDOMContent(popupContent)
-            .addTo(map);
+		const popup = new maplibregl.Popup({ closeButton: false })
+			.setLngLat([lng, lat])
+			.setDOMContent(popupContent)
+			.addTo(map);
 
-        currentPopupRef.popup = popup;
+		currentPopupRef.popup = popup;
 
-        popup.on("close", () => {
-            if (currentPopupRef.popup === popup) {
-                currentPopupRef.popup = null;
-            }
-            map.flyTo({
-                center: map.getCenter(),
-                zoom: previousZoom,
-                duration: 1000,
-            });
-        });
+		popup.on("close", () => {
+			if (currentPopupRef.popup === popup) {
+				currentPopupRef.popup = null;
+			}
+			map.flyTo({
+				center: map.getCenter(),
+				zoom: previousZoom,
+				duration: 1000,
+			});
+		});
 
-        map.flyTo({
-            center: [lng, lat],
-            zoom: Math.max(map.getZoom(), 16),
-            duration: 1000,
-        });
-    });
+		map.flyTo({
+			center: [lng, lat],
+			zoom: Math.max(map.getZoom(), 16),
+			duration: 1000,
+		});
+	});
 }
 
 export function configureTrainPopup({ map, onSelectVehicle }) {
-    attachPopup(
-        map,
-        "trainPositions-points",
-        renderTrainPopup,
-        (popup, properties, lngLat) => {
-            if (!properties) return;
+	attachPopup(
+		map,
+		"trainPositions-points",
+		renderTrainPopup,
+		(popup, properties, lngLat) => {
+			if (!properties) return;
 
-            map.flyTo({
-                center: lngLat,
-                zoom: Math.max(map.getZoom(), 16),
-                duration: 1000,
-            });
+			map.flyTo({
+				center: lngLat,
+				zoom: Math.max(map.getZoom(), 16),
+				duration: 1000,
+			});
 
-            const container = popup.getElement();
-            if (!container) return;
-            const button = container.querySelector(
-                '[data-role="view-sz-route"]'
-            );
-            if (!button) return;
+			const container = popup.getElement();
+			if (!container) return;
+			const button = container.querySelector(
+				'[data-role="view-sz-route"]',
+			);
+			if (!button) return;
 
-            button.addEventListener(
-                "click",
-                (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
+			button.addEventListener(
+				"click",
+				(event) => {
+					event.preventDefault();
+					event.stopPropagation();
 
-                    let from = properties.from;
-                    let to = properties.to;
+					let from = properties.from;
+					let to = properties.to;
 
-                    if (typeof from === "string") {
-                        try {
-                            from = JSON.parse(from);
-                        } catch (error) {
-                            console.warn(
-                                "Ne morem razvozljati podatkov 'from':",
-                                error
-                            );
-                            from = null;
-                        }
-                    }
+					if (typeof from === "string") {
+						try {
+							from = JSON.parse(from);
+						} catch (error) {
+							console.warn(
+								"Ne morem razvozljati podatkov 'from':",
+								error,
+							);
+							from = null;
+						}
+					}
 
-                    if (typeof to === "string") {
-                        try {
-                            to = JSON.parse(to);
-                        } catch (error) {
-                            console.warn(
-                                "Ne morem razvozljati podatkov 'to':",
-                                error
-                            );
-                            to = null;
-                        }
-                    }
+					if (typeof to === "string") {
+						try {
+							to = JSON.parse(to);
+						} catch (error) {
+							console.warn(
+								"Ne morem razvozljati podatkov 'to':",
+								error,
+							);
+							to = null;
+						}
+					}
 
-                    onSelectVehicle({
-                        tripId: properties.tripId || null,
-                        tripShort: properties.tripShort || null,
-                        departure: properties.departure || null,
-                        arrival: properties.arrival || null,
-                        realTime:
-                            properties.realTime === true ||
-                            properties.realTime === "true",
-                        from,
-                        to,
-                    });
-                    popup.remove();
-                },
-                { once: true }
-            );
-        }
-    );
+					onSelectVehicle({
+						tripId: properties.tripId || null,
+						tripShort: properties.tripShort || null,
+						departure: properties.departure || null,
+						arrival: properties.arrival || null,
+						realTime:
+							properties.realTime === true ||
+							properties.realTime === "true",
+						from,
+						to,
+					});
+					popup.remove();
+				},
+				{ once: true },
+			);
+		},
+	);
 }
 
 export function configureBusPopup({ map, onSelectVehicle }) {
-    attachPopup(
-        map,
-        "buses-points",
-        (properties) => {
-            if (!properties || typeof properties !== "object") {
-                return `<div style="min-width:180px">Ni podatkov</div>`;
-            }
-            if (properties.sourceType === "lpp")
-                return renderLppPopup(properties);
-            if (properties.sourceType === "ijpp")
-                return renderIjppPopup(properties);
-            return `<div style="min-width:180px">Ni podatkov</div>`;
-        },
-        (popup, properties, lngLat) => {
-            if (!properties) return;
+	map.on("click", "buses-points", async (event) => {
+		const feature = event.features?.[0];
+		if (!feature) return;
+		const properties = feature.properties || {};
+		let content;
 
-            map.flyTo({
-                center: lngLat,
-                zoom: Math.max(map.getZoom(), 16),
-                duration: 1000,
-            });
+		if (!properties || typeof properties !== "object") {
+			content = `<div style="min-width:180px">Ni podatkov</div>`;
+		} else if (properties.sourceType === "lpp") {
+			content = await renderLppPopup(properties);
+		} else if (properties.sourceType === "ijpp") {
+			content = renderIjppPopup(properties);
+		} else {
+			content = `<div style="min-width:180px">Ni podatkov</div>`;
+		}
 
-            const container = popup.getElement();
-            if (!container) return;
+		const previousZoom = map.getZoom();
 
-            if (properties.sourceType === "ijpp") {
-                const button = container.querySelector(
-                    '[data-role="view-route"]'
-                );
-                if (button) {
-                    button.addEventListener(
-                        "click",
-                        (event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onSelectVehicle({
-                                lineName: properties.lineName || null,
-                                operator: properties.operator || null,
-                                tripId: properties.tripId || null,
-                                vehicleId: properties.vehicleId || null,
-                                stop: properties.stop || null,
-                                stopStatus: properties.stopStatus || null,
-                            });
-                            popup.remove();
-                        },
-                        { once: true }
-                    );
-                }
-            }
+		// Close previous popup without triggering zoom animation
+		if (currentPopupRef.popup) {
+			currentPopupRef.popup.remove();
+			currentPopupRef.popup = null;
+		}
 
-            if (properties.sourceType === "lpp") {
-                const button = container.querySelector(
-                    '[data-role="view-lpp-route"]'
-                );
-                if (button) {
-                    button.addEventListener(
-                        "click",
-                        (event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onSelectVehicle({
-                                lineId: properties.lineId ?? null,
-                                tripId: properties.tripId ?? null,
-                                lineNumber: properties.lineNumber ?? null,
-                                lineName: properties.lineName ?? null,
-                            });
-                            popup.remove();
-                        },
-                        { once: true }
-                    );
-                }
-            }
-        }
-    );
+		const popup = new maplibregl.Popup({ closeButton: false }).setLngLat(
+			event.lngLat,
+		);
+
+		if (content && typeof content === "object" && content instanceof Node) {
+			popup.setDOMContent(content);
+		} else {
+			popup.setHTML(String(content ?? ""));
+		}
+
+		popup.addTo(map);
+		currentPopupRef.popup = popup;
+
+		popup.on("close", () => {
+			if (currentPopupRef.popup === popup) {
+				currentPopupRef.popup = null;
+			}
+			map.flyTo({
+				center: map.getCenter(),
+				zoom: previousZoom,
+				duration: 1000,
+			});
+		});
+
+		map.flyTo({
+			center: event.lngLat,
+			zoom: Math.max(map.getZoom(), 16),
+			duration: 1000,
+		});
+		const container = popup.getElement();
+		if (!container) return;
+
+		if (properties.sourceType === "ijpp") {
+			const button = container.querySelector('[data-role="view-route"]');
+			if (button) {
+				button.addEventListener(
+					"click",
+					(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						onSelectVehicle({
+							lineName: properties.lineName || null,
+							operator: properties.operator || null,
+							tripId: properties.tripId || null,
+							vehicleId: properties.vehicleId || null,
+							stop: properties.stop || null,
+							stopStatus: properties.stopStatus || null,
+						});
+						popup.remove();
+					},
+					{ once: true },
+				);
+			}
+		}
+
+		if (properties.sourceType === "lpp") {
+			const button = container.querySelector(
+				'[data-role="view-lpp-route"]',
+			);
+			if (button) {
+				button.addEventListener(
+					"click",
+					(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						onSelectVehicle({
+							lineId: properties.lineId ?? null,
+							tripId: properties.tripId ?? null,
+							lineNumber: properties.lineNumber ?? null,
+							lineName: properties.lineName ?? null,
+						});
+						popup.remove();
+					},
+					{ once: true },
+				);
+			}
+		}
+	});
 }
 
 export function configureTripStopsPopup(map, layerId) {
-    map.on("click", layerId, (event) => {
-        const feature = event.features?.[0];
-        if (!feature) return;
-        const props = feature.properties || {};
-        const [lng, lat] = feature.geometry.coordinates;
-        const name = props?.name || "Postaja";
-        const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
-        const previousZoom = map.getZoom();
+	map.on("click", layerId, (event) => {
+		const feature = event.features?.[0];
+		if (!feature) return;
+		const props = feature.properties || {};
+		const [lng, lat] = feature.geometry.coordinates;
+		const name = props?.name || "Postaja";
+		const html = `<div style="font-weight:600; font-size:15px; margin-bottom:8px">${name}</div>`;
+		const previousZoom = map.getZoom();
 
-        // Close previous popup without triggering zoom animation
-        if (currentPopupRef.popup) {
-            currentPopupRef.popup.remove();
-            currentPopupRef.popup = null;
-        }
+		// Close previous popup without triggering zoom animation
+		if (currentPopupRef.popup) {
+			currentPopupRef.popup.remove();
+			currentPopupRef.popup = null;
+		}
 
-        const popup = new maplibregl.Popup({ closeButton: false })
-            .setLngLat([lng, lat])
-            .setHTML(html)
-            .addTo(map);
+		const popup = new maplibregl.Popup({ closeButton: false })
+			.setLngLat([lng, lat])
+			.setHTML(html)
+			.addTo(map);
 
-        currentPopupRef.popup = popup;
+		currentPopupRef.popup = popup;
 
-        popup.on("close", () => {
-            if (currentPopupRef.popup === popup) {
-                currentPopupRef.popup = null;
-            }
-            map.flyTo({
-                center: map.getCenter(),
-                zoom: previousZoom,
-                duration: 1000,
-            });
-        });
+		popup.on("close", () => {
+			if (currentPopupRef.popup === popup) {
+				currentPopupRef.popup = null;
+			}
+			map.flyTo({
+				center: map.getCenter(),
+				zoom: previousZoom,
+				duration: 1000,
+			});
+		});
 
-        map.flyTo({
-            center: [lng, lat],
-            zoom: Math.max(map.getZoom(), 16),
-            duration: 1000,
-        });
-    });
+		map.flyTo({
+			center: [lng, lat],
+			zoom: Math.max(map.getZoom(), 16),
+			duration: 1000,
+		});
+	});
 }
