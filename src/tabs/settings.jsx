@@ -26,7 +26,7 @@ const SettingsTab = ({
                 <h3 style={{ textAlign: "center", padding: "5px" }}>
                     Zemljevid
                 </h3>
-                <div className="map-setttings">
+                <div className="map-settings">
                     <div style={{ margin: 0, padding: 0 }}>
                         <h3>Aktivni markerji</h3>
                         <label>

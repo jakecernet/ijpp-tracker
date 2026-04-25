@@ -3,6 +3,7 @@ import { Heart } from "lucide-react";
 import { formatPrecomputedArrival } from "../Api";
 
 const LIKED_ROUTES_KEY = "likedRoutes";
+const LIKED_STATIONS_KEY = "likedStations";
 const lppRoutesApiUrl = "https://tracker.cernetic.cc/api/lpp-all-routes";
 
 const loadLikedItems = (key) => {
@@ -20,6 +21,80 @@ const saveLikedItems = (key, items) => {
 	} catch {}
 };
 
+const bgColorMap = (item) => {
+	const operator = item?.operator || item?.operatorName;
+	const type = item?.type;
+
+	if (type === "LPP" || operator?.includes("Ljubljanski potniški promet"))
+		return "var(--lpp-color)";
+	if (type === "SZ" || operator?.includes("slovenske železnice"))
+		return "var(--sz-color)";
+	if (operator?.includes("Nomago")) return "var(--nomago-color)";
+	if (operator?.includes("Marprom")) return "var(--marprom-color)";
+	if (operator?.includes("Arriva")) return "var(--arriva-color)";
+	if (operator?.includes("Murska")) return "var(--murska-color)";
+
+	return "var(--default-color)";
+};
+
+const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
+	<div className="route-item" onClick={onClick}>
+		<div className="circle" style={{ background: bgColorMap(item) }}>
+			{item.lineNumber ?? item.routeName ?? item.tripId?.slice(5) ?? "?"}
+		</div>
+		<h3>{item.lineName || item.headsign || item.name || item.tripName}</h3>
+		<button
+			className={`like-btn ${isLiked ? "liked" : ""}`}
+			onClick={onToggleLike}
+			aria-label={
+				isLiked ? "Odstrani iz priljubljenih" : "Dodaj med priljubljene"
+			}>
+			<Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+		</button>
+	</div>
+));
+
+const ArrivalItem = memo(({ arrival }) => (
+	<div
+		className="arrival-item"
+		onClick={() => handleRouteClick(arrival, arrival.type)}>
+		<div className="left">
+			<div className="circle" style={{ background: bgColorMap(arrival) }}>
+				<h2
+					style={{
+						fontSize: arrival.type === "SZ" ? 16 : 20,
+						fontWeight: "bold",
+					}}>
+					{arrival.type === "LPP"
+						? arrival.routeName
+						: arrival.routeShortName || arrival.tripName}
+				</h2>
+			</div>
+			<h3>{arrival.tripName || arrival.headsign}</h3>
+		</div>
+		<p>{formatPrecomputedArrival(arrival)}</p>
+		{arrival.type === "SZ" && arrival.realTime && (
+			<p>
+				{"Zamuda: " +
+					formatDelay(
+						arrival.scheduledDeparture,
+						arrival.realtimeDeparture,
+					)}
+			</p>
+		)}
+	</div>
+));
+
+const SkeletonArrivalItem = memo(() => (
+	<div className="arrival-item skeleton">
+		<div className="left">
+			<div className="circle skeleton-circle"></div>
+			<div className="skeleton-text skeleton-title"></div>
+		</div>
+		<div className="skeleton-text skeleton-time"></div>
+	</div>
+));
+
 const LinesTab = ({
 	gpsPositions,
 	activeStation,
@@ -27,12 +102,16 @@ const LinesTab = ({
 	lppArrivals,
 	szArrivals,
 	getTripFromId,
+	arrivalsLoading,
 }) => {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 	const [page, setPage] = useState("arrivals"); // all, arrivals, liked
 	const [likedRoutes, setLikedRoutes] = useState(() =>
 		loadLikedItems(LIKED_ROUTES_KEY),
+	);
+	const [likedStations, setLikedStations] = useState(() =>
+		loadLikedItems(LIKED_STATIONS_KEY),
 	);
 	const [lppNumberedRoutes, setLppNumberedRoutes] = useState([]);
 
@@ -59,6 +138,40 @@ const LinesTab = ({
 		};
 		fetchLppRoutes();
 	}, []);
+
+	// Get unique station ID for liking
+	const getStationId = useCallback((station) => {
+		return station?.ref_id || station?.id || station?.name;
+	}, []);
+
+	const isCurrentStationLiked = useCallback(() => {
+		if (!activeStation) return false;
+		const id = getStationId(activeStation);
+		return likedStations.some((s) => s.id === id);
+	}, [activeStation, likedStations, getStationId]);
+
+	const toggleLikeStation = useCallback(
+		(e) => {
+			e?.stopPropagation();
+			const id = getStationId(activeStation);
+			setLikedStations((prev) => {
+				const exists = prev.some((s) => s.id === id);
+				const newLiked = exists
+					? prev.filter((s) => s.id !== id)
+					: [
+							...prev,
+							{
+								id,
+								name: activeStation.name,
+								data: activeStation,
+							},
+						];
+				saveLikedItems(LIKED_STATIONS_KEY, newLiked);
+				return newLiked;
+			});
+		},
+		[activeStation, getStationId],
+	);
 
 	// All active routes from GPS positions
 	const allActiveRoutes = useMemo(() => {
@@ -122,22 +235,6 @@ const LinesTab = ({
 		},
 		[getRouteId],
 	);
-
-	const bgColorMap = (item) => {
-		const operator = item?.operator || item?.operatorName;
-		const type = item?.type;
-
-		if (type === "LPP" || operator?.includes("Ljubljanski potniški promet"))
-			return "var(--lpp-color)";
-		if (type === "SZ" || operator?.includes("slovenske železnice"))
-			return "var(--sz-color)";
-		if (operator?.includes("Nomago")) return "var(--nomago-color)";
-		if (operator?.includes("Marprom")) return "var(--marprom-color)";
-		if (operator?.includes("Arriva")) return "var(--arriva-color)";
-		if (operator?.includes("Murska")) return "var(--murska-color)";
-
-		return "var(--default-color)";
-	};
 
 	const formatDelay = (scheduledDeparture, actualDeparture) => {
 		if (!scheduledDeparture || !actualDeparture) return "N/A";
@@ -277,66 +374,21 @@ const LinesTab = ({
 		[getTripFromId],
 	);
 
-	const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
-		<div className="route-item" onClick={onClick}>
-			<div className="circle" style={{ background: bgColorMap(item) }}>
-				{item.lineNumber ??
-					item.routeName ??
-					item.tripId?.slice(5) ??
-					"?"}
-			</div>
-			<h3>
-				{item.lineName || item.headsign || item.name || item.tripName}
-			</h3>
-			<button
-				className={`like-btn ${isLiked ? "liked" : ""}`}
-				onClick={onToggleLike}
-				aria-label={
-					isLiked
-						? "Odstrani iz priljubljenih"
-						: "Dodaj med priljubljene"
-				}>
-				<Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-			</button>
-		</div>
-	));
-
-	const ArrivalItem = memo(({ arrival }) => (
-		<div
-			className="arrival-item"
-			onClick={() => handleRouteClick(arrival, arrival.type)}>
-			<div className="left">
-				<div
-					className="circle"
-					style={{ background: bgColorMap(arrival) }}>
-					<h2
-						style={{
-							fontSize: arrival.type === "SZ" ? 16 : 20,
-							fontWeight: "bold",
-						}}>
-						{arrival.type === "LPP"
-							? arrival.routeName
-							: arrival.routeShortName || arrival.tripName}
-					</h2>
-				</div>
-				<h3>{arrival.tripName || arrival.headsign}</h3>
-			</div>
-			<p>{formatPrecomputedArrival(arrival)}</p>
-			{arrival.type === "SZ" && arrival.realTime && (
-				<p>
-					{"Zamuda: " +
-						formatDelay(
-							arrival.scheduledDeparture,
-							arrival.realtimeDeparture,
-						)}
-				</p>
-			)}
-		</div>
-	));
-
 	return (
 		<div className="insideDiv">
-			<h2>Linije {"(" + activeStation?.name + ")"}</h2>
+			<div className="lines-header">
+				<h2>Linije {"(" + activeStation?.name + ")"}</h2>
+				<button
+					className={`like-btn ${isCurrentStationLiked() ? "liked" : ""}`}
+					onClick={toggleLikeStation}
+					aria-label={
+						isCurrentStationLiked()
+							? "Odstrani iz priljubljenih"
+							: "Dodaj med priljubljene"
+					}>
+					<Heart size={20} fill={isCurrentStationLiked() ? "currentColor" : "none"} />
+				</button>
+			</div>
 			<input
 				type="text"
 				placeholder={
@@ -368,17 +420,27 @@ const LinesTab = ({
 			<div className="results">
 				{page === "arrivals" && (
 					<div className="arrival-list">
-						{allArrivals.length === 0 && (
+						{arrivalsLoading && (
+							<>
+								<SkeletonArrivalItem />
+								<SkeletonArrivalItem />
+								<SkeletonArrivalItem />
+								<SkeletonArrivalItem />
+								<SkeletonArrivalItem />
+							</>
+						)}
+						{!arrivalsLoading && allArrivals.length === 0 && (
 							<p className="empty-message">
 								Ni prihodov na tej postaji.
 							</p>
 						)}
-						{allArrivals.map((arrival, index) => (
-							<ArrivalItem
-								key={`arrival-${index}`}
-								arrival={arrival}
-							/>
-						))}
+						{!arrivalsLoading &&
+							allArrivals.map((arrival, index) => (
+								<ArrivalItem
+									key={`arrival-${index}`}
+									arrival={arrival}
+								/>
+							))}
 					</div>
 				)}
 				{page === "all" && (

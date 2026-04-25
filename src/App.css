@@ -21,6 +21,7 @@
 	--changer-bg: #111827;
 	--changer-left: 2px;
 	--hover-bg: rgba(51, 65, 85, 0.3);
+	--input-focus: rgba(30, 41, 59, 0.8);
 }
 
 .light {
@@ -46,6 +47,7 @@
 	--changer-bg: #d1d5db;
 	--changer-left: 20px;
 	--hover-bg: rgba(203, 213, 225, 0.3);
+	--input-focus: rgba(243, 244, 246, 0.8);
 }
 
 :root {
@@ -263,6 +265,25 @@ body {
 				color: var(--text-color);
 			}
 
+			.lines-header {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 8px;
+				padding: 0 10px;
+
+				h2 {
+					flex: 1;
+					text-align: center;
+					padding: 10px 0;
+					margin: 0;
+				}
+
+				.like-btn {
+					flex-shrink: 0;
+				}
+			}
+
 			.arrival-list {
 				height: 100%;
 				overflow-y: auto;
@@ -285,17 +306,6 @@ body {
 					cursor: pointer;
 					animation: slideIn 0.3s var(--transition-ease);
 					animation-fill-mode: both;
-
-					@keyframes slideIn {
-						from {
-							opacity: 0;
-							transform: translateY(10px);
-						}
-						to {
-							opacity: 1;
-							transform: translateY(0);
-						}
-					}
 
 					/* Staggered animation delays */
 					&:nth-child(1) {
@@ -367,6 +377,38 @@ body {
 				.arrival-item:last-child {
 					border-bottom: none;
 				}
+
+				.arrival-item.skeleton {
+					pointer-events: none;
+					animation: none;
+				}
+
+				.skeleton-circle,
+				.skeleton-text {
+					background: var(--selector-border);
+					animation: pulse 1.5s ease-in-out infinite;
+				}
+
+				.skeleton-circle {
+					width: 4rem;
+					height: 4rem;
+					border-radius: 50%;
+					border: 1px solid var(--selector-border);
+				}
+
+				.skeleton-text {
+					border-radius: 4px;
+					height: 20px;
+					min-width: 100px;
+				}
+
+				.skeleton-title {
+					width: 150px;
+				}
+
+				.skeleton-time {
+					width: 80px;
+				}
 			}
 
 			.route-item {
@@ -386,17 +428,6 @@ body {
 				touch-action: manipulation;
 				animation: slideIn 0.3s var(--transition-ease);
 				animation-fill-mode: both;
-
-				@keyframes slideIn {
-					from {
-						opacity: 0;
-						transform: translateY(10px);
-					}
-					to {
-						opacity: 1;
-						transform: translateY(0);
-					}
-				}
 
 				&:hover {
 					background: var(--hover-bg);
@@ -457,17 +488,6 @@ body {
 						var(--transition-ease);
 					animation: slideIn 0.3s var(--transition-ease);
 					animation-fill-mode: both;
-
-					@keyframes slideIn {
-						from {
-							opacity: 0;
-							transform: translateY(10px);
-						}
-						to {
-							opacity: 1;
-							transform: translateY(0);
-						}
-					}
 
 					div {
 						display: flex;
@@ -585,17 +605,6 @@ body {
 				animation: slideIn 0.3s var(--transition-ease);
 				animation-fill-mode: both;
 
-				@keyframes slideIn {
-					from {
-						opacity: 0;
-						transform: translateY(10px);
-					}
-					to {
-						opacity: 1;
-						transform: translateY(0);
-					}
-				}
-
 				.station-content {
 					display: flex;
 					flex-direction: row;
@@ -652,6 +661,9 @@ body {
 				overflow-y: auto;
 				-webkit-overflow-scrolling: touch;
 				overscroll-behavior: contain;
+				flex: 1;
+				min-height: 0;
+				overflow-y: auto;
 
 				ul {
 					list-style: none;
@@ -755,7 +767,7 @@ body {
 				}
 
 				&:focus {
-					background: rgba(30, 41, 59, 0.8);
+					background: var(--input-focus);
 					border-color: var(--active-color);
 					box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
 				}
@@ -801,17 +813,6 @@ body {
 						animation: slideIn 0.3s var(--transition-ease);
 						animation-fill-mode: both;
 
-						@keyframes slideIn {
-							from {
-								opacity: 0;
-								transform: translateY(5px);
-							}
-							to {
-								opacity: 1;
-								transform: translateY(0);
-							}
-						}
-
 						&:hover {
 							background: var(--hover-bg);
 						}
@@ -851,7 +852,7 @@ body {
 					margin: 10px;
 				}
 
-				.map-setttings {
+				.map-settings {
 					display: flex;
 					flex-direction: column;
 					gap: 12px;
@@ -1106,6 +1107,27 @@ body {
 @keyframes map-spin {
 	to {
 		transform: rotate(360deg);
+	}
+}
+
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 0.6;
+	}
+	50% {
+		opacity: 0.3;
 	}
 }
 

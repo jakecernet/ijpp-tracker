@@ -109,7 +109,6 @@ export async function prefetchStaticData() {
 				fetchJson(szStopsLink),
 			),
 		]);
-		console.log("Static data prefetched successfully");
 	} catch (error) {
 		console.warn("Prefetch failed, will fetch on demand:", error);
 	}
@@ -1006,9 +1005,6 @@ export async function prefetchRoutesForArrivals(
 	}
 
 	if (tasks.length === 0) return;
-	console.log(
-		`[prefetch] Prefetching ${tasks.length} routes in background...`,
-	);
 
 	const BATCH_SIZE = 3;
 	for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
@@ -1042,7 +1038,6 @@ export async function prefetchRoutesForArrivals(
 			await new Promise((r) => setTimeout(r, 300));
 		}
 	}
-	console.log(`[prefetch] Done prefetching routes.`);
 }
 
 export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };

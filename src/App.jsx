@@ -116,6 +116,7 @@ function App() {
 	const [trainPositions, setTrainPositions] = useState([]);
 	const [selectedVehicle, setSelectedVehicle] = useState(null);
 	const [routeLoading, setRouteLoading] = useState(false);
+	const [isOnLinesTab, setIsOnLinesTab] = useState(false);
 
 	const [busStops, setBusStops] = useState([]);
 	const [szStops, setSzStops] = useState([]);
@@ -123,6 +124,7 @@ function App() {
 	const [ijppArrivals, setIjppArrivals] = useState([]);
 	const [lppArrivals, setLppArrivals] = useState([]);
 	const [szArrivals, setSzArrivals] = useState([]);
+	const [arrivalsLoading, setArrivalsLoading] = useState(false);
 
 	const [mapZoom, setMapZoom] = useState(13);
 
@@ -375,6 +377,71 @@ function App() {
 		load();
 	}, [activeStation]);
 
+	// Set loading state when activeStation changes, clear it when all arrivals resolve
+	useEffect(() => {
+		setArrivalsLoading(true);
+	}, [activeStation]);
+
+	useEffect(() => {
+		if (
+			ijppArrivals.length > 0 ||
+			lppArrivals.length > 0 ||
+			szArrivals.length > 0
+		) {
+			setArrivalsLoading(false);
+		}
+	}, [ijppArrivals, lppArrivals, szArrivals]);
+
+	// Poll arrivals every 30 seconds when on Lines tab
+	useEffect(() => {
+		if (!isOnLinesTab) {
+			return;
+		}
+
+		const pollArrivals = async () => {
+			try {
+				const lppCode =
+					activeStation?.ref_id || activeStation?.station_code;
+				const ijppId = activeStation?.gtfs_id;
+				const szId = activeStation?.stopId;
+
+				const results = await Promise.all([
+					lppCode ? fetchLppArrivals(lppCode) : Promise.resolve([]),
+					ijppId ? fetchIjppArrivals(ijppId) : Promise.resolve([]),
+					szId ? fetchSzArrivals(szId) : Promise.resolve([]),
+				]);
+
+				setLppArrivals(results[0]);
+				setIjppArrivals(results[1]);
+				setSzArrivals(results[2]);
+			} catch (error) {
+				console.error("Error polling arrivals:", error);
+			}
+		};
+
+		const POLLING_INTERVAL = 30000; // 30 seconds
+
+		const handleVisibilityChange = () => {
+			if (document.hidden) {
+				// Stop polling when page is hidden
+			} else {
+				// Fetch immediately when page becomes visible
+				pollArrivals();
+			}
+		};
+
+		document.addEventListener("visibilitychange", handleVisibilityChange);
+		const intervalId = setInterval(pollArrivals, POLLING_INTERVAL);
+
+		return () => {
+			clearInterval(intervalId);
+			document.removeEventListener(
+				"visibilitychange",
+				handleVisibilityChange,
+			);
+		};
+	}, [isOnLinesTab, activeStation]);
+
 	// Prefetch routes for all arrivals in the background
 	useEffect(() => {
 		if (!ijppArrivals.length && !lppArrivals.length && !szArrivals.length)
@@ -460,14 +527,16 @@ function App() {
 		);
 	}, [selectedVehicle, getTripFromId]);
 
-	// Component to track route changes and update isOnMapTab
+	// Component to track route changes and update isOnMapTab and isOnLinesTab
 	const RouteTracker = useCallback(() => {
 		const location = useLocation();
 
 		useEffect(() => {
 			const path = location.pathname;
 			const onMap = path === "/" || path === "/map" || path === "";
+			const onLines = path === "/lines";
 			setIsOnMapTab(onMap);
+			setIsOnLinesTab(onLines);
 		}, [location.pathname]);
 
 		return null;
@@ -543,6 +612,7 @@ function App() {
 										lppArrivals={lppArrivals}
 										szArrivals={szArrivals}
 										getTripFromId={getTripFromId}
+										arrivalsLoading={arrivalsLoading}
 									/>
 								}
 							/>
