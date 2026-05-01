@@ -501,150 +501,164 @@ const Map = React.memo(function Map({
 	useEffect(() => {
 		if (mapInstanceRef.current) return;
 
-		const map = new maplibregl.Map({
-			container: mapRef.current,
-			style: getMapStyle(),
-			center: [initialCenterRef.current[1], initialCenterRef.current[0]],
-			zoom: DEFAULT_ZOOM,
-			attributionControl: true,
-			maxZoom: 22,
-		});
-
-		mapInstanceRef.current = map;
-		map.addControl(
-			new maplibregl.NavigationControl({ showCompass: true }),
-			"top-right",
-		);
-
-		map.on("load", async () => {
-			await ensureIcons(map, ICON_SOURCES);
-
-			setupSourcesAndLayers(map, {
-				buses: busesGeoJSON,
-				busStops: busStopsGeoJSON,
-				trainPositions: trainPositionsGeoJSON,
-				trainStops: trainStopsGeoJSON,
+		try {
+			const map = new maplibregl.Map({
+				container: mapRef.current,
+				style: getMapStyle(),
+				center: [
+					initialCenterRef.current[1],
+					initialCenterRef.current[0],
+				],
+				zoom: DEFAULT_ZOOM,
+				attributionControl: true,
+				maxZoom: 22,
 			});
 
-			// Setup trip overlays for all providers
-			["ijpp", "lpp", "sz"].forEach((prefix) =>
-				setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
+			mapInstanceRef.current = map;
+			map.addControl(
+				new maplibregl.NavigationControl({ showCompass: true }),
+				"top-right",
 			);
 
-			// Notify parent of initial zoom level
-			if (handlersRef.current.onZoomChange) {
-				handlersRef.current.onZoomChange(Math.round(map.getZoom()));
+			map.on("load", async () => {
+				await ensureIcons(map, ICON_SOURCES);
+
+				setupSourcesAndLayers(map, {
+					buses: busesGeoJSON,
+					busStops: busStopsGeoJSON,
+					trainPositions: trainPositionsGeoJSON,
+					trainStops: trainStopsGeoJSON,
+				});
+
+				// Setup trip overlays for all providers
+				["ijpp", "lpp", "sz"].forEach((prefix) =>
+					setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
+				);
+
+				// Notify parent of initial zoom level
+				if (handlersRef.current.onZoomChange) {
+					handlersRef.current.onZoomChange(Math.round(map.getZoom()));
+				}
+
+				// Configure all popups
+				configureBusStopPopup({
+					map,
+					onSelectStop: (stop) => {
+						const payload = {
+							name: stop.name,
+							coordinates: stop.gpsLocation,
+							id: stop.id,
+							ref_id: stop.ref_id,
+							gtfs_id: stop.gtfs_id,
+							type: "bus-stop",
+						};
+						handlersRef.current.setActiveStation(payload);
+						localStorage.setItem(
+							"activeStation",
+							JSON.stringify(payload),
+						);
+						window.location.hash = "/lines";
+					},
+				});
+
+				configureTrainStopPopup({
+					map,
+					onSelectStop: (stop) => {
+						const coordinates = Array.isArray(stop?.gpsLocation)
+							? stop.gpsLocation
+							: [stop?.lat, stop?.lon];
+						if (
+							!Array.isArray(coordinates) ||
+							!Number.isFinite(coordinates[0]) ||
+							!Number.isFinite(coordinates[1])
+						) {
+							return;
+						}
+						const payload = {
+							name: stop.name,
+							coordinates,
+							gpsLocation: coordinates,
+							stopId: stop.stopId ?? null,
+							id: stop.id ?? stop.stopId ?? stop.name,
+							lat: coordinates[0],
+							lon: coordinates[1],
+							type: "train-stop",
+						};
+						handlersRef.current.setActiveStation(payload);
+						localStorage.setItem(
+							"activeStation",
+							JSON.stringify(payload),
+						);
+						window.location.hash = "/lines";
+					},
+				});
+
+				configureTrainPopup({
+					map,
+					onSelectVehicle: (vehicle) => {
+						handlersRef.current.setSelectedVehicle(vehicle);
+						// Enable route-only SZ view and hide buses & stations
+						setFilterByRoute(true);
+						setRouteVisibilityOverride({
+							buses: false,
+							busStops: false,
+							trainPositions: true,
+							trainStops: false,
+						});
+					},
+				});
+
+				configureBusPopup({
+					map,
+					onSelectVehicle: (vehicle) => {
+						handlersRef.current.setSelectedVehicle(vehicle);
+						// Enable route-only bus view and hide stations & SZ markers
+						setFilterByRoute(true);
+						setRouteVisibilityOverride({
+							buses: true,
+							busStops: false,
+							trainPositions: false,
+							trainStops: false,
+						});
+					},
+				});
+
+				// Configure trip stops popups for all providers
+				["ijpp", "lpp", "sz"].forEach((prefix) =>
+					configureTripStopsPopup(map, `${prefix}-trip-stops-points`),
+				);
+
+				setIsMapLoaded(true);
+			});
+
+			// Track zoom changes for adaptive polling
+			map.on("zoomend", () => {
+				if (handlersRef.current.onZoomChange) {
+					handlersRef.current.onZoomChange(Math.round(map.getZoom()));
+				}
+			});
+
+			// Listen for map theme changes
+			const handleMapThemeChange = () => {
+				map.setStyle(getMapStyle());
+			};
+			window.addEventListener("mapThemeChange", handleMapThemeChange);
+
+			return () => {
+				window.removeEventListener(
+					"mapThemeChange",
+					handleMapThemeChange,
+				);
+				map.remove();
+				mapInstanceRef.current = null;
+			};
+		} catch (err) {
+			console.error("Failed to initialize map:", err);
+			if (mapRef.current) {
+				mapRef.current.innerHTML =
+					'<div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f5f5f5;"><div style="text-align: center;"><p style="margin: 0; color: #333; font-size: 16px;">Zemljevid se ne more naložiti</p><p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Prosim, preverite grafični gonilnik ali poskusite osvežiti stran.</p></div></div>';
 			}
-
-			// Configure all popups
-			configureBusStopPopup({
-				map,
-				onSelectStop: (stop) => {
-					const payload = {
-						name: stop.name,
-						coordinates: stop.gpsLocation,
-						id: stop.id,
-						ref_id: stop.ref_id,
-						gtfs_id: stop.gtfs_id,
-						type: "bus-stop",
-					};
-					handlersRef.current.setActiveStation(payload);
-					localStorage.setItem(
-						"activeStation",
-						JSON.stringify(payload),
-					);
-					window.location.hash = "/lines";
-				},
-			});
-
-			configureTrainStopPopup({
-				map,
-				onSelectStop: (stop) => {
-					const coordinates = Array.isArray(stop?.gpsLocation)
-						? stop.gpsLocation
-						: [stop?.lat, stop?.lon];
-					if (
-						!Array.isArray(coordinates) ||
-						!Number.isFinite(coordinates[0]) ||
-						!Number.isFinite(coordinates[1])
-					) {
-						return;
-					}
-					const payload = {
-						name: stop.name,
-						coordinates,
-						gpsLocation: coordinates,
-						stopId: stop.stopId ?? null,
-						id: stop.id ?? stop.stopId ?? stop.name,
-						lat: coordinates[0],
-						lon: coordinates[1],
-						type: "train-stop",
-					};
-					handlersRef.current.setActiveStation(payload);
-					localStorage.setItem(
-						"activeStation",
-						JSON.stringify(payload),
-					);
-					window.location.hash = "/lines";
-				},
-			});
-
-			configureTrainPopup({
-				map,
-				onSelectVehicle: (vehicle) => {
-					handlersRef.current.setSelectedVehicle(vehicle);
-					// Enable route-only SZ view and hide buses & stations
-					setFilterByRoute(true);
-					setRouteVisibilityOverride({
-						buses: false,
-						busStops: false,
-						trainPositions: true,
-						trainStops: false,
-					});
-				},
-			});
-
-			configureBusPopup({
-				map,
-				onSelectVehicle: (vehicle) => {
-					handlersRef.current.setSelectedVehicle(vehicle);
-					// Enable route-only bus view and hide stations & SZ markers
-					setFilterByRoute(true);
-					setRouteVisibilityOverride({
-						buses: true,
-						busStops: false,
-						trainPositions: false,
-						trainStops: false,
-					});
-				},
-			});
-
-			// Configure trip stops popups for all providers
-			["ijpp", "lpp", "sz"].forEach((prefix) =>
-				configureTripStopsPopup(map, `${prefix}-trip-stops-points`),
-			);
-
-			setIsMapLoaded(true);
-		});
-
-		// Track zoom changes for adaptive polling
-		map.on("zoomend", () => {
-			if (handlersRef.current.onZoomChange) {
-				handlersRef.current.onZoomChange(Math.round(map.getZoom()));
-			}
-		});
-
-		// Listen for map theme changes
-		const handleMapThemeChange = () => {
-			map.setStyle(getMapStyle());
-		};
-		window.addEventListener("mapThemeChange", handleMapThemeChange);
-
-		return () => {
-			window.removeEventListener("mapThemeChange", handleMapThemeChange);
-			map.remove();
-			mapInstanceRef.current = null;
-		};
+		}
 	}, []);
 
 	// Update GeoJSON sources
