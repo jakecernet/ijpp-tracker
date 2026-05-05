@@ -30,7 +30,6 @@ import {
 	fetchSzArrivals,
 	fetchIJPPTrip,
 	prefetchStaticData,
-	prefetchRoutesForArrivals,
 	getInterpolatedPosition,
 } from "./Api.jsx";
 
@@ -442,15 +441,6 @@ function App() {
 		};
 	}, [isOnLinesTab, activeStation]);
 
-	// Prefetch routes for all arrivals in the background
-	useEffect(() => {
-		if (!ijppArrivals.length && !lppArrivals.length && !szArrivals.length)
-			return;
-		const timer = setTimeout(() => {
-			prefetchRoutesForArrivals(ijppArrivals, lppArrivals, szArrivals);
-		}, 500);
-		return () => clearTimeout(timer);
-	}, [ijppArrivals, lppArrivals, szArrivals]);
 
 	// Za fetchanje tripa iz ID-ja
 	const getTripFromId = useCallback(async (tripData, type) => {

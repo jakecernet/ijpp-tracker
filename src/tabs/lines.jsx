@@ -25,7 +25,7 @@ const bgColorMap = (item) => {
 	const operator = item?.operator || item?.operatorName;
 	const type = item?.type;
 
-	if (type === "LPP" || operator?.includes("Ljubljanski potniški promet"))
+	if (type === "LPP" || operator?.toLowerCase().includes("ljubljanski potniški promet"))
 		return "var(--lpp-color)";
 	if (type === "SZ" || operator?.includes("slovenske železnice"))
 		return "var(--sz-color)";
@@ -54,10 +54,10 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
 	</div>
 ));
 
-const ArrivalItem = memo(({ arrival }) => (
+const ArrivalItem = memo(({ arrival, onRouteClick }) => (
 	<div
 		className="arrival-item"
-		onClick={() => handleRouteClick(arrival, arrival.type)}>
+		onClick={() => onRouteClick(arrival, arrival.type)}>
 		<div className="left">
 			<div className="circle" style={{ background: bgColorMap(arrival) }}>
 				<h2
@@ -439,6 +439,7 @@ const LinesTab = ({
 								<ArrivalItem
 									key={`arrival-${index}`}
 									arrival={arrival}
+									onRouteClick={handleRouteClick}
 								/>
 							))}
 					</div>
