@@ -25,7 +25,10 @@ const bgColorMap = (item) => {
 	const operator = item?.operator || item?.operatorName;
 	const type = item?.type;
 
-	if (type === "LPP" || operator?.toLowerCase().includes("ljubljanski potniški promet"))
+	if (
+		type === "LPP" ||
+		operator?.toLowerCase().includes("ljubljanski potniški promet")
+	)
 		return "var(--lpp-color)";
 	if (type === "SZ" || operator?.includes("slovenske železnice"))
 		return "var(--sz-color)";
@@ -35,6 +38,16 @@ const bgColorMap = (item) => {
 	if (operator?.includes("Murska")) return "var(--murska-color)";
 
 	return "var(--default-color)";
+};
+
+const formatDelay = (scheduledDeparture, actualDeparture) => {
+	if (!scheduledDeparture || !actualDeparture) return "N/A";
+	const scheduled = new Date(scheduledDeparture);
+	const actual = new Date(actualDeparture);
+	if (isNaN(scheduled) || isNaN(actual)) return "N/A";
+	const diffMinutes = Math.round((actual - scheduled) / 60000);
+	if (diffMinutes === 0) return " 0 min";
+	return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
 };
 
 const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
@@ -236,16 +249,6 @@ const LinesTab = ({
 		[getRouteId],
 	);
 
-	const formatDelay = (scheduledDeparture, actualDeparture) => {
-		if (!scheduledDeparture || !actualDeparture) return "N/A";
-		const scheduled = new Date(scheduledDeparture);
-		const actual = new Date(actualDeparture);
-		if (isNaN(scheduled) || isNaN(actual)) return "N/A";
-		const diffMinutes = Math.round((actual - scheduled) / 60000);
-		if (diffMinutes === 0) return " 0 min";
-		return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
-	};
-
 	// Combined arrivals for current station
 	const allArrivals = useMemo(() => {
 		const ijppFiltered = (ijppArrivals || [])
@@ -386,7 +389,10 @@ const LinesTab = ({
 							? "Odstrani iz priljubljenih"
 							: "Dodaj med priljubljene"
 					}>
-					<Heart size={20} fill={isCurrentStationLiked() ? "currentColor" : "none"} />
+					<Heart
+						size={20}
+						fill={isCurrentStationLiked() ? "currentColor" : "none"}
+					/>
 				</button>
 			</div>
 			<input

@@ -81,7 +81,7 @@ button:focus-visible {
 
 @font-face {
 	font-family: "Proxima Nova Light";
-	src: url("./proximanova_light.otf") format("opentype");
+	src: url("./proximanova_light.woff2") format("woff2");
 	font-display: swap;
 }
 

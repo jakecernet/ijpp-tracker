@@ -38,13 +38,6 @@ const StationsTab = lazy(() => import("./tabs/stations"));
 const LinesTab = lazy(() => import("./tabs/lines"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
 
-if (typeof window !== "undefined") {
-	import("./tabs/map");
-	import("./tabs/stations");
-	import("./tabs/lines");
-	import("./tabs/settings");
-}
-
 function App() {
 	const [activeStation, setActiveStation] = useState(
 		localStorage.getItem("activeStation")
@@ -322,74 +315,37 @@ function App() {
 		}
 	}, []);
 
-	// LPP prihodi
+	// Fetch all arrivals with shared loading state
 	useEffect(() => {
-		const load = async () => {
+		const loadArrivals = async () => {
+			setArrivalsLoading(true);
+
 			const lppCode =
 				activeStation?.ref_id || activeStation?.station_code;
-			if (!lppCode) {
-				setLppArrivals([]);
-				return;
-			}
-			try {
-				const arrivals = await fetchLppArrivals(lppCode);
-				setLppArrivals(arrivals);
-			} catch (error) {
-				console.error("Error loading LPP arrivals:", error);
-				setLppArrivals([]);
-			}
-		};
-		load();
-	}, [activeStation]);
-
-	// IJPP prihodi
-	useEffect(() => {
-		const load = async () => {
 			const ijppId = activeStation?.gtfs_id;
-			if (!ijppId) {
-				setIjppArrivals([]);
-				return;
-			}
-			try {
-				const arrivals = await fetchIjppArrivals(ijppId);
-				setIjppArrivals(arrivals);
-			} catch (error) {
-				console.error("Error loading IJPP arrivals:", error);
-				setIjppArrivals([]);
-			}
-		};
-		load();
-	}, [activeStation]);
-
-	// SZ prihodi
-	useEffect(() => {
-		const load = async () => {
 			const szId = activeStation?.stopId;
-			try {
-				const arrivals = await fetchSzArrivals(szId);
-				setSzArrivals(arrivals);
-			} catch (error) {
-				console.error("Error loading SZ arrivals:", error);
-				setSzArrivals([]);
-			}
-		};
-		load();
-	}, [activeStation]);
 
-	// Set loading state when activeStation changes, clear it when all arrivals resolve
-	useEffect(() => {
-		setArrivalsLoading(true);
-	}, [activeStation]);
+			const results = await Promise.allSettled([
+				lppCode ? fetchLppArrivals(lppCode) : Promise.resolve([]),
+				ijppId ? fetchIjppArrivals(ijppId) : Promise.resolve([]),
+				szId ? fetchSzArrivals(szId) : Promise.resolve([]),
+			]);
 
-	useEffect(() => {
-		if (
-			ijppArrivals.length > 0 ||
-			lppArrivals.length > 0 ||
-			szArrivals.length > 0
-		) {
+			setLppArrivals(
+				results[0].status === "fulfilled" ? results[0].value : [],
+			);
+			setIjppArrivals(
+				results[1].status === "fulfilled" ? results[1].value : [],
+			);
+			setSzArrivals(
+				results[2].status === "fulfilled" ? results[2].value : [],
+			);
+
 			setArrivalsLoading(false);
-		}
-	}, [ijppArrivals, lppArrivals, szArrivals]);
+		};
+
+		loadArrivals();
+	}, [activeStation]);
 
 	// Poll arrivals every 30 seconds when on Lines tab
 	useEffect(() => {
@@ -440,7 +396,6 @@ function App() {
 			);
 		};
 	}, [isOnLinesTab, activeStation]);
-
 
 	// Za fetchanje tripa iz ID-ja
 	const getTripFromId = useCallback(async (tripData, type) => {

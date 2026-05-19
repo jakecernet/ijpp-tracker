@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { sl } from "date-fns/locale";
+import { act } from "react";
 
 const busStopsLink =
 	"https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/unified_stops_with_gtfs.json";
@@ -60,7 +61,7 @@ const cache = new Map();
 
 const CACHE_TTL = {
 	stops: 5 * 60 * 1000, // 5 minutes - static data, rarely changes
-	positions: 5 * 1000, // 5 seconds - real-time positions
+	positions: 3 * 1000, // 5 seconds - real-time positions
 	arrivals: 15 * 1000, // 15 seconds - arrival predictions
 	routes: 5 * 60 * 1000, // 5 minutes - route/trip data
 };
@@ -352,7 +353,11 @@ const fetchSzStops = async () => {
  */
 const fetchLPPPositions = async () => {
 	try {
-		const data = await fetchJson(lppLocationsLink);
+		const data = await cachedFetch(
+			lppLocationsLink,
+			CACHE_TTL.positions,
+			() => fetchJson(lppLocationsLink),
+		);
 
 		const lppPositions = data.data.map((bus) => ({
 			gpsLocation: [bus.latitude, bus.longitude],
@@ -379,7 +384,11 @@ const fetchLPPPositions = async () => {
  */
 const fetchIJPPPositions = async () => {
 	try {
-		const data = await fetchJson(ijppLocationsLink);
+		const data = await cachedFetch(
+			ijppLocationsLink,
+			CACHE_TTL.positions,
+			() => fetchJson(ijppLocationsLink),
+		);
 		const ijppPositions = Array.isArray(data)
 			? data
 					.filter(
@@ -575,49 +584,66 @@ const fetchIJPPTrip = async (trip) => {
 	const tripId = trip.tripId || trip;
 	const cached = getCachedRoute(tripId);
 	if (cached) return cached;
-	try {
-		const dateString = new Date().toISOString().split("T")[0];
-		const raw = await fetchJson(
-			ijppRouteLink + tripId + `?date=${dateString}`,
-		);
-		const pointsResponse = await fetchJson(
-			ijppRouteLink + tripId + "/geometry",
-		);
-		const operator = fetchIJPPPositions().then((positions) =>
-			fetchIjppArrivals(
-				JSON.parse(localStorage.getItem("activeStation")).gtfs_id,
-			).then((arrivals) => {
-				const vehicle = positions.find((pos) => pos.tripId === tripId);
-				const arrival = arrivals.find((arr) => arr.tripId === tripId);
-				return arrival?.operatorName || vehicle?.operator || "";
-			}),
-		);
 
-		selectedRoute = {
-			tripName: raw?.trip_headsign || "",
-			tripId: raw?.gtfs_id || "",
-			stops: raw?.stop_times
-				? raw.stop_times.map((stop) => ({
-						arrival: seconds2time(stop.arrival_realtime),
-						departure: seconds2time(stop.departure_realtime),
-						realtime: stop.realtime,
-						passed: stop.passed,
-						name: stop.stop.name,
-						gtfsId: stop.stop.gtfs_id,
-						gpsLocation: [stop.stop.lat || 0, stop.stop.lon || 0],
-					}))
-				: [],
-			geometry: pointsResponse.coordinates || [],
-			operator: await operator,
-			isLPP: false,
-			isSZ: false,
-		};
-		setCachedRoute(tripId, selectedRoute);
-		return selectedRoute;
-	} catch (error) {
-		console.error("Error fetching IJPP trip:", error);
-		return null;
-	}
+	if (routeInFlight.has(tripId)) return routeInFlight.get(tripId);
+
+	const promise = (async () => {
+		try {
+			const dateString = new Date().toISOString().split("T")[0];
+			const raw = await fetchJson(
+				ijppRouteLink + tripId + `?date=${dateString}`,
+			);
+			const pointsResponse = await fetchJson(
+				ijppRouteLink + tripId + "/geometry",
+			);
+			const operator = fetchIJPPPositions().then((positions) =>
+				fetchIjppArrivals(
+					JSON.parse(localStorage.getItem("activeStation")).gtfs_id,
+				).then((arrivals) => {
+					const vehicle = positions.find(
+						(pos) => pos.tripId === tripId,
+					);
+					const arrival = arrivals.find(
+						(arr) => arr.tripId === tripId,
+					);
+					return arrival?.operatorName || vehicle?.operator || "";
+				}),
+			);
+
+			selectedRoute = {
+				tripName: raw?.trip_headsign || "",
+				tripId: raw?.gtfs_id || "",
+				stops: raw?.stop_times
+					? raw.stop_times.map((stop) => ({
+							arrival: seconds2time(stop.arrival_realtime),
+							departure: seconds2time(stop.departure_realtime),
+							realtime: stop.realtime,
+							passed: stop.passed,
+							name: stop.stop.name,
+							gtfsId: stop.stop.gtfs_id,
+							gpsLocation: [
+								stop.stop.lat || 0,
+								stop.stop.lon || 0,
+							],
+						}))
+					: [],
+				geometry: pointsResponse.coordinates || [],
+				operator: await operator,
+				isLPP: false,
+				isSZ: false,
+			};
+			setCachedRoute(tripId, selectedRoute);
+			return selectedRoute;
+		} catch (error) {
+			console.error("Error fetching IJPP trip:", error);
+			return null;
+		} finally {
+			routeInFlight.delete(tripId);
+		}
+	})();
+
+	routeInFlight.set(tripId, promise);
+	return promise;
 };
 
 /** Fetcha točke LPP route
@@ -697,41 +723,55 @@ const fetchLppRoute = async (lppRoute) => {
 	if (!lppRoute) return null;
 	const cached = getCachedRoute(lppRoute.tripId);
 	if (cached) return cached;
-	try {
-		const raw = await fetchJson(lppRouteLink + lppRoute.tripId);
-		const geometry = await fetchLppPoints(
-			lppRoute.lineId || lppRoute.routeId,
-			lppRoute.tripId,
-		);
 
-		const lineNumber = lppRoute.lineNumber || lppRoute.routeName || "";
-		const tripName = lppRoute.lineName || lppRoute.tripName || "";
+	if (routeInFlight.has(lppRoute.tripId))
+		return routeInFlight.get(lppRoute.tripId);
 
-		selectedRoute = {
-			isLPP: true,
-			isSZ: false,
-			tripId: lppRoute.tripId || "",
-			tripName: tripName,
-			lineNumber: lineNumber,
-			operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
-			stops: Array.isArray(raw.data)
-				? raw.data.map((stop) => ({
-						name: stop.name || "",
-						stopId: stop.station_code || "",
-						gpsLocation: [stop.latitude || 0, stop.longitude || 0],
-						arrivals: stop?.arrivals.map((arrival) => ({
-							eta_min: arrival.eta_min,
-						})),
-					}))
-				: [],
-			geometry: geometry || [],
-		};
-		setCachedRoute(lppRoute.tripId, selectedRoute);
-		return selectedRoute;
-	} catch (error) {
-		console.error("Error fetching LPP route:", error);
-		return null;
-	}
+	const promise = (async () => {
+		try {
+			const raw = await fetchJson(lppRouteLink + lppRoute.tripId);
+			const geometry = await fetchLppPoints(
+				lppRoute.lineId || lppRoute.routeId,
+				lppRoute.tripId,
+			);
+
+			const lineNumber = lppRoute.lineNumber || lppRoute.routeName || "";
+			const tripName = lppRoute.lineName || lppRoute.tripName || "";
+
+			selectedRoute = {
+				isLPP: true,
+				isSZ: false,
+				tripId: lppRoute.tripId || "",
+				tripName: tripName,
+				lineNumber: lineNumber,
+				operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
+				stops: Array.isArray(raw.data)
+					? raw.data.map((stop) => ({
+							name: stop.name || "",
+							stopId: stop.station_code || "",
+							gpsLocation: [
+								stop.latitude || 0,
+								stop.longitude || 0,
+							],
+							arrivals: stop?.arrivals.map((arrival) => ({
+								eta_min: arrival.eta_min,
+							})),
+						}))
+					: [],
+				geometry: geometry || [],
+			};
+			setCachedRoute(lppRoute.tripId, selectedRoute);
+			return selectedRoute;
+		} catch (error) {
+			console.error("Error fetching LPP route:", error);
+			return null;
+		} finally {
+			routeInFlight.delete(lppRoute.tripId);
+		}
+	})();
+
+	routeInFlight.set(lppRoute.tripId, promise);
+	return promise;
 };
 
 /**
@@ -743,67 +783,77 @@ const fetchSzTrip = async (tripId) => {
 	if (!tripId) return null;
 	const cached = getCachedRoute(tripId);
 	if (cached) return cached;
-	try {
-		const fetched = await fetchJson(szRouteLink + tripId);
-		const raw = fetched?.legs || null;
-		const startStop = raw && raw[0] ? raw[0].from : null;
-		const endStop = raw && raw[0] ? raw[0].to : null;
-		selectedRoute = Array.isArray(raw)
-			? {
-					from: {
-						name: raw[0]?.from?.name || "",
-						stopId: raw[0]?.from?.stopId || "",
-						gpsLocation: [
-							raw[0]?.from?.lat || 0,
-							raw[0]?.from?.lon || 0,
+
+	if (routeInFlight.has(tripId)) return routeInFlight.get(tripId);
+
+	const promise = (async () => {
+		try {
+			const fetched = await fetchJson(szRouteLink + tripId);
+			const raw = fetched?.legs || null;
+			const startStop = raw && raw[0] ? raw[0].from : null;
+			const endStop = raw && raw[0] ? raw[0].to : null;
+			selectedRoute = Array.isArray(raw)
+				? {
+						from: {
+							name: raw[0]?.from?.name || "",
+							stopId: raw[0]?.from?.stopId || "",
+							gpsLocation: [
+								raw[0]?.from?.lat || 0,
+								raw[0]?.from?.lon || 0,
+							],
+							departure: raw[0]?.from?.departure || "",
+						},
+						to: {
+							name: raw[0]?.to?.name || "",
+							stopId: raw[0]?.to?.stopId || "",
+							gpsLocation: [
+								raw[0]?.to?.lat || 0,
+								raw[0]?.to?.lon || 0,
+							],
+							arrival: raw[0]?.to?.arrival || "",
+						},
+						tripName: raw[0]?.headsign || "",
+						duration: raw[0]?.duration || "",
+						startTime: raw[0]?.startTime || "",
+						endTime: raw[0]?.endTime || "",
+						realTime: raw[0]?.realTime || false,
+						tripId: raw[0]?.tripId || "",
+						tripShort: raw[0]?.routeShortName || "",
+						brand: "sz",
+						stops: [
+							startStop,
+							...(raw[0]?.intermediateStops?.map((stop) => ({
+								name: stop?.name || "",
+								stopId: stop?.stopId || "",
+								gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+								arrival: stop?.arrival || "",
+								departure: stop?.departure || "",
+							})) || []),
+							endStop,
 						],
-						departure: raw[0]?.from?.departure || "",
-					},
-					to: {
-						name: raw[0]?.to?.name || "",
-						stopId: raw[0]?.to?.stopId || "",
-						gpsLocation: [
-							raw[0]?.to?.lat || 0,
-							raw[0]?.to?.lon || 0,
-						],
-						arrival: raw[0]?.to?.arrival || "",
-					},
-					tripName: raw[0]?.headsign || "",
-					duration: raw[0]?.duration || "",
-					startTime: raw[0]?.startTime || "",
-					endTime: raw[0]?.endTime || "",
-					realTime: raw[0]?.realTime || false,
-					tripId: raw[0]?.tripId || "",
-					tripShort: raw[0]?.routeShortName || "",
-					brand: "sz",
-					stops: [
-						startStop,
-						...(raw[0]?.intermediateStops?.map((stop) => ({
-							name: stop?.name || "",
-							stopId: stop?.stopId || "",
-							gpsLocation: [stop?.lat || 0, stop?.lon || 0],
-							arrival: stop?.arrival || "",
-							departure: stop?.departure || "",
-						})) || []),
-						endStop,
-					],
-					geometry: raw[0]?.legGeometry
-						? decodePolylineToPoints(
-								raw[0]?.legGeometry?.points || "",
-								6,
-							)
-						: [],
-					operator: "Slovenske železnice d.o.o.",
-					isLPP: false,
-					isSZ: true,
-				}
-			: null;
-		setCachedRoute(tripId, selectedRoute);
-		return selectedRoute;
-	} catch (error) {
-		console.error("Error fetching SZ trip:", error);
-		return null;
-	}
+						geometry: raw[0]?.legGeometry
+							? decodePolylineToPoints(
+									raw[0]?.legGeometry?.points || "",
+									6,
+								)
+							: [],
+						operator: "Slovenske železnice d.o.o.",
+						isLPP: false,
+						isSZ: true,
+					}
+				: null;
+			setCachedRoute(tripId, selectedRoute);
+			return selectedRoute;
+		} catch (error) {
+			console.error("Error fetching SZ trip:", error);
+			return null;
+		} finally {
+			routeInFlight.delete(tripId);
+		}
+	})();
+
+	routeInFlight.set(tripId, promise);
+	return promise;
 };
 
 /**
