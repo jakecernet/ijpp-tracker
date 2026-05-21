@@ -305,9 +305,10 @@ const fetchAllBusStops = async () => {
 					return null;
 				}
 
-				const refId = stop.ref_id ?? stop.refID ?? stop.refId ?? null;
+				const refId = stop.ref_id ?? null;
+                const gtfsId = stop.gtfs_id ?? null;
 				const ijppId =
-					stop.ijpp_id ?? stop.ijppID ?? stop.ijppId ?? null;
+					stop.ijpp_id ?? null;
 
 				const routesOnStop = stop.route_groups_on_station
 					? stop.route_groups_on_station
@@ -319,6 +320,7 @@ const fetchAllBusStops = async () => {
 					gpsLocation: gpsLocation,
 					coordinates: gpsLocation,
 					ref_id: refId,
+                    gtfs_id: gtfsId,
 					ijpp_id: ijppId,
 					routes_on_stop: routesOnStop,
 					vCenter: refId ? vCenter : null,

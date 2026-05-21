@@ -445,6 +445,7 @@ const Map = React.memo(function Map({
 					icon: "bus-stop",
 					ref_id: stop?.ref_id ?? stop?.refID ?? null,
 					gtfs_id: stop?.gtfs_id ?? null,
+					ijpp_id: stop?.ijpp_id ?? null,
 					vCenter: stop?.vCenter ?? false,
 					routes_on_stop: JSON.stringify(stop?.routes_on_stop ?? []),
 				}),
@@ -550,9 +551,11 @@ const Map = React.memo(function Map({
 							id: stop.id,
 							ref_id: stop.ref_id,
 							gtfs_id: stop.gtfs_id,
+							ijpp_id: stop.ijpp_id,
 							type: "bus-stop",
 						};
 						handlersRef.current.setActiveStation(payload);
+						console.log("Selected bus stop payload:", payload);
 						localStorage.setItem(
 							"activeStation",
 							JSON.stringify(payload),

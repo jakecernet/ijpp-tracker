@@ -323,22 +323,38 @@ function App() {
 			const lppCode =
 				activeStation?.ref_id || activeStation?.station_code;
 			const ijppId = activeStation?.gtfs_id;
+			const gtfsId = activeStation?.ijpp_id;
 			const szId = activeStation?.stopId;
 
 			const results = await Promise.allSettled([
 				lppCode ? fetchLppArrivals(lppCode) : Promise.resolve([]),
 				ijppId ? fetchIjppArrivals(ijppId) : Promise.resolve([]),
+				gtfsId ? fetchIjppArrivals(gtfsId) : Promise.resolve([]),
 				szId ? fetchSzArrivals(szId) : Promise.resolve([]),
 			]);
 
 			setLppArrivals(
 				results[0].status === "fulfilled" ? results[0].value : [],
 			);
-			setIjppArrivals(
-				results[1].status === "fulfilled" ? results[1].value : [],
-			);
+
+			let ijppArrivalsData =
+				results[1].status === "fulfilled" ? results[1].value : [];
+
+			const ijppIdArrivals =
+				results[2].status === "fulfilled"
+					? results[2].value.filter(
+							(arrival) =>
+								!arrival?.operatorName
+									?.toLowerCase()
+									.includes("ljubljanski potniški promet"),
+						)
+					: [];
+
+			ijppArrivalsData = [...ijppArrivalsData, ...ijppIdArrivals];
+
+			setIjppArrivals(ijppArrivalsData);
 			setSzArrivals(
-				results[2].status === "fulfilled" ? results[2].value : [],
+				results[3].status === "fulfilled" ? results[3].value : [],
 			);
 
 			setArrivalsLoading(false);
@@ -358,17 +374,31 @@ function App() {
 				const lppCode =
 					activeStation?.ref_id || activeStation?.station_code;
 				const ijppId = activeStation?.gtfs_id;
+				const gtfsId = activeStation?.ijpp_id;
 				const szId = activeStation?.stopId;
 
 				const results = await Promise.all([
 					lppCode ? fetchLppArrivals(lppCode) : Promise.resolve([]),
 					ijppId ? fetchIjppArrivals(ijppId) : Promise.resolve([]),
+					gtfsId ? fetchIjppArrivals(gtfsId) : Promise.resolve([]),
 					szId ? fetchSzArrivals(szId) : Promise.resolve([]),
 				]);
 
 				setLppArrivals(results[0]);
-				setIjppArrivals(results[1]);
-				setSzArrivals(results[2]);
+
+				let ijppArrivalsData = results[1];
+
+				const ijppIdArrivals = results[2].filter(
+					(arrival) =>
+						!arrival?.operatorName
+							?.toLowerCase()
+							.includes("ljubljanski potniški promet"),
+				);
+
+				ijppArrivalsData = [...ijppArrivalsData, ...ijppIdArrivals];
+
+				setIjppArrivals(ijppArrivalsData);
+				setSzArrivals(results[3]);
 			} catch (error) {
 				console.error("Error polling arrivals:", error);
 			}

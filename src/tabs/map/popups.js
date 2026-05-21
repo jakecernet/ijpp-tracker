@@ -150,7 +150,7 @@ export function renderTrainPopup(properties) {
 }
 
 export function createBusStopPopup(
-	{ name, id, ref_id, gtfs_id, vCenter, routes_on_stop },
+	{ name, id, ref_id, gtfs_id, ijpp_id, vCenter, routes_on_stop },
 	coordinates,
 	onSelect,
 ) {
@@ -211,6 +211,7 @@ export function createBusStopPopup(
 			gpsLocation: coordinates,
 			ref_id: ref_id ?? null,
 			gtfs_id: gtfs_id ?? null,
+			ijpp_id: ijpp_id ?? null,
 			vCenter: Boolean(vCenter),
 		});
 	});
