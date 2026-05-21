@@ -170,6 +170,15 @@ body {
 			}
 		}
 
+		.suspense-fallback {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			height: 100%;
+			font-size: 14px;
+			color: #94a3b8;
+		}
+
 		.map-container {
 			overflow: hidden;
 			height: calc(100vh - 80px);

@@ -95,26 +95,6 @@ async function cachedFetch(key, ttl, fetcher) {
 	return data;
 }
 
-/**
- * Prefetch static data (bus stops, train stops) on app initialization
- * Call this early to warm the cache before user needs the data
- */
-export async function prefetchStaticData() {
-	try {
-		// Fetch both in parallel to speed up initial load
-		await Promise.all([
-			cachedFetch(busStopsLink, CACHE_TTL.stops, () =>
-				fetchJson(busStopsLink),
-			),
-			cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
-				fetchJson(szStopsLink),
-			),
-		]);
-	} catch (error) {
-		console.warn("Prefetch failed, will fetch on demand:", error);
-	}
-}
-
 /** Pretvori sekunde od polnoči v časovni format HH:MM:SS
  * @param {number} seconds - Sekunde od polnoči
  * @returns Čas v formatu HH:MM:SS
