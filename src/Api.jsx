@@ -268,15 +268,9 @@ const fetchAllBusStops = async () => {
 
 		return list
 			.map((stop) => {
-				const latitude = Number(
-					stop.latitude ?? stop.lat ?? stop["Latitude"],
-				);
-				const longitude = Number(
-					stop.longitude ?? stop.lon ?? stop["Longitude"],
-				);
-				const gpsLocation = Array.isArray(stop.gpsLocation)
-					? stop.gpsLocation
-					: [latitude, longitude];
+				const latitude = stop.latitude ?? null;
+				const longitude = stop.longitude ?? null;
+				const gpsLocation = [latitude, longitude];
 				const vCenter = stop.ref_id % 2 === 1 ? true : false;
 				if (
 					!Number.isFinite(gpsLocation?.[0]) ||
@@ -286,9 +280,8 @@ const fetchAllBusStops = async () => {
 				}
 
 				const refId = stop.ref_id ?? null;
-                const gtfsId = stop.gtfs_id ?? null;
-				const ijppId =
-					stop.ijpp_id ?? null;
+				const gtfsId = stop.gtfs_id ?? null;
+				const extraId = stop.ijpp_id ?? null;
 
 				const routesOnStop = stop.route_groups_on_station
 					? stop.route_groups_on_station
@@ -296,12 +289,12 @@ const fetchAllBusStops = async () => {
 
 				return {
 					...stop,
-					name: stop.name ?? stop.stop_name ?? "",
+					name: stop.name ?? "",
 					gpsLocation: gpsLocation,
 					coordinates: gpsLocation,
 					ref_id: refId,
-                    gtfs_id: gtfsId,
-					ijpp_id: ijppId,
+					gtfs_id: gtfsId,
+					ijpp_id: extraId,
 					routes_on_stop: routesOnStop,
 					vCenter: refId ? vCenter : null,
 				};

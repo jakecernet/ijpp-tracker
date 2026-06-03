@@ -302,13 +302,13 @@ function App() {
 	const fetchAndUpdateArrivals = useCallback(async () => {
 		const lppId = activeStation?.ref_id || activeStation?.station_code;
 		const ijppId = activeStation?.gtfs_id;
-		const gtfsId = activeStation?.ijpp_id;
+		const extraId = activeStation?.ijpp_id;
 		const szId = activeStation?.stopId;
 
 		const results = await Promise.allSettled([
 			lppId ? fetchLppArrivals(lppId) : Promise.resolve([]),
 			ijppId ? fetchIjppArrivals(ijppId) : Promise.resolve([]),
-			gtfsId ? fetchIjppArrivals(gtfsId) : Promise.resolve([]),
+			extraId ? fetchIjppArrivals(extraId) : Promise.resolve([]),
 			szId ? fetchSzArrivals(szId) : Promise.resolve([]),
 		]);
 
