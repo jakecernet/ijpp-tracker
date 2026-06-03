@@ -363,7 +363,7 @@ const fetchLPPPositions = async () => {
 
 /**
  * Fetcha IJPP podatke o vozilih
- * @returns Tabela z IJPP pozicijami in routami ('stops' lastnost)
+ * @returns Tabelo z IJPP pozicijami in routami ('stops' lastnost)
  */
 const fetchIJPPPositions = async () => {
 	try {

@@ -548,7 +548,6 @@ const Map = React.memo(function Map({
 						const payload = {
 							name: stop.name,
 							coordinates: stop.gpsLocation,
-							id: stop.id,
 							ref_id: stop.ref_id,
 							gtfs_id: stop.gtfs_id,
 							ijpp_id: stop.ijpp_id,
@@ -582,7 +581,6 @@ const Map = React.memo(function Map({
 							coordinates,
 							gpsLocation: coordinates,
 							stopId: stop.stopId ?? null,
-							id: stop.id ?? stop.stopId ?? stop.name,
 							lat: coordinates[0],
 							lon: coordinates[1],
 							type: "train-stop",
