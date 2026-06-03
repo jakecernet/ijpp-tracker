@@ -65,7 +65,15 @@ const RouteTab = ({
 		}
 
 		const timeStr = actualDate ? printTime(actualDate) : "N/A";
-		return `${etaMin ?? "?"} min (${timeStr})`;
+		let etaDisplay;
+		if (etaMin !== undefined && etaMin >= 60) {
+			const hours = Math.floor(etaMin / 60);
+			const minutes = etaMin % 60;
+			etaDisplay = `${hours}h ${minutes}m`;
+		} else {
+			etaDisplay = `${etaMin ?? "?"} min`;
+		}
+		return `${etaDisplay} (${timeStr})`;
 	};
 
 	const dataText = {

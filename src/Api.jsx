@@ -184,7 +184,15 @@ function computeEtaAndTime(arrival) {
 export function formatPrecomputedArrival(arrival) {
 	const etaMin = arrival.etaMinutes ?? "?";
 	const timeStr = arrival.arrivalTime ?? "N/A";
-	return `${etaMin} min (${timeStr})`;
+	let etaDisplay;
+	if (typeof etaMin === "number" && etaMin >= 60) {
+		const hours = Math.floor(etaMin / 60);
+		const minutes = etaMin % 60;
+		etaDisplay = `${hours}h ${minutes}m`;
+	} else {
+		etaDisplay = `${etaMin} min`;
+	}
+	return `${etaDisplay} (${timeStr})`;
 }
 
 /**
