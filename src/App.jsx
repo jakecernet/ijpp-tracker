@@ -363,10 +363,7 @@ function App() {
 		const POLLING_INTERVAL = 30000;
 
 		const handleVisibilityChange = () => {
-			if (document.hidden) {
-			} else {
-				pollArrivals();
-			}
+			if (!document.hidden) pollArrivals();
 		};
 
 		document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -503,7 +500,6 @@ function App() {
 										setSelectedVehicle={setSelectedVehicle}
 										selectedVehicle={selectedVehicle}
 										routeLoading={routeLoading}
-										theme={theme}
 										visibility={visibility}
 										setVisibility={setVisibility}
 										busOperators={busOperators}

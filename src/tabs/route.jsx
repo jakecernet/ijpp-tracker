@@ -1,3 +1,5 @@
+import { formatTime } from "../Api.jsx";
+
 const RouteTab = ({
 	selectedVehicle,
 	setActiveStation,
@@ -10,82 +12,39 @@ const RouteTab = ({
 
 	const stops = selectedVehicle?.stops || [];
 
-	const printTime = (timeStr) => {
-		if (!timeStr) return "N/A";
-		try {
-			const date = new Date(timeStr);
-			if (isNaN(date.getTime())) return "N/A";
-			return date.toLocaleTimeString("en-GB", {
-				hour: "2-digit",
-				minute: "2-digit",
-				hour12: false,
-			});
-		} catch {
-			return "N/A";
-		}
-	};
-
+	// Formats arrival for LPP { eta_min } objects or IJPP "HH:MM:SS" strings
 	const formatArrivalTime = (arrival) => {
 		if (!arrival) return "";
+		let etaMin, date;
 
-		let etaMin = arrival.eta_min;
-		let actualTime =
-			arrival.estimated_arrival_time || arrival.arrival_time || arrival;
-
-		let actualDate = null;
-		if (actualTime) {
-			actualDate = new Date(actualTime);
-			// If parsing failed or if it looks like a time-only string, try prepending today's date
-			if (
-				isNaN(actualDate.getTime()) &&
-				typeof actualTime === "string" &&
-				actualTime.match(/^\d{2}:\d{2}(:\d{2})?$/)
-			) {
-				const today = new Date().toISOString().split("T")[0];
-				actualDate = new Date(`${today}T${actualTime}`);
-			}
+		if (typeof arrival === "object" && arrival.eta_min !== undefined) {
+			etaMin = arrival.eta_min;
+			date = new Date(Date.now() + etaMin * 60000);
+		} else if (
+			typeof arrival === "string" &&
+			arrival.match(/^\d{2}:\d{2}(:\d{2})?$/)
+		) {
+			const today = new Date().toISOString().split("T")[0];
+			date = new Date(`${today}T${arrival}`);
+			if (!isNaN(date))
+				etaMin = Math.max(0, Math.round((date - Date.now()) / 60000));
 		}
 
-		if (actualDate && isNaN(actualDate.getTime())) {
-			actualDate = null;
-		}
-
-		// Generate ETA if missing
-		if (etaMin === undefined && actualDate) {
-			const now = new Date();
-			etaMin = Math.max(
-				0,
-				Math.round((actualDate.getTime() - now.getTime()) / 60000),
-			);
-		}
-
-		// Generate actual time if missing
-		if (!actualDate && etaMin !== undefined) {
-			actualDate = new Date(new Date().getTime() + etaMin * 60000);
-		}
-
-		const timeStr = actualDate ? printTime(actualDate) : "N/A";
-		let etaDisplay;
-		if (etaMin !== undefined && etaMin >= 60) {
-			const hours = Math.floor(etaMin / 60);
-			const minutes = etaMin % 60;
-			etaDisplay = `${hours}h ${minutes}m`;
-		} else {
-			etaDisplay = `${etaMin ?? "?"} min`;
-		}
-		return `${etaDisplay} (${timeStr})`;
+		if (etaMin === undefined) return "";
+		const timeStr = date && !isNaN(date) ? formatTime(date) : "N/A";
+		return etaMin >= 60
+			? `${Math.floor(etaMin / 60)}h ${etaMin % 60}m (${timeStr})`
+			: `${etaMin} min (${timeStr})`;
 	};
 
-	const dataText = {
-		lineName:
-			(isLPP ? selectedVehicle?.lineNumber + " | " : "") +
-			selectedVehicle?.tripName,
-		operator: isLPP
-			? "Ljubljanski potniški promet"
-			: isSZ
-				? "Slovenske železnice"
-				: selectedVehicle?.operator,
-	};
+	const lineName =
+		(isLPP ? selectedVehicle?.lineNumber + " | " : "") +
+		selectedVehicle?.tripName;
+	const operator = isLPP
+		? "Ljubljanski potniški promet"
+		: isSZ
+			? "Slovenske železnice"
+			: selectedVehicle?.operator;
 
 	return (
 		<div className="route">
@@ -95,8 +54,8 @@ const RouteTab = ({
 				onPointerMove={onDragPointerMove}
 				onPointerUp={onDragPointerUpOrCancel}
 				onPointerCancel={onDragPointerUpOrCancel}>
-				<h3>{dataText.lineName || "Neznana linija"}</h3>
-				<p>{dataText.operator}</p>
+				<h3>{lineName || "Neznana linija"}</h3>
+				<p>{operator}</p>
 			</div>
 			<div className="stops">
 				<ul>
@@ -116,11 +75,7 @@ const RouteTab = ({
 										gtfsId: stop.gtfsId,
 										stopId: stop.stopId,
 										station_code: stop.stopId,
-										type: isSZ
-											? "train-stop"
-											: isLPP
-												? "bus-stop"
-												: "bus-stop",
+										type: isSZ ? "train-stop" : "bus-stop",
 									};
 									setActiveStation(payload);
 									localStorage.setItem(
@@ -172,13 +127,13 @@ const RouteTab = ({
 										{stop.arrival && (
 											<p>
 												Prihod:{" "}
-												{printTime(stop.arrival)}
+												{formatTime(stop.arrival)}
 											</p>
 										)}
 										{stop.departure && (
 											<p>
 												Odhod:{" "}
-												{printTime(stop.departure)}
+												{formatTime(stop.departure)}
 											</p>
 										)}
 									</span>

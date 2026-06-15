@@ -319,65 +319,6 @@ const Map = React.memo(function Map({
 		else setRouteDrawerSnap("peek");
 	};
 
-	useEffect(() => {
-		try {
-			const raw = localStorage.getItem("mapLayerSettings");
-			if (!raw) return;
-			const settings = JSON.parse(raw);
-			if (settings && typeof settings === "object") {
-				if (
-					settings.visibility &&
-					typeof settings.visibility === "object"
-				) {
-					setVisibility((v) => ({ ...v, ...settings.visibility }));
-				}
-				if (
-					settings.busOperators &&
-					typeof settings.busOperators === "object"
-				) {
-					setBusOperators((b) => ({
-						...b,
-						...settings.busOperators,
-					}));
-				}
-			}
-		} catch {}
-	}, [setVisibility, setBusOperators]);
-
-	const selectedVehicleCoords = useMemo(() => {
-		if (!selectedVehicle || !gpsPositions) return null;
-
-		// Find the selected vehicle in gpsPositions
-		const vehicle = gpsPositions.find((pos) => {
-			if (
-				selectedVehicle.tripId &&
-				pos.tripId === selectedVehicle.tripId
-			) {
-				return true;
-			}
-			if (
-				selectedVehicle.lineNumber &&
-				pos.lineNumber === selectedVehicle.lineNumber
-			) {
-				return true;
-			}
-			if (
-				selectedVehicle.lineId &&
-				pos.lineId === selectedVehicle.lineId
-			) {
-				return true;
-			}
-			return false;
-		});
-
-		return vehicle?.gpsLocation || null;
-	}, [selectedVehicle, gpsPositions]);
-
-	const center = useMemo(
-		() => selectedVehicleCoords || userLocation || DEFAULT_CENTER,
-		[selectedVehicleCoords, userLocation],
-	);
-
 	const busesGeoJSON = useMemo(() => {
 		const filtered = (gpsPositions || []).filter((pos) => {
 			const brandKey = operatorToIcon[pos?.operator] || "generic";
@@ -554,7 +495,6 @@ const Map = React.memo(function Map({
 							type: "bus-stop",
 						};
 						handlersRef.current.setActiveStation(payload);
-						console.log("Selected bus stop payload:", payload);
 						localStorage.setItem(
 							"activeStation",
 							JSON.stringify(payload),

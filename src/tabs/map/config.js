@@ -3,11 +3,9 @@ import lppPNG from "../../img/lpp.png";
 import nomagoPNG from "../../img/nomago.png";
 import marpromPNG from "../../img/marprom.png";
 import murskaPNG from "../../img/murska.png";
-import userPNG from "../../img/user.png";
 import busStopPNG from "../../img/routeStop2.png";
 import trainStopPNG from "../../img/trainStop.png";
 import szPNG from "../../img/sz.png";
-import locationPNG from "../../img/location.png";
 
 export const DEFAULT_CENTER = [46.0569, 14.5058];
 export const DEFAULT_ZOOM = 13;
@@ -54,8 +52,6 @@ export const ICON_SOURCES = [
     { id: "bus-stop", image: busStopPNG },
     { id: "train-stop", image: trainStopPNG },
     { id: "train", image: szPNG },
-    { id: "user", image: userPNG },
-    { id: "station", image: locationPNG },
     { id: "arriva", image: arrivaPNG },
     { id: "lpp", image: lppPNG },
     { id: "nomago", image: nomagoPNG },
