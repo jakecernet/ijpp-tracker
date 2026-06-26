@@ -129,13 +129,11 @@ export function configureTrainPopup({ map, onSelectVehicle }) {
 				try {
 					from = typeof from === "string" ? JSON.parse(from) : from;
 				} catch {
-					console.warn("Ne morem razvozljati podatkov 'from'");
 					from = null;
 				}
 				try {
 					to = typeof to === "string" ? JSON.parse(to) : to;
 				} catch {
-					console.warn("Ne morem razvozljati podatkov 'to'");
 					to = null;
 				}
 
