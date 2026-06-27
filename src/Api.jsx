@@ -81,6 +81,7 @@ function setCachedRoute(tripId, data) {
 		routeCache.set(tripId, { data, time: Date.now() });
 	}
 }
+const inFlight = new Map();
 
 /**
  * Helper za fetchanje s cachingom
@@ -89,9 +90,21 @@ function setCachedRoute(tripId, data) {
 async function cachedFetch(key, ttl, fetcher) {
 	const cached = cache.get(key);
 	if (cached && Date.now() - cached.time < ttl) return cached.data;
-	const data = await fetcher();
-	cache.set(key, { data, time: Date.now() });
-	return data;
+
+	if (inFlight.has(key)) return inFlight.get(key);
+
+	const promise = (async () => {
+		try {
+			const data = await fetcher();
+			cache.set(key, { data, time: Date.now() });
+			return data;
+		} finally {
+			inFlight.delete(key);
+		}
+	})();
+
+	inFlight.set(key, promise);
+	return promise;
 }
 
 /** Pretvori sekunde od polnoči v časovni format HH:MM:SS
@@ -548,10 +561,15 @@ const fetchIJPPTrip = async (trip) => {
 			const pointsResponse = await fetchJson(
 				ijppRouteLink + tripId + "/geometry",
 			);
-			const operator = fetchIJPPPositions().then((positions) =>
-				fetchIjppArrivals(
-					JSON.parse(localStorage.getItem("activeStation")).gtfs_id,
-				).then((arrivals) => {
+			const operator = fetchIJPPPositions().then((positions) => {
+				let activeStationId;
+				try {
+					const raw = localStorage.getItem("activeStation");
+					activeStationId = raw ? JSON.parse(raw)?.gtfs_id : undefined;
+				} catch {
+					activeStationId = undefined;
+				}
+				return fetchIjppArrivals(activeStationId).then((arrivals) => {
 					const vehicle = positions.find(
 						(pos) => pos.tripId === tripId,
 					);
@@ -559,8 +577,8 @@ const fetchIJPPTrip = async (trip) => {
 						(arr) => arr.tripId === tripId,
 					);
 					return arrival?.operatorName || vehicle?.operator || "";
-				}),
-			);
+				});
+			});
 
 			selectedRoute = {
 				tripName: raw?.trip_headsign || "",
@@ -942,3 +960,4 @@ export { fetchLPPPositions, fetchIJPPPositions, fetchTrainPositions };
 export { fetchLppArrivals, fetchIjppArrivals, fetchLppRoute, fetchIJPPTrip };
 export { fetchSzStops, fetchSzTrip, fetchSzArrivals };
 export { fetchAllBusStops };
+export { getInterpolatedPosition };

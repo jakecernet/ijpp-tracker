@@ -37,6 +37,61 @@ const StationsTab = lazy(() => import("./tabs/stations"));
 const LinesTab = lazy(() => import("./tabs/lines"));
 const SettingsTab = lazy(() => import("./tabs/settings"));
 
+const DEFAULT_VISIBILITY = {
+	buses: true,
+	busStops: true,
+	trainPositions: true,
+	trainStops: true,
+};
+
+const DEFAULT_BUS_OPERATORS = {
+	arriva: true,
+	lpp: true,
+	nomago: true,
+	marprom: true,
+	murska: true,
+	generic: true,
+};
+
+// Prebere shranjene nastavitve plasti (avtobusi/vlaki/postaje) iz localStorage.
+// Robustno: če je shramba poškodovana, manjkajo posamezni ključi, ali gre za
+// star (flat) format iz prejšnje verzije aplikacije, se manjkajoči/neveljavni
+// podatki tiho dopolnijo z defaulti namesto da se cela nastavitev zavrže.
+function loadMapLayerSettings() {
+	let saved = null;
+	try {
+		const raw = localStorage.getItem("mapLayerSettings");
+		if (raw) saved = JSON.parse(raw);
+	} catch {
+		saved = null;
+	}
+
+	const isPlainObject = (v) =>
+		v && typeof v === "object" && !Array.isArray(v);
+
+	// Stara verzija je nastavitve plasti shranjevala neposredno (brez "visibility" wrapperja)
+	const legacyVisibility =
+		isPlainObject(saved) && saved.visibility === undefined
+			? saved
+			: null;
+
+	const visibilitySource = isPlainObject(saved?.visibility)
+		? saved.visibility
+		: legacyVisibility;
+
+	const busOperatorsSource = isPlainObject(saved?.busOperators)
+		? saved.busOperators
+		: null;
+
+	return {
+		visibility: { ...DEFAULT_VISIBILITY, ...(visibilitySource || {}) },
+		busOperators: {
+			...DEFAULT_BUS_OPERATORS,
+			...(busOperatorsSource || {}),
+		},
+	};
+}
+
 function App() {
 	const [activeStation, setActiveStation] = useState(
 		localStorage.getItem("activeStation")
@@ -61,43 +116,13 @@ function App() {
 	const [isOnMapTab, setIsOnMapTab] = useState(true);
 	const [isOnLinesTab, setIsOnLinesTab] = useState(false);
 
-	const [visibility, setVisibility] = useState(() => {
-		try {
-			const saved = localStorage.getItem("mapLayerSettings");
-			if (saved) {
-				const settings = JSON.parse(saved);
-				if (settings.visibility) {
-					return settings.visibility;
-				}
-			}
-		} catch {}
-		return {
-			buses: true,
-			busStops: true,
-			trainPositions: true,
-			trainStops: true,
-		};
-	});
+	const [visibility, setVisibility] = useState(
+		() => loadMapLayerSettings().visibility,
+	);
 
-	const [busOperators, setBusOperators] = useState(() => {
-		try {
-			const saved = localStorage.getItem("mapLayerSettings");
-			if (saved) {
-				const settings = JSON.parse(saved);
-				if (settings.busOperators) {
-					return settings.busOperators;
-				}
-			}
-		} catch {}
-		return {
-			arriva: true,
-			lpp: true,
-			nomago: true,
-			marprom: true,
-			murska: true,
-			generic: true,
-		};
-	});
+	const [busOperators, setBusOperators] = useState(
+		() => loadMapLayerSettings().busOperators,
+	);
 
 	useEffect(() => {
 		try {
@@ -106,7 +131,9 @@ function App() {
 				busOperators,
 			};
 			localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
-		} catch {}
+		} catch (error) {
+			console.warn("Ni bilo mogoče shraniti nastavitev plasti:", error);
+		}
 	}, [visibility, busOperators]);
 
 	const [gpsPositions, setGpsPositions] = useState([]);
