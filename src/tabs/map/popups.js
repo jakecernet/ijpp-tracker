@@ -61,18 +61,6 @@ function authorCaption(author) {
 	)}`;
 }
 
-// Ohranjeno za nazaj združljivost (lahko se uporablja drugje) - zgradi
-// sliko LPP vozila na podlagi busName, skupaj z imenom avtorja.
-export async function createImageLPP(busName) {
-	if (!busName) return "";
-	const busNumber = getLppBusNumber(busName);
-	const info = await fetchLppBusInfo(busNumber);
-	return imageWrapper(
-		`https://mestnipromet.cyou/tracker/img/avtobusi/${busNumber}.jpg`,
-		authorCaption(info?.author),
-	);
-}
-
 export function createRow(label, value) {
 	if (value === null || value === undefined || value === "") return "";
 	return (
@@ -126,11 +114,10 @@ export async function renderLppPopup(properties) {
 
 	const rows =
 		createRow("Prevoznik", "LPP") +
+		createRow("Registrska", properties.busName) +
 		(isUrban
-			? createRow("Tip", "Turistični vlakec Urban")
-			: createRow("Smer", properties.lineDestination)) +
-		createRow("Vozilo", properties.busName) +
-		createModelRow(info?.model, info?.hasRamp) +
+			? createModelRow("Turistični vlakec Urban", info?.hasRamp)
+			: createModelRow(info?.model, info?.hasRamp)) + createRow("Smer", properties.lineDestination) +
 		createRow("Hitrost", formatSpeed(properties.speed)) +
 		(isUrban
 			? ""
