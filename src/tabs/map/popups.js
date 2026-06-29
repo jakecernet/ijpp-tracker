@@ -3,32 +3,43 @@ import { findNonLppBusInfo } from "./busImages";
 import Camera from "../../img/camera.svg";
 import Center from "../../img/center.svg";
 
-async function fetchAuthor(busNumber) {
-	if (!busNumber) return "Neznan avtor";
-	try {
-		const response = await fetch(
-			"https://mestnipromet.cyou/tracker/js/json/images.json",
-		);
-		const data = await response.json();
-		const bus = data.find((b) => b.no === busNumber);
-		return bus?.author || "Neznan avtor";
-	} catch {
-		return "Neznan avtor";
-	}
+// Ikona invalidskega vozička - prikazana, če ima vozilo nizko stopnico
+// oz. rampo za vstop. Skupna za LPP (lastna baza, glej fetchLppBusInfo)
+// in ne-LPP vozila (skupnostna Kranjbus baza, glej busImages.js).
+const ACCESSIBLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="15" height="15" style="vertical-align:-2px; margin-left:6px">
+	<g fill="#60a5fa" transform="translate(85,55) scale(0.8)">
+		<path d="M161.988 98.124c24.9629-2.30469 44.3574-23.811 44.3574-48.9658C206.346 22.083 184.263 0 157.188 0s-49.1572 22.083-49.1572 49.1582c0 8.25684 2.30371 16.7056 6.14453 23.8105l17.5156 246.467 180.396.0488 73.9912 173.365 97.1445-38.0977-15.043-35.8203-54.3662 19.625-71.5908-165.28-167.729 1.12695-2.30273-31.2129 121.423.0483v-46.1831l-126.055-.0493L161.988 98.124Z"/>
+		<path d="M343.42 451.591c-30.4473 60.1875-94.1748 99.8398-162.15 99.8398C81.4297 551.431 0 470.001 0 370.161c0-70.1006 42.4854-135.244 105.882-164.121l4.10254 53.5376c-37.4971 23.6284-60.6123 66.2622-60.6123 110.951 0 72.4268 59.0713 131.497 131.497 131.497 66.2617 0 122.765-50.8516 130.47-116.087L343.42 451.591Z"/>
+	</g>
+</svg>`;
+
+// Iz `busName` (npr. "LPP-313" ali ime urbanega vlakca) izpelje interno
+// številko vozila, ki se uporablja tako za sliko kot za poizvedbo v
+// lastni bazi slik/modelov LPP vozil.
+function getLppBusNumber(busName) {
+	if (!busName) return null;
+	return busName.includes("U1") || busName.includes("U2")
+		? "-U1"
+		: busName.slice(7);
 }
 
-async function fetchLPPInfo(busNumber) {
+// Pridobi podatke o LPP vozilu (model, avtor slike, dostopnost) iz
+// skupne baze "images.json". To je ekvivalent findNonLppBusInfo iz
+// busImages.js, le za LPP vozila namesto skupnostne Kranjbus baze.
+async function fetchLppBusInfo(busNumber) {
 	if (!busNumber) return null;
 	try {
 		const response = await fetch(
 			"https://mestnipromet.cyou/tracker/js/json/images.json",
 		);
 		const data = await response.json();
-		const model = data.find((b) => b.no === busNumber).model ?? null;
-		const author =
-			data.find((b) => b.no === busNumber).author ?? "Neznan avtor";
-		const invalid = data.find((b) => b.no === busNumber).ramp ?? false;
-		return { model, author, invalid };
+		const bus = data.find((b) => b.no === busNumber);
+		if (!bus) return null;
+		return {
+			model: bus.model ?? null,
+			author: bus.author || "Neznan avtor",
+			hasRamp: Boolean(bus.ramp),
+		};
 	} catch {
 		return null;
 	}
@@ -44,15 +55,21 @@ function imageWrapper(src, caption) {
             </div>`;
 }
 
-export async function createImageLPP(src) {
-	if (!src) return "";
-	const busNumber =
-		src.includes("U1") || src.includes("U2") ? "-U1" : src.slice(7);
-	const author = await fetchAuthor(busNumber);
+function authorCaption(author) {
+	return `<img src="${Camera}" alt="Author" /> ${escapeHTML(
+		author || "Neznan avtor",
+	)}`;
+}
 
+// Ohranjeno za nazaj združljivost (lahko se uporablja drugje) - zgradi
+// sliko LPP vozila na podlagi busName, skupaj z imenom avtorja.
+export async function createImageLPP(busName) {
+	if (!busName) return "";
+	const busNumber = getLppBusNumber(busName);
+	const info = await fetchLppBusInfo(busNumber);
 	return imageWrapper(
 		`https://mestnipromet.cyou/tracker/img/avtobusi/${busNumber}.jpg`,
-		`<img src="${Camera}" alt="Author" /> ${escapeHTML(author)}`,
+		authorCaption(info?.author),
 	);
 }
 
@@ -64,6 +81,21 @@ export function createRow(label, value) {
 		`<span style="font-weight:600; text-align:right">${escapeHTML(
 			String(value),
 		)}</span>` +
+		`</div>`
+	);
+}
+
+// Vrstica za model vozila z opcijsko ikono dostopnosti (rampa/nizka
+// stopnica) - skupna za LPP in ne-LPP (IJPP) popupe, da je prikaz
+// modela in dostopnosti enak ne glede na prevoznika.
+function createModelRow(model, hasRamp) {
+	if (!model) return "";
+	return (
+		`<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
+		`<span style="opacity:0.7">Model</span>` +
+		`<span style="font-weight:600; text-align:right">${escapeHTML(
+			model,
+		)}${hasRamp ? ACCESSIBLE_ICON : ""}</span>` +
 		`</div>`
 	);
 }
@@ -81,13 +113,24 @@ export async function renderLppPopup(properties) {
 	const isUrban =
 		properties.busName?.includes("U1") ||
 		properties.busName?.includes("U2");
-	const imageHTML = await createImageLPP(properties.busName);
+
+	const busNumber = getLppBusNumber(properties.busName);
+	const info = await fetchLppBusInfo(busNumber);
+
+	const imageHTML = imageWrapper(
+		busNumber
+			? `https://mestnipromet.cyou/tracker/img/avtobusi/${busNumber}.jpg`
+			: "",
+		authorCaption(info?.author),
+	);
+
 	const rows =
 		createRow("Prevoznik", "LPP") +
 		(isUrban
 			? createRow("Tip", "Turistični vlakec Urban")
 			: createRow("Smer", properties.lineDestination)) +
 		createRow("Vozilo", properties.busName) +
+		createModelRow(info?.model, info?.hasRamp) +
 		createRow("Hitrost", formatSpeed(properties.speed)) +
 		(isUrban
 			? ""
@@ -108,15 +151,6 @@ export async function renderLppPopup(properties) {
 	);
 }
 
-// Ikona invalidskega vozička - prikazana, če ima vozilo nizko stopnico
-// oz. rampo za vstop (podatek iz skupnostne baze, glej busImages.js).
-const ACCESSIBLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="15" height="15" style="vertical-align:-2px; margin-left:6px">
-	<g fill="#60a5fa" transform="translate(85,55) scale(0.8)">
-		<path d="M161.988 98.124c24.9629-2.30469 44.3574-23.811 44.3574-48.9658C206.346 22.083 184.263 0 157.188 0s-49.1572 22.083-49.1572 49.1582c0 8.25684 2.30371 16.7056 6.14453 23.8105l17.5156 246.467 180.396.0488 73.9912 173.365 97.1445-38.0977-15.043-35.8203-54.3662 19.625-71.5908-165.28-167.729 1.12695-2.30273-31.2129 121.423.0483v-46.1831l-126.055-.0493L161.988 98.124Z"/>
-		<path d="M343.42 451.591c-30.4473 60.1875-94.1748 99.8398-162.15 99.8398C81.4297 551.431 0 470.001 0 370.161c0-70.1006 42.4854-135.244 105.882-164.121l4.10254 53.5376c-37.4971 23.6284-60.6123 66.2622-60.6123 110.951 0 72.4268 59.0713 131.497 131.497 131.497 66.2617 0 122.765-50.8516 130.47-116.087L343.42 451.591Z"/>
-	</g>
-</svg>`;
-
 export async function renderIjppPopup(properties) {
 	const heading =
 		properties.lineName ||
@@ -131,11 +165,9 @@ export async function renderIjppPopup(properties) {
 		properties.stop,
 	);
 
-	const plate = properties?.busName ?? properties?.vehicleId;
-
-	// Za LPP imamo lastno bazo slik (createImage zgoraj); za vse druge
-	// prevoznike (Arriva, Nomago, AP Murska Sobota ...) iščemo po
-	// skupnostni Kranjbus bazi glede na registrsko oznako/ID vozila.
+	// Za LPP imamo lastno bazo slik/modelov (glej fetchLppBusInfo zgoraj);
+	// za vse druge prevoznike (Arriva, Nomago, AP Murska Sobota ...) iščemo
+	// po skupnostni Kranjbus bazi glede na registrsko oznako/ID vozila.
 	const busInfo = await findNonLppBusInfo(
 		properties.plate,
 		properties.vehicleId,
@@ -144,21 +176,9 @@ export async function renderIjppPopup(properties) {
 		busInfo?.image,
 		'<img src="' + Camera + '" alt="Vir" /> Skupnost Kranjbus',
 	);
-	const vehicleRow = busInfo?.model
-		? `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
-			`<span style="opacity:0.7">Vozilo</span>` +
-			`<span style="font-weight:600; text-align:right">${escapeHTML(
-				busInfo.model,
-			)}${busInfo.hasRamp ? ACCESSIBLE_ICON : ""}</span>` +
-			`</div>`
-		: "";
 
-	const plateRow = properties.plate
-		? `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
-			`<span style="opacity:0.7">Registrska</span>` +
-			`<span style="font-weight:600; text-align:right">${escapeHTML(properties.plate)}</span>` +
-			`</div>`
-		: "";
+	const modelRow = createModelRow(busInfo?.model, busInfo?.hasRamp);
+	const plateRow = createRow("Registrska", properties.plate);
 
 	return (
 		`<div style="min-width:240px">` +
@@ -167,7 +187,7 @@ export async function renderIjppPopup(properties) {
 			String(heading),
 		)}</div>` +
 		operator +
-		vehicleRow +
+		modelRow +
 		plateRow +
 		stop +
 		'<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
