@@ -172,7 +172,7 @@ export function configureBusPopup({ map, onSelectVehicle }) {
 		if (properties.sourceType === "lpp")
 			content = await renderLppPopup(properties);
 		else if (properties.sourceType === "ijpp")
-			content = renderIjppPopup(properties);
+			content = await renderIjppPopup(properties);
 		else content = `<div style="min-width:180px">Ni podatkov</div>`;
 
 		const popup = openPopup(map, event.lngLat, content);

@@ -1,4 +1,5 @@
 import { escapeHTML } from "./utils";
+import { findNonLppBusInfo } from "./busImages";
 import Camera from "../../img/camera.svg";
 import Center from "../../img/center.svg";
 
@@ -16,19 +17,43 @@ async function fetchAuthor(busNumber) {
 	}
 }
 
-export async function createImage(src) {
+async function fetchLPPInfo(busNumber) {
+	if (!busNumber) return null;
+	try {
+		const response = await fetch(
+			"https://mestnipromet.cyou/tracker/js/json/images.json",
+		);
+		const data = await response.json();
+		const model = data.find((b) => b.no === busNumber).model ?? null;
+		const author =
+			data.find((b) => b.no === busNumber).author ?? "Neznan avtor";
+		const invalid = data.find((b) => b.no === busNumber).ramp ?? false;
+		return { model, author, invalid };
+	} catch {
+		return null;
+	}
+}
+
+// Splošen ovojnik za slike v popupih - `caption` je poljubna HTML vsebina
+// (npr. ikona + ime avtorja), ki se izriše čez sliko v spodnjem desnem kotu.
+function imageWrapper(src, caption) {
+	if (!src) return "";
+	return `<div class="popup-image-wrapper">
+              <img loading="lazy" src="${src}" alt="Slika" />
+              ${caption ? `<p>${caption}</p>` : ""}
+            </div>`;
+}
+
+export async function createImageLPP(src) {
 	if (!src) return "";
 	const busNumber =
 		src.includes("U1") || src.includes("U2") ? "-U1" : src.slice(7);
 	const author = await fetchAuthor(busNumber);
 
-	return `<div class="popup-image-wrapper">
-              <img loading="lazy" src="https://mestnipromet.cyou/tracker/img/avtobusi/${busNumber}.jpg" alt="Slika" />
-              <p>
-                <img src="${Camera}" alt="Author" />
-                ${escapeHTML(author)}
-              </p>
-            </div>`;
+	return imageWrapper(
+		`https://mestnipromet.cyou/tracker/img/avtobusi/${busNumber}.jpg`,
+		`<img src="${Camera}" alt="Author" /> ${escapeHTML(author)}`,
+	);
 }
 
 export function createRow(label, value) {
@@ -56,7 +81,7 @@ export async function renderLppPopup(properties) {
 	const isUrban =
 		properties.busName?.includes("U1") ||
 		properties.busName?.includes("U2");
-	const imageHTML = await createImage(properties.busName);
+	const imageHTML = await createImageLPP(properties.busName);
 	const rows =
 		createRow("Prevoznik", "LPP") +
 		(isUrban
@@ -83,7 +108,16 @@ export async function renderLppPopup(properties) {
 	);
 }
 
-export function renderIjppPopup(properties) {
+// Ikona invalidskega vozička - prikazana, če ima vozilo nizko stopnico
+// oz. rampo za vstop (podatek iz skupnostne baze, glej busImages.js).
+const ACCESSIBLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="15" height="15" style="vertical-align:-2px; margin-left:6px">
+	<g fill="#60a5fa" transform="translate(85,55) scale(0.8)">
+		<path d="M161.988 98.124c24.9629-2.30469 44.3574-23.811 44.3574-48.9658C206.346 22.083 184.263 0 157.188 0s-49.1572 22.083-49.1572 49.1582c0 8.25684 2.30371 16.7056 6.14453 23.8105l17.5156 246.467 180.396.0488 73.9912 173.365 97.1445-38.0977-15.043-35.8203-54.3662 19.625-71.5908-165.28-167.729 1.12695-2.30273-31.2129 121.423.0483v-46.1831l-126.055-.0493L161.988 98.124Z"/>
+		<path d="M343.42 451.591c-30.4473 60.1875-94.1748 99.8398-162.15 99.8398C81.4297 551.431 0 470.001 0 370.161c0-70.1006 42.4854-135.244 105.882-164.121l4.10254 53.5376c-37.4971 23.6284-60.6123 66.2622-60.6123 110.951 0 72.4268 59.0713 131.497 131.497 131.497 66.2617 0 122.765-50.8516 130.47-116.087L343.42 451.591Z"/>
+	</g>
+</svg>`;
+
+export async function renderIjppPopup(properties) {
 	const heading =
 		properties.lineName ||
 		properties.title ||
@@ -97,12 +131,44 @@ export function renderIjppPopup(properties) {
 		properties.stop,
 	);
 
+	const plate = properties?.busName ?? properties?.vehicleId;
+
+	// Za LPP imamo lastno bazo slik (createImage zgoraj); za vse druge
+	// prevoznike (Arriva, Nomago, AP Murska Sobota ...) iščemo po
+	// skupnostni Kranjbus bazi glede na registrsko oznako/ID vozila.
+	const busInfo = await findNonLppBusInfo(
+		properties.plate,
+		properties.vehicleId,
+	);
+	const imageHTML = imageWrapper(
+		busInfo?.image,
+		'<img src="' + Camera + '" alt="Vir" /> Skupnost Kranjbus',
+	);
+	const vehicleRow = busInfo?.model
+		? `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
+			`<span style="opacity:0.7">Vozilo</span>` +
+			`<span style="font-weight:600; text-align:right">${escapeHTML(
+				busInfo.model,
+			)}${busInfo.hasRamp ? ACCESSIBLE_ICON : ""}</span>` +
+			`</div>`
+		: "";
+
+	const plateRow = properties.plate
+		? `<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
+			`<span style="opacity:0.7">Registrska</span>` +
+			`<span style="font-weight:600; text-align:right">${escapeHTML(properties.plate)}</span>` +
+			`</div>`
+		: "";
+
 	return (
 		`<div style="min-width:240px">` +
+		imageHTML +
 		`<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
 			String(heading),
 		)}</div>` +
 		operator +
+		vehicleRow +
+		plateRow +
 		stop +
 		'<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
 		`</div>`
