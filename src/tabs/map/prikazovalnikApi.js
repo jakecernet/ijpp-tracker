@@ -10,8 +10,7 @@
 // Do baze dostopamo prek javnega Firestore REST API-ja (brez firebase SDK-ja),
 // da v bundle ne dodajamo celotne knjižnice samo za eno periodično branje.
 
-const KRANJBUS_PROJECT_ID = "kranjbus";
-const KRANJBUS_BUSES_URL = `https://firestore.googleapis.com/v1/projects/${KRANJBUS_PROJECT_ID}/databases/(default)/documents/avtobusi`;
+const KRANJBUS_BUSES_URL = `https://firestore.googleapis.com/v1/projects/kranjbus/databases/(default)/documents/avtobusi`;
 
 // Baza fotografij se ne spreminja pogosto - osvežimo jo enkrat na uro, da po
 // nepotrebnem ne obremenjujemo tuje (skupnostne) Firestore baze z branji.

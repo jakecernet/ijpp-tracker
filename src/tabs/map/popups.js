@@ -1,5 +1,5 @@
 import { escapeHTML } from "./utils";
-import { findNonLppBusInfo } from "./busImages";
+import { findNonLppBusInfo } from "./prikazovalnikApi";
 import Camera from "../../img/camera.svg";
 import Center from "../../img/center.svg";
 
