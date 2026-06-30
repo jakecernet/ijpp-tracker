@@ -1,5 +1,5 @@
 import { escapeHTML } from "./utils";
-import { findNonLppBusInfo } from "./prikazovalnikApi";
+import { findKranjbusInfo } from "./prikazovalnikApi";
 import Camera from "../../img/camera.svg";
 import Center from "../../img/center.svg";
 
@@ -145,33 +145,66 @@ export async function renderIjppPopup(properties) {
 		properties.title ||
 		properties.routeId ||
 		"Vozilo";
-	const operator = createRow(
-		"Prevoznik",
-		properties.operator === "MP_Kranj"
-			? "Mestni promet Kranj"
-			: properties.operator,
-	);
-	const stop = createRow(
-		properties.stopStatus === "STOPPED_AT"
-			? "Na postaji: "
-			: "Naslednja postaja: ",
-		properties.stop,
-	);
 
-	// Za LPP imamo lastno bazo slik/modelov (glej fetchLppBusInfo zgoraj);
-	// za vse druge prevoznike (Arriva, Nomago, AP Murska Sobota ...) iščemo
-	// po skupnostni Kranjbus bazi glede na registrsko oznako/ID vozila.
-	const busInfo = await findNonLppBusInfo(
+	// Primarno ujemanje po tripId, rezervno po registrski/vehicleId.
+	const busInfo = await findKranjbusInfo(
+		properties.tripId,
 		properties.plate,
 		properties.vehicleId,
 	);
-	const imageHTML = imageWrapper(
-		busInfo?.image,
-		'<img src="' + Camera + '" alt="Vir" /> Skupnost Kranjbus',
+
+	const imageHTML = busInfo?.image
+		? imageWrapper(
+				busInfo.image,
+				'<img src="' + Camera + '" alt="Vir" /> Skupnost Kranjbus',
+			)
+		: "";
+
+	// Prevoznik: Kranjbus baza ima zanesljivejše ime kot IJPP API.
+	const operatorName =
+		busInfo?.operator ||
+		(properties.operator === "MP_Kranj"
+			? "Mestni promet Kranj"
+			: properties.operator) ||
+		null;
+
+	const stop = createRow(
+		properties.stopStatus === "STOPPED_AT"
+			? "Na postaji"
+			: "Naslednja postaja",
+		properties.stop,
 	);
 
-	const modelRow = createModelRow(busInfo?.model, busInfo?.hasRamp);
-	const plateRow = createRow("Registrska", properties.plate);
+	// Datum zadnjega stika - pretvori ISO niz v berljiv format.
+	let lastSeenFormatted = null;
+	if (busInfo?.lastSeen) {
+		try {
+			lastSeenFormatted = new Date(busInfo.lastSeen).toLocaleString(
+				"sl-SI",
+				{ dateStyle: "short", timeStyle: "short" },
+			);
+		} catch {
+			lastSeenFormatted = busInfo.lastSeen;
+		}
+	}
+
+	const headingParts = String(heading).split(" - ");
+	const linePart = String(busInfo?.currentLine).split(" - ");
+    console.log("headingParts:", headingParts, "linePart:", linePart);
+	const isSame =
+		(headingParts[0] === linePart[0] && headingParts[1] === linePart[1]) ||
+		(headingParts[0] === linePart[1] && headingParts[1] === linePart[0]) ||
+		(headingParts[0] === linePart[1] && headingParts[1] === linePart[0]);
+
+	const rows =
+		createRow("Prevoznik", operatorName) +
+		createModelRow(busInfo?.model, busInfo?.hasRamp) +
+		createRow("Registrska", busInfo?.registration || properties.plate) +
+		(busInfo?.currentLine && !isSame
+			? createRow("Linija (stara)", busInfo.currentLine)
+			: "") +
+		stop +
+		createRow("Zadnji stik", lastSeenFormatted);
 
 	return (
 		`<div style="min-width:240px">` +
@@ -179,10 +212,7 @@ export async function renderIjppPopup(properties) {
 		`<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
 			String(heading),
 		)}</div>` +
-		operator +
-		modelRow +
-		plateRow +
-		stop +
+		rows +
 		'<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
 		`</div>`
 	);
