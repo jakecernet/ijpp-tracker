@@ -148,8 +148,6 @@ export const operatorToIcon = {
     Marprom: "marprom",
     "AP Murska Sobota, d.d.": "murska",
     "MP_Kranj": "kranj",
-    "mp_kranj": "kranj",
-    "MP Kranj": "kranj",
 };
 
 export const HALO_RADIUS = [

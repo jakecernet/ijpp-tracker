@@ -113,11 +113,12 @@ export async function renderLppPopup(properties) {
 	);
 
 	const rows =
-		createRow("Prevoznik", "LPP") +
+		createRow("Prevoznik", "Ljubljanski potniški promet") +
 		createRow("Registrska", properties.busName) +
 		(isUrban
 			? createModelRow("Turistični vlakec Urban", info?.hasRamp)
-			: createModelRow(info?.model, info?.hasRamp)) + createRow("Smer", properties.lineDestination) +
+			: createModelRow(info?.model, info?.hasRamp)) +
+		createRow("Smer", properties.lineDestination) +
 		createRow("Hitrost", formatSpeed(properties.speed)) +
 		(isUrban
 			? ""
@@ -144,7 +145,12 @@ export async function renderIjppPopup(properties) {
 		properties.title ||
 		properties.routeId ||
 		"Vozilo";
-	const operator = createRow("Prevoznik", properties.operator);
+	const operator = createRow(
+		"Prevoznik",
+		properties.operator === "MP_Kranj"
+			? "Mestni promet Kranj"
+			: properties.operator,
+	);
 	const stop = createRow(
 		properties.stopStatus === "STOPPED_AT"
 			? "Na postaji: "

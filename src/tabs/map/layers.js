@@ -23,7 +23,7 @@ export const BRAND_COLOR_EXPR = [
 	"murska",
 	BRAND_COLORS.arriva.stroke,
     "kranj",
-    BRAND_COLORS.arriva.stroke,
+    BRAND_COLORS.marprom.stroke,
 	BRAND_COLORS.default.stroke,
 ];
 
@@ -134,6 +134,10 @@ const HALO_COLOR_EXPR = [
 	BRAND_COLORS.lpp.fill,
 	"marprom",
 	BRAND_COLORS.marprom.fill,
+	"murska",
+	BRAND_COLORS.arriva.fill,
+	"kranj",
+	BRAND_COLORS.marprom.fill,
 	BRAND_COLORS.default.fill,
 ];
 
@@ -149,6 +153,10 @@ const HALO_STROKE_EXPR = [
 	"lpp",
 	BRAND_COLORS.lpp.stroke,
 	"marprom",
+	BRAND_COLORS.marprom.stroke,
+	"murska",
+	BRAND_COLORS.arriva.stroke,
+	"kranj",
 	BRAND_COLORS.marprom.stroke,
 	BRAND_COLORS.default.stroke,
 ];
