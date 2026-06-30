@@ -3,6 +3,7 @@ import lppPNG from "../../img/lpp.png";
 import nomagoPNG from "../../img/nomago.png";
 import marpromPNG from "../../img/marprom.png";
 import murskaPNG from "../../img/murska.png";
+import kranjPNG from "../../img/kranj.png";
 import busStopPNG from "../../img/routeStop2.png";
 import trainStopPNG from "../../img/trainStop.png";
 import szPNG from "../../img/sz.png";
@@ -49,16 +50,17 @@ export const OSM_RASTER_STYLE_LIGHT = {
 };
 
 export const ICON_SOURCES = [
-	{ id: "bus-stop", image: busStopPNG },
-	{ id: "train-stop", image: trainStopPNG },
-	{ id: "train", image: szPNG },
-	{ id: "arriva", image: arrivaPNG },
-	{ id: "lpp", image: lppPNG },
-	{ id: "nomago", image: nomagoPNG },
-	{ id: "marprom", image: marpromPNG },
-	{ id: "murska", image: murskaPNG },
-	{ id: "bus-generic", image: busStopPNG },
-	{ id: "train-generic", image: szPNG },
+    { id: "bus-stop", image: busStopPNG },
+    { id: "train-stop", image: trainStopPNG },
+    { id: "train", image: szPNG },
+    { id: "arriva", image: arrivaPNG },
+    { id: "lpp", image: lppPNG },
+    { id: "nomago", image: nomagoPNG },
+    { id: "marprom", image: marpromPNG },
+    { id: "murska", image: murskaPNG },
+    { id: "kranj", image: kranjPNG },
+    { id: "bus-generic", image: busStopPNG },
+    { id: "train-generic", image: szPNG },
 ];
 
 export const CLUSTER_CONFIG = {
@@ -140,11 +142,14 @@ export const BRAND_COLORS = {
 };
 
 export const operatorToIcon = {
-	"Ljubljanski potniški promet d.o.o.": "lpp",
-	"Nomago d.o.o.": "nomago",
-	"Arriva d.o.o.": "arriva",
-	Marprom: "marprom",
-	"AP Murska Sobota, d.d.": "murska",
+    "Ljubljanski potniški promet d.o.o.": "lpp",
+    "Nomago d.o.o.": "nomago",
+    "Arriva d.o.o.": "arriva",
+    Marprom: "marprom",
+    "AP Murska Sobota, d.d.": "murska",
+    "MP_Kranj": "kranj",
+    "mp_kranj": "kranj",
+    "MP Kranj": "kranj",
 };
 
 export const HALO_RADIUS = [

@@ -50,6 +50,7 @@ const DEFAULT_BUS_OPERATORS = {
 	nomago: true,
 	marprom: true,
 	murska: true,
+	kranj: true,
 	generic: true,
 };
 

@@ -90,6 +90,7 @@ const SettingsTab = ({
                             nomago: "Nomago",
                             marprom: "Marprom",
                             murska: "Murska Sobota",
+                            kranj: "MP Kranj",
                             generic: "Ostali",
                         }).map(([key, label]) => (
                             <label key={key}>
