@@ -20,7 +20,7 @@ const KRANJBUS_BUSES_URL = `https://firestore.googleapis.com/v1/projects/kranjbu
 
 // Baza se ne spreminja prepogosto - osvežimo jo enkrat na uro, da po
 // nepotrebnem ne obremenjujemo tuje (skupnostne) Firestore baze z branji.
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 1000;
 
 let cache = null; // { data, time }
 let inFlight = null;
