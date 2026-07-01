@@ -237,10 +237,11 @@ const SettingsTab = ({
                     </a>
                     <br />
                     Viri podatkov:
-                    <br />{" "}
+                    {" "}
                     <a href="https://data.lpp.si/doc" target="_blank">
                         LPP
                     </a>
+
                     ,{" "}
                     <a
                         href="https://mestnipromet.cyou/tracker/"
@@ -266,6 +267,14 @@ const SettingsTab = ({
                     >
                         (DERP)
                     </a>
+                    ,{" "}
+                    <a
+                        href="https://prikazovalnik.gt.tc/zemljevid.html"
+                        target="_blank"
+                    >
+                        Prikazovalnik
+                    </a>
+                    
                     <br />
                     Izvirna koda:{" "}
                     <a

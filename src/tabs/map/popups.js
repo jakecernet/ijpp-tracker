@@ -3,9 +3,6 @@ import { findKranjbusInfo } from "./prikazovalnikApi";
 import Camera from "../../img/camera.svg";
 import Center from "../../img/center.svg";
 
-// Ikona invalidskega vozička - prikazana, če ima vozilo nizko stopnico
-// oz. rampo za vstop. Skupna za LPP (lastna baza, glej fetchLppBusInfo)
-// in ne-LPP vozila (skupnostna Kranjbus baza, glej busImages.js).
 const ACCESSIBLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="15" height="15" style="vertical-align:-2px; margin-left:6px">
 	<g fill="#60a5fa" transform="translate(85,55) scale(0.8)">
 		<path d="M161.988 98.124c24.9629-2.30469 44.3574-23.811 44.3574-48.9658C206.346 22.083 184.263 0 157.188 0s-49.1572 22.083-49.1572 49.1582c0 8.25684 2.30371 16.7056 6.14453 23.8105l17.5156 246.467 180.396.0488 73.9912 173.365 97.1445-38.0977-15.043-35.8203-54.3662 19.625-71.5908-165.28-167.729 1.12695-2.30273-31.2129 121.423.0483v-46.1831l-126.055-.0493L161.988 98.124Z"/>
@@ -13,9 +10,8 @@ const ACCESSIBLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 51
 	</g>
 </svg>`;
 
-// Iz `busName` (npr. "LPP-313" ali ime urbanega vlakca) izpelje interno
-// številko vozila, ki se uporablja tako za sliko kot za poizvedbo v
-// lastni bazi slik/modelov LPP vozil.
+const ijppImages = "https://jakecernet.github.io/prikazovalnik-slike/";
+
 function getLppBusNumber(busName) {
 	if (!busName) return null;
 	return busName.includes("U1") || busName.includes("U2")
@@ -23,9 +19,6 @@ function getLppBusNumber(busName) {
 		: busName.slice(7);
 }
 
-// Pridobi podatke o LPP vozilu (model, avtor slike, dostopnost) iz
-// skupne baze "images.json". To je ekvivalent findNonLppBusInfo iz
-// busImages.js, le za LPP vozila namesto skupnostne Kranjbus baze.
 async function fetchLppBusInfo(busNumber) {
 	if (!busNumber) return null;
 	try {
@@ -153,12 +146,10 @@ export async function renderIjppPopup(properties) {
 		properties.vehicleId,
 	);
 
-	const imageHTML = busInfo?.image
-		? imageWrapper(
-				busInfo.image,
-				'<img src="' + Camera + '" alt="Vir" /> Skupnost Kranjbus',
-			)
-		: "";
+    const imageHTML = imageWrapper(
+        busInfo?.hasImage ? `${ijppImages}${busInfo.image}` : "",
+        authorCaption("prikazovalnik.gt.tc"),
+    );
 
 	// Prevoznik: Kranjbus baza ima zanesljivejše ime kot IJPP API.
 	const operatorName =
@@ -190,7 +181,7 @@ export async function renderIjppPopup(properties) {
 
 	const headingParts = String(heading).split(" - ");
 	const linePart = String(busInfo?.currentLine).split(" - ");
-    console.log("headingParts:", headingParts, "linePart:", linePart);
+	console.log("headingParts:", headingParts, "linePart:", linePart);
 	const isSame =
 		(headingParts[0] === linePart[0] && headingParts[1] === linePart[1]) ||
 		(headingParts[0] === linePart[1] && headingParts[1] === linePart[0]) ||

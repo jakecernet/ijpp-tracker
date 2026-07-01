@@ -89,27 +89,6 @@ async function getBusDatabase() {
 	return inFlight;
 }
 
-/**
- * Poišče vozilo v skupnostni Kranjbus bazi glede na `tripId` trenutne
- * vožnje (npr. "IJPP:471631") in vrne vsa razpoložljiva polja zanj.
- *
- * Primarno ujemanje: lastTripId == tripId (neposredna primerjava, brez čiščenja).
- * Rezervno ujemanje: stVozila ali registrska se ujema s plate ali vehicleId
- * (kot prej), za primere kjer lastTripId v bazi še ni osvežen.
- *
- * @param {string} tripId    - tripId vozila iz IJPP API-ja (npr. "IJPP:471631")
- * @param {string} [plate]   - registrska oznaka (rezervno ujemanje)
- * @param {string} [vehicleId] - id vozila iz IJPP API-ja (rezervno ujemanje)
- * @returns {Promise<{
- *   image: string|null,
- *   model: string|null,
- *   hasRamp: boolean,
- *   registration: string|null,
- *   operator: string|null,
- *   currentLine: string|null,
- *   lastSeen: string|null,
- * }|null>}
- */
 export async function findKranjbusInfo(tripId, plate, vehicleId) {
 	if (!tripId && !plate && !vehicleId) return null;
 
@@ -143,7 +122,7 @@ export async function findKranjbusInfo(tripId, plate, vehicleId) {
 		if (!match) return null;
 
 		return {
-			image: match.slikaPath || null,
+			image: match?.registrska?.replace(/\s/g, "_") + ".jpg" || null,
 			model:
 				[match.proizvajalec, match.model].filter(Boolean).join(" ") ||
 				null,
@@ -152,6 +131,7 @@ export async function findKranjbusInfo(tripId, plate, vehicleId) {
 			operator: match.tip || null,
 			currentLine: match.trenutnaLinija || null,
 			lastSeen: match.lastSeen || null,
+			hasImage: Boolean(match?.slikaPath),
 		};
 	} catch (error) {
 		console.error("Napaka pri iskanju podatkov o avtobusu:", error);
