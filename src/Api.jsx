@@ -377,6 +377,10 @@ const fetchIJPPPositions = async () => {
 						(vehicle) =>
 							vehicle?.vehicle?.operator_name !=
 								"Ljubljanski Potniški Promet" &&
+							vehicle?.vehicle?.operator_name !=
+								"Ljubljanski potniški promet" &&
+                            vehicle?.vehicle?.operator_name !=
+                                "Ljubljanski potniški promet, d.o.o." &&
 							vehicle?.vehicle?.operator_name !==
 								"Slovenske železnice",
 					)
@@ -565,7 +569,9 @@ const fetchIJPPTrip = async (trip) => {
 				let activeStationId;
 				try {
 					const raw = localStorage.getItem("activeStation");
-					activeStationId = raw ? JSON.parse(raw)?.gtfs_id : undefined;
+					activeStationId = raw
+						? JSON.parse(raw)?.gtfs_id
+						: undefined;
 				} catch {
 					activeStationId = undefined;
 				}

@@ -181,7 +181,6 @@ export async function renderIjppPopup(properties) {
 
 	const headingParts = String(heading).split(" - ");
 	const linePart = String(busInfo?.currentLine).split(" - ");
-	console.log("headingParts:", headingParts, "linePart:", linePart);
 	const isSame =
 		(headingParts[0] === linePart[0] && headingParts[1] === linePart[1]) ||
 		(headingParts[0] === linePart[1] && headingParts[1] === linePart[0]) ||
