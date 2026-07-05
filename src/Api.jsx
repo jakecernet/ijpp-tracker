@@ -1,6 +1,5 @@
 import { format } from "date-fns";
 import { sl } from "date-fns/locale";
-import { act } from "react";
 
 const busStopsLink =
 	"https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/unified_stops_with_gtfs.json";
@@ -60,10 +59,10 @@ async function fetchJson(url) {
 const cache = new Map();
 
 const CACHE_TTL = {
-	stops: 5 * 60 * 1000, // 5 minutes - static data, rarely changes
-	positions: 3 * 1000, // 5 seconds - real-time positions
-	arrivals: 15 * 1000, // 15 seconds - arrival predictions
-	routes: 5 * 60 * 1000, // 5 minutes - route/trip data
+	stops: 5 * 60 * 1000,
+	positions: 3 * 1000,
+	arrivals: 15 * 1000,
+	routes: 5 * 60 * 1000,
 };
 
 const routeCache = new Map();
@@ -82,6 +81,7 @@ function setCachedRoute(tripId, data) {
 		routeCache.set(tripId, { data, time: Date.now() });
 	}
 }
+const inFlight = new Map();
 
 /**
  * Helper za fetchanje s cachingom
@@ -90,29 +90,21 @@ function setCachedRoute(tripId, data) {
 async function cachedFetch(key, ttl, fetcher) {
 	const cached = cache.get(key);
 	if (cached && Date.now() - cached.time < ttl) return cached.data;
-	const data = await fetcher();
-	cache.set(key, { data, time: Date.now() });
-	return data;
-}
 
-/**
- * Prefetch static data (bus stops, train stops) on app initialization
- * Call this early to warm the cache before user needs the data
- */
-export async function prefetchStaticData() {
-	try {
-		// Fetch both in parallel to speed up initial load
-		await Promise.all([
-			cachedFetch(busStopsLink, CACHE_TTL.stops, () =>
-				fetchJson(busStopsLink),
-			),
-			cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
-				fetchJson(szStopsLink),
-			),
-		]);
-	} catch (error) {
-		console.warn("Prefetch failed, will fetch on demand:", error);
-	}
+	if (inFlight.has(key)) return inFlight.get(key);
+
+	const promise = (async () => {
+		try {
+			const data = await fetcher();
+			cache.set(key, { data, time: Date.now() });
+			return data;
+		} finally {
+			inFlight.delete(key);
+		}
+	})();
+
+	inFlight.set(key, promise);
+	return promise;
 }
 
 /** Pretvori sekunde od polnoči v časovni format HH:MM:SS
@@ -204,7 +196,15 @@ function computeEtaAndTime(arrival) {
 export function formatPrecomputedArrival(arrival) {
 	const etaMin = arrival.etaMinutes ?? "?";
 	const timeStr = arrival.arrivalTime ?? "N/A";
-	return `${etaMin} min (${timeStr})`;
+	let etaDisplay;
+	if (typeof etaMin === "number" && etaMin >= 60) {
+		const hours = Math.floor(etaMin / 60);
+		const minutes = etaMin % 60;
+		etaDisplay = `${hours}h ${minutes}m`;
+	} else {
+		etaDisplay = `${etaMin} min`;
+	}
+	return `${etaDisplay} (${timeStr})`;
 }
 
 /**
@@ -240,9 +240,7 @@ function decodePolylineOnce(str, precision) {
 		const dlng = result & 1 ? ~(result >> 1) : result >> 1;
 		lng += dlng;
 
-		const latitude = lat / factor;
-		const longitude = lng / factor;
-		pts.push([longitude, latitude]);
+		pts.push([lng / factor, lat / factor]);
 	}
 	return pts;
 }
@@ -288,15 +286,9 @@ const fetchAllBusStops = async () => {
 
 		return list
 			.map((stop) => {
-				const latitude = Number(
-					stop.latitude ?? stop.lat ?? stop["Latitude"],
-				);
-				const longitude = Number(
-					stop.longitude ?? stop.lon ?? stop["Longitude"],
-				);
-				const gpsLocation = Array.isArray(stop.gpsLocation)
-					? stop.gpsLocation
-					: [latitude, longitude];
+				const latitude = stop.latitude ?? null;
+				const longitude = stop.longitude ?? null;
+				const gpsLocation = [latitude, longitude];
 				const vCenter = stop.ref_id % 2 === 1 ? true : false;
 				if (
 					!Number.isFinite(gpsLocation?.[0]) ||
@@ -305,25 +297,16 @@ const fetchAllBusStops = async () => {
 					return null;
 				}
 
-				const refId = stop.ref_id ?? null;
-                const gtfsId = stop.gtfs_id ?? null;
-				const ijppId =
-					stop.ijpp_id ?? null;
-
-				const routesOnStop = stop.route_groups_on_station
-					? stop.route_groups_on_station
-					: [];
-
 				return {
 					...stop,
-					name: stop.name ?? stop.stop_name ?? "",
-					gpsLocation: gpsLocation,
+					name: stop.name ?? "",
+					gpsLocation,
 					coordinates: gpsLocation,
-					ref_id: refId,
-                    gtfs_id: gtfsId,
-					ijpp_id: ijppId,
-					routes_on_stop: routesOnStop,
-					vCenter: refId ? vCenter : null,
+					ref_id: stop.ref_id ?? null,
+					gtfs_id: stop.gtfs_id ?? null,
+					ijpp_id: stop.ijpp_id ?? null,
+					routes_on_stop: stop.route_groups_on_station ?? [],
+					vCenter: stop.ref_id ? vCenter : null,
 				};
 			})
 			.filter(Boolean);
@@ -339,10 +322,9 @@ const fetchAllBusStops = async () => {
  */
 const fetchSzStops = async () => {
 	try {
-		const raw = await cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
+		return await cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
 			fetchJson(szStopsLink),
 		);
-		return raw;
 	} catch (error) {
 		console.error("Error fetching SZ stops:", error);
 		return [];
@@ -361,7 +343,7 @@ const fetchLPPPositions = async () => {
 			() => fetchJson(lppLocationsLink),
 		);
 
-		const lppPositions = data.data.map((bus) => ({
+		return data.data.map((bus) => ({
 			gpsLocation: [bus.latitude, bus.longitude],
 			operator: "Ljubljanski potniški promet d.o.o.",
 			lineNumber: bus.line_number,
@@ -373,8 +355,6 @@ const fetchLPPPositions = async () => {
 			ignition: bus.ignition,
 			tripId: bus.trip_id,
 		}));
-
-		return lppPositions;
 	} catch (error) {
 		console.error("Error fetching lpp positions:", error);
 	}
@@ -382,7 +362,7 @@ const fetchLPPPositions = async () => {
 
 /**
  * Fetcha IJPP podatke o vozilih
- * @returns Tabela z IJPP pozicijami in routami ('stops' lastnost)
+ * @returns Tabelo z IJPP pozicijami in routami ('stops' lastnost)
  */
 const fetchIJPPPositions = async () => {
 	try {
@@ -391,12 +371,16 @@ const fetchIJPPPositions = async () => {
 			CACHE_TTL.positions,
 			() => fetchJson(ijppLocationsLink),
 		);
-		const ijppPositions = Array.isArray(data)
+		return Array.isArray(data)
 			? data
 					.filter(
 						(vehicle) =>
 							vehicle?.vehicle?.operator_name !=
 								"Ljubljanski Potniški Promet" &&
+							vehicle?.vehicle?.operator_name !=
+								"Ljubljanski potniški promet" &&
+                            vehicle?.vehicle?.operator_name !=
+                                "Ljubljanski potniški promet, d.o.o." &&
 							vehicle?.vehicle?.operator_name !==
 								"Slovenske železnice",
 					)
@@ -407,11 +391,10 @@ const fetchIJPPPositions = async () => {
 						lineName: vehicle?.trip_headsign,
 						tripId: vehicle?.trip_id,
 						vehicleId: vehicle?.vehicle?.id,
-						stop: vehicle && vehicle.stop ? vehicle.stop.name : "/",
+						stop: vehicle?.stop?.name ?? "/",
 						stopStatus: vehicle?.stop_status,
 					}))
 			: [];
-		return ijppPositions;
 	} catch (error) {
 		console.error("Error fetching ijpp positions:", error);
 	}
@@ -428,19 +411,8 @@ const fetchTrainPositions = async () => {
 			(train) => train.routeColor === "29ace2",
 		);
 
-		const formatIso = (iso) => {
-			if (!iso) return null;
-			const d = new Date(iso);
-			if (Number.isNaN(d.getTime())) return iso;
-			const Y = d.getFullYear();
-			const M = String(d.getMonth() + 1).padStart(2, "0");
-			const D = String(d.getDate()).padStart(2, "0");
-			const h = String(d.getHours()).padStart(2, "0");
-			const m = String(d.getMinutes()).padStart(2, "0");
-			return `${Y}-${M}-${D} ${h}:${m}`;
-		};
+		const fmtTime = (iso) => (iso ? format(new Date(iso), "HH:mm") : "?");
 
-		// Helper za izračun razdalje med koordinatami
 		const haversine = (c1, c2) => {
 			const R = 6371000;
 			const toRad = (d) => (d * Math.PI) / 180;
@@ -454,7 +426,7 @@ const fetchTrainPositions = async () => {
 			return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 		};
 
-		const positions = filteredData
+		return filteredData
 			.filter((train) => train.trips?.[0]?.tripId)
 			.map((train) => {
 				const coords = decodePolylineOnce(train.polyline, 5);
@@ -466,9 +438,10 @@ const fetchTrainPositions = async () => {
 				const scheduledArrival = new Date(
 					train.scheduledArrival,
 				).getTime();
-				const departureDelay = departure - scheduledDeparture;
-				const arrivalDelay = arrival - scheduledArrival;
-				const delay = Math.max(departureDelay, arrivalDelay);
+				const delay = Math.max(
+					departure - scheduledDeparture,
+					arrival - scheduledArrival,
+				);
 
 				// Zgradi pot s časovnimi žigi
 				let path = [];
@@ -495,11 +468,8 @@ const fetchTrainPositions = async () => {
 					from: train.from,
 					to: train.to,
 					realtime: train.realTime,
-					departure: formatIso(train.scheduledDeparture).slice(
-						11,
-						16,
-					),
-					arrival: formatIso(train.scheduledArrival).slice(11, 16),
+					departure: fmtTime(train.scheduledDeparture),
+					arrival: fmtTime(train.scheduledArrival),
 					tripId: train.trips[0]?.tripId,
 					tripShort:
 						train.trips[0].routeShortName?.split(" ").join("") ||
@@ -507,8 +477,6 @@ const fetchTrainPositions = async () => {
 					delay,
 				};
 			});
-
-		return positions;
 	} catch (error) {
 		console.error("Error fetching train positions:", error);
 		return [];
@@ -526,7 +494,6 @@ function getInterpolatedPosition(path, now) {
 		return { coord: [0, 0], bearing: 0 };
 	}
 
-	// Helper za bearing
 	const calcBearing = (from, to) => {
 		const toRad = (d) => (d * Math.PI) / 180;
 		const toDeg = (r) => (r * 180) / Math.PI;
@@ -598,10 +565,17 @@ const fetchIJPPTrip = async (trip) => {
 			const pointsResponse = await fetchJson(
 				ijppRouteLink + tripId + "/geometry",
 			);
-			const operator = fetchIJPPPositions().then((positions) =>
-				fetchIjppArrivals(
-					JSON.parse(localStorage.getItem("activeStation")).gtfs_id,
-				).then((arrivals) => {
+			const operator = fetchIJPPPositions().then((positions) => {
+				let activeStationId;
+				try {
+					const raw = localStorage.getItem("activeStation");
+					activeStationId = raw
+						? JSON.parse(raw)?.gtfs_id
+						: undefined;
+				} catch {
+					activeStationId = undefined;
+				}
+				return fetchIjppArrivals(activeStationId).then((arrivals) => {
 					const vehicle = positions.find(
 						(pos) => pos.tripId === tripId,
 					);
@@ -609,8 +583,8 @@ const fetchIJPPTrip = async (trip) => {
 						(arr) => arr.tripId === tripId,
 					);
 					return arrival?.operatorName || vehicle?.operator || "";
-				}),
-			);
+				});
+			});
 
 			selectedRoute = {
 				tripName: raw?.trip_headsign || "",
@@ -662,29 +636,14 @@ const fetchLppPoints = async (routeId, tripId = null) => {
 		// If tripId is provided, filter to only include that specific trip's geometry
 		if (tripId && data) {
 			const matchingTrip = data.find((point) => point.trip_id === tripId);
-			// If we found a matching trip, use only that one; otherwise fall back to first trip
-			if (matchingTrip) {
-				data = [matchingTrip];
-			} else if (data.length > 0) {
-				// Fall back to first trip if no exact match (different trip on same route)
-				data = [data[0]];
-			}
-		} else if (data && data.length > 0) {
-			// No tripId provided - use only the first trip to avoid mixed paths
+			data = [matchingTrip || data[0]].filter(Boolean);
+		} else if (data?.length > 0) {
 			data = [data[0]];
 		}
 
 		const points = data
 			?.map((point) => {
-				// Additional safety check for geojson_shape.type
-				if (!point.geojson_shape || !point.geojson_shape.type) {
-					console.warn(
-						"Skipping point with missing geojson_shape:",
-						point,
-					);
-					return null;
-				}
-
+				if (!point.geojson_shape?.type) return null;
 				return {
 					tripId: point.trip_id,
 					routeNumber: point.route_number,
@@ -708,8 +667,8 @@ const fetchLppPoints = async (routeId, tripId = null) => {
 								: [],
 				};
 			})
-			.filter(Boolean); // Remove any null entries from the map
-		return points && points.length > 0 ? points : null;
+			.filter(Boolean);
+		return points?.length > 0 ? points : null;
 	} catch (error) {
 		console.error("Error fetching LPP route points:", error);
 		return null;
@@ -792,8 +751,8 @@ const fetchSzTrip = async (tripId) => {
 		try {
 			const fetched = await fetchJson(szRouteLink + tripId);
 			const raw = fetched?.legs || null;
-			const startStop = raw && raw[0] ? raw[0].from : null;
-			const endStop = raw && raw[0] ? raw[0].to : null;
+			const startStop = raw?.[0]?.from ?? null;
+			const endStop = raw?.[0]?.to ?? null;
 			selectedRoute = Array.isArray(raw)
 				? {
 						from: {
@@ -870,7 +829,7 @@ const fetchLppArrivals = async (stationCode) => {
 		const list = Array.isArray(raw?.data?.arrivals)
 			? raw.data.arrivals
 			: [];
-		const arrivals = list
+		return list
 			.map((arrival) => {
 				const etaData = computeEtaAndTime({
 					etaMinutes: arrival.eta_min,
@@ -888,7 +847,6 @@ const fetchLppArrivals = async (stationCode) => {
 				};
 			})
 			.sort((a, b) => (a.etaMinutes ?? 999) - (b.etaMinutes ?? 999));
-		return arrivals;
 	} catch (error) {
 		console.error("Error fetching LPP arrivals:", error);
 		return [];
@@ -907,7 +865,7 @@ const fetchIjppArrivals = async (ijppId) => {
 			ijppArrivalsLink + ijppId + "?current=true",
 		);
 		const list = Array.isArray(raw?.arrivals) ? raw.arrivals : [];
-		const arrivals = list.map((arrival) => {
+		return list.map((arrival) => {
 			const etaData = computeEtaAndTime({
 				etaMinutes: undefined,
 				realtimeDeparture: seconds2time(arrival?.departure_realtime),
@@ -931,7 +889,6 @@ const fetchIjppArrivals = async (ijppId) => {
 				arrivalTime: etaData.arrivalTime,
 			};
 		});
-		return arrivals;
 	} catch (error) {
 		console.error("Error fetching IJPP arrivals:", error);
 		return [];
@@ -951,61 +908,54 @@ const fetchSzArrivals = async (stationCode) => {
 		// Get today's date in YYYY-MM-DD format
 		const today = new Date().toISOString().split("T")[0];
 
-		const arrivals = (raw?.stopTimes || [])
+		return (raw?.stopTimes || [])
 			.filter((arrival) => {
-				// Filter to only include arrivals scheduled for today
 				const scheduledDeparture = arrival?.place?.scheduledDeparture;
-				if (!scheduledDeparture) return false;
-				const arrivalDate = scheduledDeparture.split("T")[0];
-				return arrivalDate === today;
+				return scheduledDeparture?.split("T")[0] === today;
 			})
 			.map((arrival) => {
 				const place = arrival?.place;
 				const realTime = arrival?.realTime || false;
 
-				// Extract times from the new nested structure
 				const scheduledArrival = place?.scheduledArrival;
 				const scheduledDeparture = place?.scheduledDeparture;
 				const actualArrival = place?.arrival;
 				const actualDeparture = place?.departure;
 
-				// Calculate delays in milliseconds
 				let arrivalDelay = 0;
 				let departureDelay = 0;
 				if (realTime && actualDeparture && scheduledDeparture) {
-					const actual = new Date(actualDeparture).getTime();
-					const scheduled = new Date(scheduledDeparture).getTime();
-					departureDelay = actual - scheduled;
+					departureDelay =
+						new Date(actualDeparture) -
+						new Date(scheduledDeparture);
 				}
 				if (realTime && actualArrival && scheduledArrival) {
-					const actual = new Date(actualArrival).getTime();
-					const scheduled = new Date(scheduledArrival).getTime();
-					arrivalDelay = actual - scheduled;
+					arrivalDelay =
+						new Date(actualArrival) - new Date(scheduledArrival);
 				}
 
 				const etaData = computeEtaAndTime({
 					realtimeArrival: realTime ? actualArrival : null,
-					scheduledArrival: scheduledArrival,
+					scheduledArrival,
 					realtimeDeparture: realTime ? actualDeparture : null,
-					scheduledDeparture: scheduledDeparture,
+					scheduledDeparture,
 				});
 
 				return {
 					headsign: arrival?.headsign,
 					tripId: arrival?.tripId,
 					routeShortName: arrival?.routeShortName,
-					realTime: realTime,
-					scheduledArrival: scheduledArrival,
-					scheduledDeparture: scheduledDeparture,
+					realTime,
+					scheduledArrival,
+					scheduledDeparture,
 					realtimeArrival: realTime ? actualArrival : null,
 					realtimeDeparture: realTime ? actualDeparture : null,
-					arrivalDelay: arrivalDelay,
-					departureDelay: departureDelay,
+					arrivalDelay,
+					departureDelay,
 					etaMinutes: etaData.etaMinutes,
 					arrivalTime: etaData.arrivalTime,
 				};
 			});
-		return arrivals;
 	} catch (error) {
 		console.error("Error fetching SZ arrivals:", error);
 		return [];

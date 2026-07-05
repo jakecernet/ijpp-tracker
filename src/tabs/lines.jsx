@@ -36,6 +36,7 @@ const bgColorMap = (item) => {
 	if (operator?.includes("Marprom")) return "var(--marprom-color)";
 	if (operator?.includes("Arriva")) return "var(--arriva-color)";
 	if (operator?.includes("Murska")) return "var(--murska-color)";
+    if (operator?.includes("Kranj")) return "var(--kranj-color)";
 
 	return "var(--default-color)";
 };

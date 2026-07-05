@@ -90,6 +90,7 @@ const SettingsTab = ({
                             nomago: "Nomago",
                             marprom: "Marprom",
                             murska: "Murska Sobota",
+                            kranj: "MP Kranj",
                             generic: "Ostali",
                         }).map(([key, label]) => (
                             <label key={key}>
@@ -236,10 +237,11 @@ const SettingsTab = ({
                     </a>
                     <br />
                     Viri podatkov:
-                    <br />{" "}
+                    {" "}
                     <a href="https://data.lpp.si/doc" target="_blank">
                         LPP
                     </a>
+
                     ,{" "}
                     <a
                         href="https://mestnipromet.cyou/tracker/"
@@ -265,6 +267,14 @@ const SettingsTab = ({
                     >
                         (DERP)
                     </a>
+                    ,{" "}
+                    <a
+                        href="https://prikazovalnik.gt.tc/zemljevid.html"
+                        target="_blank"
+                    >
+                        Prikazovalnik
+                    </a>
+                    
                     <br />
                     Izvirna koda:{" "}
                     <a

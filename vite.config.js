@@ -23,6 +23,7 @@ export default defineConfig({
 		react(),
 		VitePWA({
 			registerType: "autoUpdate",
+			injectRegister: "script-defer",
 			manifest: {
 				name: "IJPP Tracker",
 				short_name: "IJPP Tracker",
@@ -42,5 +43,12 @@ export default defineConfig({
 	build: {
 		outDir: "build",
 		emptyOutDir: true,
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					maplibre: ["maplibre-gl"],
+				},
+			},
+		},
 	},
 });

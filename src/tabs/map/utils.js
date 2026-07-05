@@ -125,13 +125,11 @@ export function stopsToFeatures(stops, brand, includeFrom, includeTo) {
 }
 
 /**
- * Parse train gpsLocation string "lng,lat" to [lat, lng]
+ * Parse train gpsLocation [lng, lat] to [lat, lng]
  */
 export function parseTrainCoord(gpsLocation) {
-	if (!gpsLocation) return null;
-	const [lng, lat] = String(gpsLocation)
-		.split(",")
-		.map((v) => Number(v.trim()));
+	if (!Array.isArray(gpsLocation)) return null;
+	const [lng, lat] = gpsLocation;
 	return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
 }
 

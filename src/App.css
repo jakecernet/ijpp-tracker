@@ -57,6 +57,7 @@
 	--marprom-color: #ff000081;
 	--arriva-color: #00338081;
 	--murska-color: #00518081;
+    --kranj-color: #ff000081;
 	--default-color: #80808081;
 	--transition-speed: 0.2s;
 	--transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -168,6 +169,15 @@ body {
 			to {
 				opacity: 1;
 			}
+		}
+
+		.suspense-fallback {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			height: 100%;
+			font-size: 14px;
+			color: #94a3b8;
 		}
 
 		.map-container {
