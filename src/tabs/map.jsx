@@ -95,6 +95,7 @@ const Map = React.memo(function Map({
 	setVisibility,
 	busOperators,
 	setBusOperators,
+	isActive = true,
 }) {
 	const mapRef = useRef(null);
 	const mapInstanceRef = useRef(null);
@@ -107,6 +108,16 @@ const Map = React.memo(function Map({
 	const initialCenterRef = useRef(
 		userLocation || activeStation?.coordinates || DEFAULT_CENTER,
 	);
+
+	// Ko se zavihek zemljevida znova prikaže (bil je display:none), mora
+	// MapLibre ponovno izračunati velikost platna, sicer ostane napačne velikosti.
+	useEffect(() => {
+		if (!isActive) return;
+		const map = mapInstanceRef.current;
+		if (!map) return;
+		const id = requestAnimationFrame(() => map.resize());
+		return () => cancelAnimationFrame(id);
+	}, [isActive]);
 
 	const [filterByRoute, setFilterByRoute] = useState(false);
 	const [routeDrawerOpen, setRouteDrawerOpen] = useState(false);

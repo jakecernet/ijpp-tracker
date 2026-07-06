@@ -506,6 +506,37 @@ function App() {
 			<RouteTracker />
 			<div className={`container ${theme}`}>
 				<div className="content">
+					{/* Zemljevid je vedno priklopljen (samo skrit z CSS-om),
+					    da se MapLibre instanca ne uniči ob preklopu zavihkov */}
+					<div
+						className={`persistent-map${
+							isOnMapTab ? "" : " persistent-map--hidden"
+						}`}>
+						<Suspense
+							fallback={
+								<div className="suspense-fallback">
+									Nalaganje...
+								</div>
+							}>
+							<MapTab
+								gpsPositions={deferredGpsPositions}
+								busStops={busStops}
+								trainStops={szStops}
+								activeStation={activeStation}
+								setActiveStation={setActiveStation}
+								userLocation={userLocation}
+								trainPositions={deferredTrainPositions}
+								setSelectedVehicle={setSelectedVehicle}
+								selectedVehicle={selectedVehicle}
+								routeLoading={routeLoading}
+								visibility={visibility}
+								setVisibility={setVisibility}
+								busOperators={busOperators}
+								setBusOperators={setBusOperators}
+								isActive={isOnMapTab}
+							/>
+						</Suspense>
+					</div>
 					<Suspense
 						fallback={
 							<div className="suspense-fallback">
@@ -513,27 +544,7 @@ function App() {
 							</div>
 						}>
 						<Routes>
-							<Route
-								path="/*"
-								element={
-									<MapTab
-										gpsPositions={deferredGpsPositions}
-										busStops={busStops}
-										trainStops={szStops}
-										activeStation={activeStation}
-										setActiveStation={setActiveStation}
-										userLocation={userLocation}
-										trainPositions={deferredTrainPositions}
-										setSelectedVehicle={setSelectedVehicle}
-										selectedVehicle={selectedVehicle}
-										routeLoading={routeLoading}
-										visibility={visibility}
-										setVisibility={setVisibility}
-										busOperators={busOperators}
-										setBusOperators={setBusOperators}
-									/>
-								}
-							/>
+							<Route path="/*" element={null} />
 							<Route
 								path="/stations"
 								element={

@@ -182,6 +182,14 @@ body {
 			color: #94a3b8;
 		}
 
+		.persistent-map {
+			height: 100%;
+		}
+
+		.persistent-map--hidden {
+			display: none;
+		}
+
 		.map-container {
 			overflow: hidden;
 			height: calc(100vh - 80px); /* fallback */
