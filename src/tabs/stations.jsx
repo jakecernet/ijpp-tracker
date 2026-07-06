@@ -230,20 +230,42 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 	// Cache for measured item heights
 	const itemHeightsCache = useRef({});
 
-	// Measure container height for virtualized list
+	// Measure container height for virtualized list.
+	// Uses a ResizeObserver so the measurement stays correct even if the
+	// layout settles a frame after mount (e.g. sibling panels collapsing).
 	useEffect(() => {
+		let rafId = null;
+
 		const updateHeight = () => {
-			if (listContainerRef.current) {
+			if (rafId) cancelAnimationFrame(rafId);
+			rafId = requestAnimationFrame(() => {
+				if (!listContainerRef.current) return;
 				const rect = listContainerRef.current.getBoundingClientRect();
-				// Account for padding/margins, use available height
+				// Account for the bottom navigation, use available height
 				const availableHeight = window.innerHeight - rect.top - 80;
 				setListHeight(Math.max(200, availableHeight));
-			}
+			});
 		};
 
 		updateHeight();
+
+		const ro =
+			typeof ResizeObserver !== "undefined"
+				? new ResizeObserver(updateHeight)
+				: null;
+		if (ro && listContainerRef.current) {
+			ro.observe(listContainerRef.current);
+			if (listContainerRef.current.parentElement) {
+				ro.observe(listContainerRef.current.parentElement);
+			}
+		}
+
 		window.addEventListener("resize", updateHeight);
-		return () => window.removeEventListener("resize", updateHeight);
+		return () => {
+			if (rafId) cancelAnimationFrame(rafId);
+			if (ro) ro.disconnect();
+			window.removeEventListener("resize", updateHeight);
+		};
 	}, []);
 
 	// Reset list cache when data changes
