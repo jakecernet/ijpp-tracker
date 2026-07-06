@@ -60,7 +60,7 @@ const cache = new Map();
 
 const CACHE_TTL = {
 	stops: 5 * 60 * 1000,
-	positions: 3 * 1000,
+	positions: 2.5 * 1000,
 	arrivals: 15 * 1000,
 	routes: 5 * 60 * 1000,
 };
@@ -551,6 +551,12 @@ function getInterpolatedPosition(path, now) {
 const fetchIJPPTrip = async (trip) => {
 	if (!trip) return null;
 	const tripId = trip.tripId || trip;
+	// Operator is already carried on the selected vehicle object, so reuse it
+	// instead of re-fetching all positions/arrivals just to resolve a name.
+	const operator =
+		(typeof trip === "object" &&
+			(trip.operatorName || trip.operator)) ||
+		"";
 	const cached = getCachedRoute(tripId);
 	if (cached) return cached;
 
@@ -565,26 +571,6 @@ const fetchIJPPTrip = async (trip) => {
 			const pointsResponse = await fetchJson(
 				ijppRouteLink + tripId + "/geometry",
 			);
-			const operator = fetchIJPPPositions().then((positions) => {
-				let activeStationId;
-				try {
-					const raw = localStorage.getItem("activeStation");
-					activeStationId = raw
-						? JSON.parse(raw)?.gtfs_id
-						: undefined;
-				} catch {
-					activeStationId = undefined;
-				}
-				return fetchIjppArrivals(activeStationId).then((arrivals) => {
-					const vehicle = positions.find(
-						(pos) => pos.tripId === tripId,
-					);
-					const arrival = arrivals.find(
-						(arr) => arr.tripId === tripId,
-					);
-					return arrival?.operatorName || vehicle?.operator || "";
-				});
-			});
 
 			selectedRoute = {
 				tripName: raw?.trip_headsign || "",
@@ -604,7 +590,7 @@ const fetchIJPPTrip = async (trip) => {
 						}))
 					: [],
 				geometry: pointsResponse.coordinates || [],
-				operator: await operator,
+				operator,
 				isLPP: false,
 				isSZ: false,
 			};

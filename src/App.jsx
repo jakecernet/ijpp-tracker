@@ -152,8 +152,6 @@ function App() {
 	const [routeLoading, setRouteLoading] = useState(false);
 	const [arrivalsLoading, setArrivalsLoading] = useState(false);
 
-	const [mapZoom, setMapZoom] = useState(13);
-
 	const tripsWithTimingRef = useRef([]);
 	const animationFrameRef = useRef(null);
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
@@ -207,7 +205,7 @@ function App() {
 		}
 	}, []);
 
-	// Na 2 sekundi fetcha pozicije busov, se ustavi ko ni na map tab-u
+	// Na 3 sekunde fetcha pozicije busov, se ustavi ko ni na map tab-u
 	useEffect(() => {
 		const fetchPositions = async () => {
 			try {
@@ -234,7 +232,8 @@ function App() {
 		let intervalId;
 
 		const startPolling = () => {
-			intervalId = setInterval(fetchPositions, 2000);
+			// 3s interval with a 2.5s cache TTL so every poll fetches fresh data
+			intervalId = setInterval(fetchPositions, 3000);
 		};
 
 		const stopPolling = () => {
@@ -263,7 +262,7 @@ function App() {
 				handleVisibilityChange,
 			);
 		};
-	}, [isOnMapTab, mapZoom]);
+	}, [isOnMapTab]);
 
 	// fetcha pozicije vlakov, animacija je v useEffect spodi
 	useEffect(() => {
@@ -422,7 +421,7 @@ function App() {
 			} else if (type === "SZ") {
 				route = await fetchSzTrip(tripId);
 			} else {
-				route = await fetchIJPPTrip(tripId);
+				route = await fetchIJPPTrip(tripData);
 			}
 
 			if (route) {
@@ -532,7 +531,6 @@ function App() {
 										setVisibility={setVisibility}
 										busOperators={busOperators}
 										setBusOperators={setBusOperators}
-										onZoomChange={setMapZoom}
 									/>
 								}
 							/>

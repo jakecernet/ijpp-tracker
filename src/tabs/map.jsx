@@ -95,7 +95,6 @@ const Map = React.memo(function Map({
 	setVisibility,
 	busOperators,
 	setBusOperators,
-	onZoomChange,
 }) {
 	const mapRef = useRef(null);
 	const mapInstanceRef = useRef(null);
@@ -103,7 +102,6 @@ const Map = React.memo(function Map({
 	const handlersRef = useRef({
 		setActiveStation,
 		setSelectedVehicle,
-		onZoomChange,
 	});
 	const routeDrawerRef = useRef(null);
 	const initialCenterRef = useRef(
@@ -123,9 +121,8 @@ const Map = React.memo(function Map({
 		handlersRef.current = {
 			setActiveStation,
 			setSelectedVehicle,
-			onZoomChange,
 		};
-	}, [setActiveStation, setSelectedVehicle, onZoomChange]);
+	}, [setActiveStation, setSelectedVehicle]);
 
 	useEffect(() => {
 		try {
@@ -477,11 +474,6 @@ const Map = React.memo(function Map({
 					setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
 				);
 
-				// Notify parent of initial zoom level
-				if (handlersRef.current.onZoomChange) {
-					handlersRef.current.onZoomChange(Math.round(map.getZoom()));
-				}
-
 				// Configure all popups
 				configureBusStopPopup({
 					map,
@@ -570,13 +562,6 @@ const Map = React.memo(function Map({
 				);
 
 				setIsMapLoaded(true);
-			});
-
-			// Track zoom changes for adaptive polling
-			map.on("zoomend", () => {
-				if (handlersRef.current.onZoomChange) {
-					handlersRef.current.onZoomChange(Math.round(map.getZoom()));
-				}
 			});
 
 			// Listen for map theme changes
