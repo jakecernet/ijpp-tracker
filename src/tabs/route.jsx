@@ -44,7 +44,9 @@ const RouteTab = ({
 		? "Ljubljanski potniški promet"
 		: isSZ
 			? "Slovenske železnice"
-			: selectedVehicle?.operator;
+			: selectedVehicle?.operator == "MP_Kranj"
+				? "Mestni promet Kranj"
+				: selectedVehicle?.operator;
 
 	return (
 		<div className="route">

@@ -152,8 +152,6 @@ function App() {
 	const [routeLoading, setRouteLoading] = useState(false);
 	const [arrivalsLoading, setArrivalsLoading] = useState(false);
 
-	const [mapZoom, setMapZoom] = useState(13);
-
 	const tripsWithTimingRef = useRef([]);
 	const animationFrameRef = useRef(null);
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
@@ -207,7 +205,6 @@ function App() {
 		}
 	}, []);
 
-	// Na 2 sekundi fetcha pozicije busov, se ustavi ko ni na map tab-u
 	useEffect(() => {
 		const fetchPositions = async () => {
 			try {
@@ -234,7 +231,7 @@ function App() {
 		let intervalId;
 
 		const startPolling = () => {
-			intervalId = setInterval(fetchPositions, 2000);
+			intervalId = setInterval(fetchPositions, 3000);
 		};
 
 		const stopPolling = () => {
@@ -263,7 +260,7 @@ function App() {
 				handleVisibilityChange,
 			);
 		};
-	}, [isOnMapTab, mapZoom]);
+	}, [isOnMapTab]);
 
 	// fetcha pozicije vlakov, animacija je v useEffect spodi
 	useEffect(() => {
@@ -422,7 +419,7 @@ function App() {
 			} else if (type === "SZ") {
 				route = await fetchSzTrip(tripId);
 			} else {
-				route = await fetchIJPPTrip(tripId);
+				route = await fetchIJPPTrip(tripData);
 			}
 
 			if (route) {
@@ -507,6 +504,35 @@ function App() {
 			<RouteTracker />
 			<div className={`container ${theme}`}>
 				<div className="content">
+					<div
+						className={`persistent-map${
+							isOnMapTab ? "" : " persistent-map--hidden"
+						}`}>
+						<Suspense
+							fallback={
+								<div className="suspense-fallback">
+									Nalaganje...
+								</div>
+							}>
+							<MapTab
+								gpsPositions={deferredGpsPositions}
+								busStops={busStops}
+								trainStops={szStops}
+								activeStation={activeStation}
+								setActiveStation={setActiveStation}
+								userLocation={userLocation}
+								trainPositions={deferredTrainPositions}
+								setSelectedVehicle={setSelectedVehicle}
+								selectedVehicle={selectedVehicle}
+								routeLoading={routeLoading}
+								visibility={visibility}
+								setVisibility={setVisibility}
+								busOperators={busOperators}
+								setBusOperators={setBusOperators}
+								isActive={isOnMapTab}
+							/>
+						</Suspense>
+					</div>
 					<Suspense
 						fallback={
 							<div className="suspense-fallback">
@@ -514,28 +540,7 @@ function App() {
 							</div>
 						}>
 						<Routes>
-							<Route
-								path="/*"
-								element={
-									<MapTab
-										gpsPositions={deferredGpsPositions}
-										busStops={busStops}
-										trainStops={szStops}
-										activeStation={activeStation}
-										setActiveStation={setActiveStation}
-										userLocation={userLocation}
-										trainPositions={deferredTrainPositions}
-										setSelectedVehicle={setSelectedVehicle}
-										selectedVehicle={selectedVehicle}
-										routeLoading={routeLoading}
-										visibility={visibility}
-										setVisibility={setVisibility}
-										busOperators={busOperators}
-										setBusOperators={setBusOperators}
-										onZoomChange={setMapZoom}
-									/>
-								}
-							/>
+							<Route path="/*" element={null} />
 							<Route
 								path="/stations"
 								element={
