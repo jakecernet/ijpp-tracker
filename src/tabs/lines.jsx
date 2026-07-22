@@ -51,6 +51,35 @@ const formatDelay = (scheduledDeparture, actualDeparture) => {
 	return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
 };
 
+const getEndpointName = (endpoint) => {
+	if (!endpoint) return "";
+	if (typeof endpoint === "string") return endpoint;
+	if (typeof endpoint === "object") {
+		return (
+			endpoint.name ||
+			endpoint.stopName ||
+			endpoint.stationName ||
+			endpoint.title ||
+			""
+		);
+	}
+	return "";
+};
+
+const getRouteDisplayName = (item) => {
+	return (
+        "Med postajama: " +
+		item.displayName ||
+		item.lineName ||
+		item.headsign ||
+		item.name ||
+		item.tripName ||
+		[getEndpointName(item.from), getEndpointName(item.to)]
+			.filter(Boolean)
+			.join(" - ")
+	);
+};
+
 const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
 	<div className="route-item" onClick={onClick}>
 		<div className="circle" style={{ background: bgColorMap(item) }}>
@@ -62,11 +91,7 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
 				"?"}
 		</div>
 		<h3>
-			{item.lineName ||
-				item.headsign ||
-				item.name ||
-				item.tripName ||
-				[item.from, item.to].filter(Boolean).join(" - ")}
+			{getRouteDisplayName(item)}
 		</h3>
 		<button
 			className={`like-btn ${isLiked ? "liked" : ""}`}
@@ -226,7 +251,10 @@ const LinesTab = ({
 					...train,
 					lineName: name,
 					lineNumber: name,
-					tripName: [train.from, train.to]
+					tripName: [getEndpointName(train.from), getEndpointName(train.to)]
+						.filter(Boolean)
+						.join(" - "),
+					displayName: [getEndpointName(train.from), getEndpointName(train.to)]
 						.filter(Boolean)
 						.join(" - "),
 					operator: "Slovenske železnice d.o.o.",
@@ -273,6 +301,7 @@ const LinesTab = ({
 							{
 								id,
 								name:
+									route.displayName ||
 									route.lineName ||
 									route.route_name ||
 									route.tripName ||
@@ -284,8 +313,21 @@ const LinesTab = ({
 								operator: route.operator || route.operatorName,
 								headsign:
 									route.headsign ||
+									route.displayName ||
 									route.tripName ||
-									[route.from, route.to]
+									[
+										getEndpointName(route.from),
+										getEndpointName(route.to),
+									]
+										.filter(Boolean)
+										.join(" - "),
+								displayName:
+									route.displayName ||
+									route.tripName ||
+									[
+										getEndpointName(route.from),
+										getEndpointName(route.to),
+									]
 										.filter(Boolean)
 										.join(" - "),
 								tripId: route.tripId,
@@ -559,6 +601,7 @@ const LinesTab = ({
 									lineNumber: liked.lineNumber,
 									operator: liked.operator,
 									headsign: liked.headsign,
+									displayName: liked.displayName || liked.name,
 									tripId: liked.tripId,
 									tripShort: liked.tripShort,
 									lineId: liked.lineId,
