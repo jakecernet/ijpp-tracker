@@ -379,8 +379,8 @@ const fetchIJPPPositions = async () => {
 								"Ljubljanski Potniški Promet" &&
 							vehicle?.vehicle?.operator_name !=
 								"Ljubljanski potniški promet" &&
-                            vehicle?.vehicle?.operator_name !=
-                                "Ljubljanski potniški promet, d.o.o." &&
+							vehicle?.vehicle?.operator_name !=
+								"Ljubljanski potniški promet, d.o.o." &&
 							vehicle?.vehicle?.operator_name !==
 								"Slovenske železnice",
 					)
@@ -553,8 +553,7 @@ const fetchIJPPTrip = async (trip) => {
 	const tripId = trip.tripId || trip;
 
 	const operator =
-		(typeof trip === "object" &&
-			(trip.operatorName || trip.operator)) ||
+		(typeof trip === "object" && (trip.operatorName || trip.operator)) ||
 		"";
 	const cached = getCachedRoute(tripId);
 	if (cached) return cached;

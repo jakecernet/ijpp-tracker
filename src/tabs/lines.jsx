@@ -36,7 +36,7 @@ const bgColorMap = (item) => {
 	if (operator?.includes("Marprom")) return "var(--marprom-color)";
 	if (operator?.includes("Arriva")) return "var(--arriva-color)";
 	if (operator?.includes("Murska")) return "var(--murska-color)";
-    if (operator?.includes("Kranj")) return "var(--kranj-color)";
+	if (operator?.includes("Kranj")) return "var(--kranj-color)";
 
 	return "var(--default-color)";
 };
@@ -54,9 +54,20 @@ const formatDelay = (scheduledDeparture, actualDeparture) => {
 const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
 	<div className="route-item" onClick={onClick}>
 		<div className="circle" style={{ background: bgColorMap(item) }}>
-			{item.lineNumber ?? item.routeName ?? item.tripId?.slice(5) ?? "?"}
+			{item.lineNumber ??
+				item.routeName ??
+				item.routeShortName ??
+				item.tripShort ??
+				item.tripId?.slice(5) ??
+				"?"}
 		</div>
-		<h3>{item.lineName || item.headsign || item.name || item.tripName}</h3>
+		<h3>
+			{item.lineName ||
+				item.headsign ||
+				item.name ||
+				item.tripName ||
+				[item.from, item.to].filter(Boolean).join(" - ")}
+		</h3>
 		<button
 			className={`like-btn ${isLiked ? "liked" : ""}`}
 			onClick={onToggleLike}
@@ -117,6 +128,7 @@ const LinesTab = ({
 	szArrivals,
 	getTripFromId,
 	arrivalsLoading,
+	trainPositions,
 }) => {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -206,12 +218,38 @@ const LinesTab = ({
 			}
 		}
 
+		for (const train of trainPositions) {
+			const name = train.tripShort;
+			if (name && !seenNames.has(name)) {
+				seenNames.add(name);
+				uniqueRoutes.push({
+					...train,
+					lineName: name,
+					lineNumber: name,
+					tripName: [train.from, train.to]
+						.filter(Boolean)
+						.join(" - "),
+					operator: "Slovenske železnice d.o.o.",
+					type: "SZ",
+				});
+			}
+		}
+
+		console.log("Unique active routes:", uniqueRoutes);
+
 		return uniqueRoutes;
-	}, [gpsPositions]);
+	}, [gpsPositions, trainPositions]);
 
 	// Get unique route ID for liking
 	const getRouteId = useCallback((route) => {
-		return route?.lineName || route?.route_name;
+		return (
+			route?.lineName ||
+			route?.route_name ||
+			route?.lineNumber ||
+			route?.routeName ||
+			route?.tripShort ||
+			route?.tripId
+		);
 	}, []);
 
 	const isRouteLiked = useCallback(
@@ -234,11 +272,24 @@ const LinesTab = ({
 							...prev,
 							{
 								id,
-								name: route.lineName || route.route_name,
-								lineNumber: route.lineNumber || route.routeName,
+								name:
+									route.lineName ||
+									route.route_name ||
+									route.tripName ||
+									route.tripShort,
+								lineNumber:
+									route.lineNumber ||
+									route.routeName ||
+									route.tripShort,
 								operator: route.operator || route.operatorName,
-								headsign: route.headsign || route.tripName,
+								headsign:
+									route.headsign ||
+									route.tripName ||
+									[route.from, route.to]
+										.filter(Boolean)
+										.join(" - "),
 								tripId: route.tripId,
+								tripShort: route.tripShort,
 								lineId: route.lineId,
 								routeId: route.routeId,
 							},
@@ -320,8 +371,17 @@ const LinesTab = ({
 		// For longer searches, also include active routes
 		if (debouncedSearchTerm.length >= 3) {
 			const filteredActive = allActiveRoutes.filter((route) =>
-				(route.lineName || route.route_name || route.lineNumber)
-					?.toLowerCase()
+				(
+					route.lineName ||
+					route.route_name ||
+					route.lineNumber ||
+					route.routeName ||
+					route.tripShort ||
+					route.tripId ||
+					""
+				)
+					.toString()
+					.toLowerCase()
 					.includes(term),
 			);
 
@@ -362,9 +422,13 @@ const LinesTab = ({
 
 			const operatorType =
 				type ||
-				(item.operator?.toLowerCase().includes("slovenske železnice")
+				(item.type === "SZ" ||
+				item.tripShort ||
+				item.operator?.toLowerCase().includes("slovenske železnice")
 					? "SZ"
-					: item.operator?.includes("Ljubljanski potniški promet")
+					: item.operator
+								?.toLowerCase()
+								.includes("ljubljanski potniški promet")
 						? "LPP"
 						: "IJPP");
 			const route = await getTripFromId(item, operatorType);
@@ -496,6 +560,7 @@ const LinesTab = ({
 									operator: liked.operator,
 									headsign: liked.headsign,
 									tripId: liked.tripId,
+									tripShort: liked.tripShort,
 									lineId: liked.lineId,
 									routeId: liked.routeId,
 								};

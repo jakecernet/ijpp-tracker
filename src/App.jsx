@@ -312,6 +312,7 @@ function App() {
 				() => requestAnimationFrame(animate),
 				1000,
 			);
+            console.log("Train positions updated:", features);
 		};
 
 		animate();
@@ -563,6 +564,7 @@ function App() {
 										szArrivals={szArrivals}
 										getTripFromId={getTripFromId}
 										arrivalsLoading={arrivalsLoading}
+                                        trainPositions={trainPositions}
 									/>
 								}
 							/>
