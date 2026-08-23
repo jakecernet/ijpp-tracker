@@ -132,24 +132,17 @@ export async function renderLppPopup(properties) {
 	);
 }
 
-export async function renderIjppPopup(properties) {
+function buildIjppPopupHtml(properties, busInfo) {
 	const heading =
 		properties.lineName ||
 		properties.title ||
 		properties.routeId ||
 		"Vozilo";
 
-	// Primarno ujemanje po tripId, rezervno po registrski/vehicleId.
-	const busInfo = await findKranjbusInfo(
-		properties.tripId,
-		properties.plate,
-		properties.vehicleId,
+	const imageHTML = imageWrapper(
+		busInfo?.hasImage ? `${ijppImages}${busInfo.image}` : "",
+		authorCaption("prikazovalnik.gt.tc"),
 	);
-
-    const imageHTML = imageWrapper(
-        busInfo?.hasImage ? `${ijppImages}${busInfo.image}` : "",
-        authorCaption("prikazovalnik.gt.tc"),
-    );
 
 	// Prevoznik: Kranjbus baza ima zanesljivejše ime kot IJPP API.
 	const operatorName =
@@ -206,6 +199,23 @@ export async function renderIjppPopup(properties) {
 		'<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
 		`</div>`
 	);
+}
+
+export function renderIjppPopup(properties, onUpdate) {
+	const basicHtml = buildIjppPopupHtml(properties, null);
+
+	// Primarno ujemanje po tripId, rezervno po registrski/vehicleId.
+	findKranjbusInfo(properties.tripId, properties.plate, properties.vehicleId)
+		.then((busInfo) => {
+			if (!busInfo) return;
+			const updatedHtml = buildIjppPopupHtml(properties, busInfo);
+			onUpdate?.(updatedHtml, busInfo);
+		})
+		.catch(() => {
+			// Tiho prezri napako - popup ostane prikazan z osnovnimi podatki.
+		});
+
+	return basicHtml;
 }
 
 export function renderTrainPopup(properties) {

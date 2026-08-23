@@ -168,26 +168,10 @@ export function configureBusPopup({ map, onSelectVehicle }) {
 		if (!feature) return;
 		const properties = feature.properties || {};
 
-		let content;
-		if (properties.sourceType === "lpp")
-			content = await renderLppPopup(properties);
-		else if (properties.sourceType === "ijpp")
-			content = await renderIjppPopup(properties);
-		else content = `<div style="min-width:180px">Ni podatkov</div>`;
-
-		const popup = openPopup(map, event.lngLat, content);
-		map.flyTo({
-			center: event.lngLat,
-			zoom: Math.max(map.getZoom(), 16),
-			duration: 1000,
-		});
-
-		const container = popup.getElement();
-		if (!container) return;
-
-		if (properties.sourceType === "ijpp") {
-			container
-				.querySelector('[data-role="view-route"]')
+		const attachIjppRouteButton = (popup) => {
+			popup
+				.getElement()
+				?.querySelector('[data-role="view-route"]')
 				?.addEventListener(
 					"click",
 					(e) => {
@@ -205,11 +189,45 @@ export function configureBusPopup({ map, onSelectVehicle }) {
 					},
 					{ once: true },
 				);
+		};
+
+		let popup;
+
+		if (properties.sourceType === "lpp") {
+			const content = await renderLppPopup(properties);
+			popup = openPopup(map, event.lngLat, content);
+		} else if (properties.sourceType === "ijpp") {
+			// Prikaže osnoven popup takoj, nato ga dopolni, ko podatki iz
+			// Kranjbus baze prispejo (slika, model, prevoznik ...).
+			const content = renderIjppPopup(properties, (updatedHtml) => {
+				// Če je bil medtem odprt drug popup, posodobitve ne uporabi.
+				if (currentPopupRef.popup !== popup) return;
+				popup.setHTML(updatedHtml);
+				attachIjppRouteButton(popup);
+			});
+			popup = openPopup(map, event.lngLat, content);
+		} else {
+			popup = openPopup(
+				map,
+				event.lngLat,
+				`<div style="min-width:180px">Ni podatkov</div>`,
+			);
+		}
+
+		map.flyTo({
+			center: event.lngLat,
+			zoom: Math.max(map.getZoom(), 16),
+			duration: 1000,
+		});
+
+		if (properties.sourceType === "ijpp") {
+			attachIjppRouteButton(popup);
 		}
 
 		if (properties.sourceType === "lpp") {
-			container
-				.querySelector('[data-role="view-lpp-route"]')
+			popup
+				.getElement()
+				?.querySelector('[data-role="view-lpp-route"]')
 				?.addEventListener(
 					"click",
 					(e) => {
