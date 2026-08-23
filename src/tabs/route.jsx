@@ -37,6 +37,17 @@ const RouteTab = ({
 			: `${etaMin} min (${timeStr})`;
 	};
 
+	const formatSZETA = (time) => {
+		if (!time) return "";
+		const date = new Date(time);
+		if (isNaN(date)) return "";
+		const etaMin = Math.max(0, Math.round((date - Date.now()) / 60000));
+		const timeStr = formatTime(date);
+		return etaMin >= 60
+			? `${Math.floor(etaMin / 60)}h ${etaMin % 60}m (${timeStr})`
+			: `${etaMin} min (${timeStr})`;
+	};
+
 	const lineName =
 		(isLPP ? selectedVehicle?.lineNumber + " | " : "") +
 		selectedVehicle?.tripName;
@@ -126,17 +137,10 @@ const RouteTab = ({
 											display: "flex",
 											gap: "20px",
 										}}>
-										{stop.arrival && (
-											<p>
-												Prihod:{" "}
-												{formatTime(stop.arrival)}
-											</p>
-										)}
-										{stop.departure && (
-											<p>
-												Odhod:{" "}
-												{formatTime(stop.departure)}
-											</p>
+										{stop.departure ? (
+											<p>{formatSZETA(stop.departure)}</p>
+										) : (
+											<p>{formatSZETA(stop.arrival)}</p>
 										)}
 									</span>
 								)}
