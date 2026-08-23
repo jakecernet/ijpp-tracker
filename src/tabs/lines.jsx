@@ -68,7 +68,6 @@ const getEndpointName = (endpoint) => {
 
 const getRouteDisplayName = (item) => {
 	return (
-        "Med postajama: " +
 		item.displayName ||
 		item.lineName ||
 		item.headsign ||
@@ -262,9 +261,6 @@ const LinesTab = ({
 				});
 			}
 		}
-
-		console.log("Unique active routes:", uniqueRoutes);
-
 		return uniqueRoutes;
 	}, [gpsPositions, trainPositions]);
 

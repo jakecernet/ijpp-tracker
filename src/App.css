@@ -138,6 +138,7 @@ body {
 					color var(--transition-speed) var(--transition-ease),
 					transform 0.1s var(--transition-ease);
 				cursor: pointer;
+                outline: none;
 			}
 
 			&:hover button {
@@ -146,6 +147,7 @@ body {
 
 			&:active button {
 				transform: scale(0.97);
+                outline: none;
 			}
 		}
 
@@ -584,11 +586,13 @@ body {
 
 				button:active {
 					transform: scale(0.98);
+                    outline: none;
 				}
 
 				button.active {
 					color: var(--active-color);
 					background: none;
+                    outline: none;
 				}
 			}
 

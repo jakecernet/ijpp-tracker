@@ -312,7 +312,6 @@ function App() {
 				() => requestAnimationFrame(animate),
 				1000,
 			);
-            console.log("Train positions updated:", features);
 		};
 
 		animate();
