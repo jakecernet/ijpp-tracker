@@ -891,11 +891,14 @@ const fetchSzArrivals = async (stationCode) => {
 
 		// Get today's date in YYYY-MM-DD format
 		const today = new Date().toISOString().split("T")[0];
+		const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+			.toISOString()
+			.split("T")[0];
 
 		return (raw?.stopTimes || [])
 			.filter((arrival) => {
 				const scheduledDeparture = arrival?.place?.scheduledDeparture;
-				return scheduledDeparture?.split("T")[0] === today;
+				return scheduledDeparture?.split("T")[0] === tomorrow;
 			})
 			.map((arrival) => {
 				const place = arrival?.place;
