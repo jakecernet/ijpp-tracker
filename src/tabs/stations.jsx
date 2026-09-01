@@ -228,36 +228,50 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 	const itemHeightsCache = useRef({});
 
 	useEffect(() => {
-		let rafId = null;
+		const container = listContainerRef.current;
+		if (!container) return;
 
-		const updateHeight = () => {
+		let rafId = null;
+		let lastHeight = null;
+
+		const applyHeight = (height) => {
+			if (!Number.isFinite(height)) return;
+			const rounded = Math.round(height);
+			if (rounded === lastHeight) return;
+			lastHeight = rounded;
+			setListHeight(Math.max(200, rounded));
+		};
+
+		const measure = () => {
 			if (rafId) cancelAnimationFrame(rafId);
 			rafId = requestAnimationFrame(() => {
-				if (!listContainerRef.current) return;
-				const rect = listContainerRef.current.getBoundingClientRect();
-				const availableHeight = window.innerHeight - rect.top - 80;
-				setListHeight(Math.max(200, availableHeight));
+				rafId = null;
+				if (!container.isConnected) return;
+				applyHeight(container.getBoundingClientRect().height);
 			});
 		};
 
-		updateHeight();
+		measure();
 
-		const ro =
-			typeof ResizeObserver !== "undefined"
-				? new ResizeObserver(updateHeight)
-				: null;
-		if (ro && listContainerRef.current) {
-			ro.observe(listContainerRef.current);
-			if (listContainerRef.current.parentElement) {
-				ro.observe(listContainerRef.current.parentElement);
-			}
+		let ro = null;
+		if (typeof ResizeObserver !== "undefined") {
+			ro = new ResizeObserver((entries) => {
+				const entry = entries[0];
+				if (!entry) return;
+				const height =
+					entry.contentBoxSize?.[0]?.blockSize ??
+					entry.contentRect?.height;
+				applyHeight(height);
+			});
+			ro.observe(container);
+		} else {
+			window.addEventListener("resize", measure);
 		}
 
-		window.addEventListener("resize", updateHeight);
 		return () => {
 			if (rafId) cancelAnimationFrame(rafId);
 			if (ro) ro.disconnect();
-			window.removeEventListener("resize", updateHeight);
+			else window.removeEventListener("resize", measure);
 		};
 	}, []);
 

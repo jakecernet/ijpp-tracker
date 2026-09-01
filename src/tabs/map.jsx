@@ -467,6 +467,20 @@ const Map = React.memo(function Map({
 				new maplibregl.NavigationControl({ showCompass: true }),
 				"top-right",
 			);
+			map.addControl(
+				new maplibregl.GeolocateControl({
+					positionOptions: { enableHighAccuracy: true },
+					trackUserLocation: true,
+					showUserLocation: true,
+					showAccuracyCircle: true,
+					fitBoundsOptions: { maxZoom: 15 },
+				}),
+				"top-right",
+			);
+			map.addControl(
+				new maplibregl.FullscreenControl({ container: document.body }),
+				"top-right",
+			);
 
 			map.on("load", async () => {
 				await ensureIcons(map, ICON_SOURCES);
@@ -700,7 +714,8 @@ const Map = React.memo(function Map({
 					Array.isArray(c) &&
 					c.length >= 2 &&
 					Number.isFinite(c[0]) &&
-					Number.isFinite(c[1])
+					Number.isFinite(c[1]) &&
+					(Math.abs(c[0]) > 0.001 || Math.abs(c[1]) > 0.001)
 				) {
 					bounds.extend([c[0], c[1]]);
 				}

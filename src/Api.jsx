@@ -582,8 +582,8 @@ const fetchIJPPTrip = async (trip) => {
 							name: stop.stop.name,
 							gtfsId: stop.stop.gtfs_id,
 							gpsLocation: [
-								stop.stop.lat || 0,
-								stop.stop.lon || 0,
+								stop.stop.lat ?? null,
+								stop.stop.lon ?? null,
 							],
 						}))
 					: [],
@@ -695,8 +695,8 @@ const fetchLppRoute = async (lppRoute) => {
 							name: stop.name || "",
 							stopId: stop.station_code || "",
 							gpsLocation: [
-								stop.latitude || 0,
-								stop.longitude || 0,
+								stop.latitude ?? null,
+								stop.longitude ?? null,
 							],
 							arrivals: stop?.arrivals.map((arrival) => ({
 								eta_min: arrival.eta_min,
@@ -743,8 +743,8 @@ const fetchSzTrip = async (tripId) => {
 							name: raw[0]?.from?.name || "",
 							stopId: raw[0]?.from?.stopId || "",
 							gpsLocation: [
-								raw[0]?.from?.lat || 0,
-								raw[0]?.from?.lon || 0,
+								raw[0]?.from?.lat ?? null,
+								raw[0]?.from?.lon ?? null,
 							],
 							departure: raw[0]?.from?.departure || "",
 						},
@@ -752,8 +752,8 @@ const fetchSzTrip = async (tripId) => {
 							name: raw[0]?.to?.name || "",
 							stopId: raw[0]?.to?.stopId || "",
 							gpsLocation: [
-								raw[0]?.to?.lat || 0,
-								raw[0]?.to?.lon || 0,
+								raw[0]?.to?.lat ?? null,
+								raw[0]?.to?.lon ?? null,
 							],
 							arrival: raw[0]?.to?.arrival || "",
 						},
@@ -770,7 +770,10 @@ const fetchSzTrip = async (tripId) => {
 							...(raw[0]?.intermediateStops?.map((stop) => ({
 								name: stop?.name || "",
 								stopId: stop?.stopId || "",
-								gpsLocation: [stop?.lat || 0, stop?.lon || 0],
+								gpsLocation: [
+									stop?.lat ?? null,
+									stop?.lon ?? null,
+								],
 								arrival: stop?.arrival || "",
 								departure: stop?.departure || "",
 							})) || []),
