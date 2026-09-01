@@ -30,7 +30,11 @@ const bgColorMap = (item) => {
 		operator?.toLowerCase().includes("ljubljanski potniški promet")
 	)
 		return "var(--lpp-color)";
-	if (type === "SZ" || operator?.includes("slovenske železnice"))
+	if (
+		type === "SZ" ||
+		operator?.includes("slovenske železnice") ||
+		operator?.includes("SŽ")
+	)
 		return "var(--sz-color)";
 	if (operator?.includes("Nomago")) return "var(--nomago-color)";
 	if (operator?.includes("Marprom")) return "var(--marprom-color)";
@@ -89,9 +93,7 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
 				item.tripId?.slice(5) ??
 				"?"}
 		</div>
-		<h3>
-			{getRouteDisplayName(item)}
-		</h3>
+		<h3>{getRouteDisplayName(item)}</h3>
 		<button
 			className={`like-btn ${isLiked ? "liked" : ""}`}
 			onClick={onToggleLike}
@@ -250,10 +252,16 @@ const LinesTab = ({
 					...train,
 					lineName: name,
 					lineNumber: name,
-					tripName: [getEndpointName(train.from), getEndpointName(train.to)]
+					tripName: [
+						getEndpointName(train.from),
+						getEndpointName(train.to),
+					]
 						.filter(Boolean)
 						.join(" - "),
-					displayName: [getEndpointName(train.from), getEndpointName(train.to)]
+					displayName: [
+						getEndpointName(train.from),
+						getEndpointName(train.to),
+					]
 						.filter(Boolean)
 						.join(" - "),
 					operator: "Slovenske železnice d.o.o.",
@@ -597,7 +605,8 @@ const LinesTab = ({
 									lineNumber: liked.lineNumber,
 									operator: liked.operator,
 									headsign: liked.headsign,
-									displayName: liked.displayName || liked.name,
+									displayName:
+										liked.displayName || liked.name,
 									tripId: liked.tripId,
 									tripShort: liked.tripShort,
 									lineId: liked.lineId,

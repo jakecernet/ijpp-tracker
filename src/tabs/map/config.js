@@ -143,11 +143,13 @@ export const BRAND_COLORS = {
 
 export const operatorToIcon = {
     "Ljubljanski potniški promet d.o.o.": "lpp",
+    "Ljubljanski potniški promet, d.o.o.": "lpp",
     "Nomago d.o.o.": "nomago",
     "Arriva d.o.o.": "arriva",
     Marprom: "marprom",
     "AP Murska Sobota, d.d.": "murska",
     "MP_Kranj": "kranj",
+    "SŽ - Potniški promet, d.o.o.": "sz",
 };
 
 export const HALO_RADIUS = [
