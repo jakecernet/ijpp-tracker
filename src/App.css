@@ -919,8 +919,11 @@ body {
 							height: 14px;
 							background: var(--active-color);
 							box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
+							animation: currentStopPulse 1.6s ease-in-out
+								infinite;
 						}
 
+						/* Živi busi na tej liniji, priti na najbližjo postajo */
 						.stop__buses {
 							display: flex;
 							align-items: center;
@@ -930,18 +933,12 @@ body {
 						}
 
 						.stop__bus {
-							width: 8px;
-							height: 8px;
+							width: 7px;
+							height: 7px;
 							border-radius: 50%;
-							background: #f59e0b;
-							box-shadow: 0 0 0 2px var(--content-bg);
-						}
-
-						.stop__bus--self {
-							width: 11px;
-							height: 11px;
 							background: var(--active-color);
-							animation: pulse 1.6s ease-in-out infinite;
+							opacity: 0.65;
+							box-shadow: 0 0 0 2px var(--content-bg);
 						}
 					}
 				}
@@ -1251,6 +1248,16 @@ body {
 	}
 	50% {
 		opacity: 0.3;
+	}
+}
+
+@keyframes currentStopPulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
+	}
+	50% {
+		box-shadow: 0 0 0 7px rgba(96, 165, 250, 0.12);
 	}
 }
 

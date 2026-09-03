@@ -26,8 +26,14 @@ const distanceMeters = (a, b) => {
 	return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
-// Bus se šteje za "na tej postaji", če je bližje kot 700m
-const SNAP_DISTANCE_M = 700;
+// Bus se šteje za "na tej postaji", če je bližje kot toliko metrov.
+// LPP postaje so gosto posejane (mestni promet), IJPP (medkrajevni) pa
+// so razmaknjene dlje narazen, zato dovolimo večji radij.
+const SNAP_DISTANCE_LPP_M = 700;
+const SNAP_DISTANCE_OTHER_M = 1500;
+
+const normalizeStr = (value) =>
+	typeof value === "string" ? value.trim().toLowerCase() : value;
 
 const RouteTab = ({
 	selectedVehicle,
@@ -42,27 +48,46 @@ const RouteTab = ({
 
 	const stops = selectedVehicle?.stops || [];
 
+	// Najde vse busse, ki trenutno vozijo isto linijo (v isto smer), in jih
+	// pripne na najbližjo postajo na tej poti (za prikaz na dot-route timeline)
 	const busesByStopIndex = useMemo(() => {
 		const result = {};
 		if (!gpsPositions?.length || !stops.length) return result;
 
 		let candidates = [];
-		if (isLPP && selectedVehicle?.lineNumber != null) {
-			candidates = gpsPositions.filter(
-				(pos) =>
-					pos.lineNumber != null &&
-					String(pos.lineNumber) ===
-						String(selectedVehicle.lineNumber),
-			);
+		if (isLPP) {
+			// lineId je specifičen za posamezno smer/varianto linije, zato
+			// z njim izločimo buse, ki vozijo v nasprotno smer. Če lineId
+			// ni na voljo, se kot fallback uporabi širši lineNumber.
+			const selfLineId = selectedVehicle?.lineId;
+			const selfLineNumber = selectedVehicle?.lineNumber;
+			if (selfLineId != null) {
+				candidates = gpsPositions.filter(
+					(pos) =>
+						pos.lineId != null &&
+						String(pos.lineId) === String(selfLineId),
+				);
+			} else if (selfLineNumber != null) {
+				candidates = gpsPositions.filter(
+					(pos) =>
+						pos.lineNumber != null &&
+						String(pos.lineNumber) === String(selfLineNumber),
+				);
+			}
 		} else if (!isSZ && selectedVehicle?.tripName) {
-			// IJPP nima ID-ja linije, zato buse na isti liniji
-			// prepoznamo po istem "headsign" imenu
+			// IJPP nima ID-ja linije, zato buse na isti liniji (v isto smer)
+			// prepoznamo po istem "headsign" imenu potovanja
+			const selfHeadsign = normalizeStr(selectedVehicle.tripName);
 			candidates = gpsPositions.filter(
 				(pos) =>
 					pos.vehicleId != null &&
-					pos.lineName === selectedVehicle.tripName,
+					normalizeStr(pos.lineName) === selfHeadsign,
 			);
 		}
+
+		const snapDistance = isLPP
+			? SNAP_DISTANCE_LPP_M
+			: SNAP_DISTANCE_OTHER_M;
 
 		candidates.forEach((bus, idx) => {
 			let bestIndex = -1;
@@ -74,7 +99,7 @@ const RouteTab = ({
 					bestIndex = stopIndex;
 				}
 			});
-			if (bestIndex === -1 || bestDist > SNAP_DISTANCE_M) return;
+			if (bestIndex === -1 || bestDist > snapDistance) return;
 
 			if (!result[bestIndex]) result[bestIndex] = [];
 			result[bestIndex].push({
@@ -83,12 +108,31 @@ const RouteTab = ({
 					!!selectedVehicle?.tripId &&
 					bus.tripId === selectedVehicle.tripId,
 				label:
-					bus.busName || bus.lineDestination || bus.lineName || "Bus",
+					bus.busName ||
+					bus.lineDestination ||
+					bus.lineName ||
+					"Bus",
 			});
 		});
 
 		return result;
 	}, [gpsPositions, stops, isLPP, isSZ, selectedVehicle]);
+
+	// Postaja, kjer se trenutno nahaja IZBRANI bus (iz gpsPositions),
+	// če je na voljo živa lokacija zanj
+	const selfStopIndex = useMemo(() => {
+		for (const idx of Object.keys(busesByStopIndex)) {
+			if (busesByStopIndex[idx].some((bus) => bus.isSelf))
+				return Number(idx);
+		}
+		return null;
+	}, [busesByStopIndex]);
+
+	// Ali imamo za to potovanje sploh podatek "passed" (samo IJPP)
+	const hasPassedData = useMemo(
+		() => stops.some((stop) => stop.passed !== undefined),
+		[stops],
+	);
 
 	// Formats arrival for LPP { eta_min } objects or IJPP "HH:MM:SS" strings
 	const formatArrivalTime = (arrival) => {
@@ -156,122 +200,113 @@ const RouteTab = ({
 							const isLast = key === stops.length - 1;
 							const isPassed = stop.passed === true;
 							const isCurrent =
-								!isPassed &&
-								(isFirst || stops[key - 1]?.passed === true);
-							const busesHere = busesByStopIndex[key] || [];
+								selfStopIndex !== null
+									? key === selfStopIndex
+									: hasPassedData
+										? !isPassed &&
+											(isFirst ||
+												stops[key - 1]?.passed ===
+													true)
+										: false;
+							const busesHere = (
+								busesByStopIndex[key] || []
+							).filter((bus) => !bus.isSelf);
 
 							return (
-								<li
-									key={stop.gtfsId || stop.stopId || key}
-									className={
-										"stop" +
-										(isFirst ? " stop--first" : "") +
-										(isLast ? " stop--last" : "") +
-										(isPassed ? " stop--passed" : "") +
-										(isCurrent ? " stop--current" : "")
-									}
-									onClick={() => {
-										const payload = {
-											name: stop.name,
-											coordinates: stop.gpsLocation,
-											id:
-												stop.gtfsId ||
-												stop.stopId ||
-												stop.name,
-											gtfs_id: stop.gtfsId,
-											gtfsId: stop.gtfsId,
-											stopId: stop.stopId,
-											station_code: stop.stopId,
-											type: isSZ
-												? "train-stop"
-												: "bus-stop",
-										};
-										setActiveStation(payload);
-										localStorage.setItem(
-											"activeStation",
-											JSON.stringify(payload),
-										);
-										window.location.hash = "/lines";
-									}}>
+							<li
+								key={stop.gtfsId || stop.stopId || key}
+								className={
+									"stop" +
+									(isFirst ? " stop--first" : "") +
+									(isLast ? " stop--last" : "") +
+									(isPassed ? " stop--passed" : "") +
+									(isCurrent ? " stop--current" : "")
+								}
+								onClick={() => {
+									const payload = {
+										name: stop.name,
+										coordinates: stop.gpsLocation,
+										id:
+											stop.gtfsId ||
+											stop.stopId ||
+											stop.name,
+										gtfs_id: stop.gtfsId,
+										gtfsId: stop.gtfsId,
+										stopId: stop.stopId,
+										station_code: stop.stopId,
+										type: isSZ ? "train-stop" : "bus-stop",
+									};
+									setActiveStation(payload);
+									localStorage.setItem(
+										"activeStation",
+										JSON.stringify(payload),
+									);
+									window.location.hash = "/lines";
+								}}>
+								<span className="stop__track" aria-hidden="true">
+									<span className="stop__dot" />
+								</span>
+								{busesHere.length > 0 && (
 									<span
-										className="stop__track"
+										className="stop__buses"
 										aria-hidden="true">
-										<span className="stop__dot" />
+										{busesHere.map((bus) => (
+											<span
+												key={bus.key}
+												className="stop__bus"
+												title={bus.label}
+											/>
+										))}
 									</span>
-									{busesHere.length > 0 && (
-										<span
-											className="stop__buses"
-											aria-hidden="true">
-											{busesHere.map((bus) => (
-												<span
-													key={bus.key}
-													className={
-														"stop__bus" +
-														(bus.isSelf
-															? " stop__bus--self"
-															: "")
-													}
-													title={bus.label}
-												/>
-											))}
-										</span>
-									)}
-									<h3>{stop.name}</h3>
-									{!isLPP && !isSZ && (
-										<p>
-											{formatArrivalTime(stop?.departure)}
-										</p>
-									)}
-									{isLPP && (
-										<span
-											style={{
-												display: "flex",
-												flexDirection: "row",
-												gap: "20px",
-											}}>
-											{stop.arrivals?.[0] && (
-												<p>
-													{formatArrivalTime(
-														stop.arrivals[0],
-													)}
-												</p>
-											)}
-											{stop.arrivals?.[1] && (
-												<p>
-													{formatArrivalTime(
-														stop.arrivals[1],
-													)}
-												</p>
-											)}
-											{stop.arrivals?.[2] && (
-												<p>
-													{formatArrivalTime(
-														stop.arrivals[2],
-													)}
-												</p>
-											)}
-										</span>
-									)}
-									{isSZ && (
-										<span
-											style={{
-												display: "flex",
-												gap: "20px",
-											}}>
-											{stop.departure ? (
-												<p>
-													{formatSZETA(
-														stop.departure,
-													)}
-												</p>
-											) : (
-												<p>
-													{formatSZETA(stop.arrival)}
-												</p>
-											)}
-										</span>
-									)}
-								</li>
+								)}
+								<h3>{stop.name}</h3>
+								{!isLPP && !isSZ && (
+									<p>{formatArrivalTime(stop?.departure)}</p>
+								)}
+								{isLPP && (
+									<span
+										style={{
+											display: "flex",
+											flexDirection: "row",
+											gap: "20px",
+										}}>
+										{stop.arrivals?.[0] && (
+											<p>
+												{formatArrivalTime(
+													stop.arrivals[0],
+												)}
+											</p>
+										)}
+										{stop.arrivals?.[1] && (
+											<p>
+												{formatArrivalTime(
+													stop.arrivals[1],
+												)}
+											</p>
+										)}
+										{stop.arrivals?.[2] && (
+											<p>
+												{formatArrivalTime(
+													stop.arrivals[2],
+												)}
+											</p>
+										)}
+									</span>
+								)}
+								{isSZ && (
+									<span
+										style={{
+											display: "flex",
+											gap: "20px",
+										}}>
+										{stop.departure ? (
+											<p>{formatSZETA(stop.departure)}</p>
+										) : (
+											<p>{formatSZETA(stop.arrival)}</p>
+										)}
+									</span>
+								)}
+							</li>
 							);
 						})
 					) : (
