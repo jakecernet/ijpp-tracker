@@ -826,11 +826,12 @@ body {
 					color: var(--text-color);
 
 					li {
+						position: relative;
 						display: flex;
 						align-items: center;
-						justify-content: space-between;
+						gap: 10px;
 						border-bottom: 1px solid var(--selector-border);
-						padding: 10px 5px 10px 10px;
+						padding: 10px 5px 10px 34px;
 						transition:
 							background var(--transition-speed)
 								var(--transition-ease),
@@ -839,6 +840,11 @@ body {
 						cursor: pointer;
 						animation: slideIn 0.3s var(--transition-ease);
 						animation-fill-mode: both;
+
+						h3 {
+							flex: 1;
+							min-width: 0;
+						}
 
 						&:hover {
 							background: var(--hover-bg);
@@ -850,6 +856,69 @@ body {
 
 						&:last-child {
 							border-bottom: none;
+						}
+
+						/* Dot-route timeline marker */
+						.stop__track {
+							position: absolute;
+							left: 16px;
+							top: 0;
+							bottom: 0;
+							width: 2px;
+							display: block;
+							pointer-events: none;
+						}
+
+						.stop__track::before {
+							content: "";
+							position: absolute;
+							left: 50%;
+							top: 0;
+							bottom: 0;
+							width: 2px;
+							background: var(--active-color);
+							opacity: 0.45;
+							transform: translateX(-50%);
+						}
+
+						.stop__dot {
+							position: absolute;
+							left: 50%;
+							top: 50%;
+							width: 10px;
+							height: 10px;
+							border-radius: 50%;
+							background: var(--content-bg);
+							border: 2px solid var(--active-color);
+							transform: translate(-50%, -50%);
+							z-index: 1;
+							transition:
+								background var(--transition-speed)
+									var(--transition-ease),
+								width var(--transition-speed)
+									var(--transition-ease),
+								height var(--transition-speed)
+									var(--transition-ease);
+						}
+
+						&.stop--first .stop__track::before {
+							top: 50%;
+						}
+
+						&.stop--last .stop__track::before {
+							bottom: 50%;
+						}
+
+						&.stop--first .stop__dot,
+						&.stop--passed .stop__dot {
+							background: var(--active-color);
+						}
+
+						&.stop--current .stop__dot {
+							width: 14px;
+							height: 14px;
+							background: var(--active-color);
+							box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
 						}
 					}
 				}
