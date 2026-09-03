@@ -844,6 +844,7 @@ const Map = React.memo(function Map({
 						{selectedVehicle ? (
 							<RouteTab
 								selectedVehicle={selectedVehicle}
+								gpsPositions={gpsPositions}
 								setActiveStation={setActiveStation}
 								onDragPointerDown={onRouteDrawerPointerDown}
 								onDragPointerMove={onRouteDrawerPointerMove}

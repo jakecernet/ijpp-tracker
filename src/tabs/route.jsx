@@ -1,7 +1,37 @@
+import { useMemo } from "react";
 import { formatTime } from "../Api.jsx";
+
+// Razdalja med dvema GPS točkama v metrih (haversine)
+const distanceMeters = (a, b) => {
+	if (!a || !b) return Infinity;
+	const [lat1, lon1] = a;
+	const [lat2, lon2] = b;
+	if (
+		!Number.isFinite(lat1) ||
+		!Number.isFinite(lon1) ||
+		!Number.isFinite(lat2) ||
+		!Number.isFinite(lon2)
+	)
+		return Infinity;
+
+	const R = 6371000;
+	const toRad = (d) => (d * Math.PI) / 180;
+	const dLat = toRad(lat2 - lat1);
+	const dLon = toRad(lon2 - lon1);
+	const sinLat = Math.sin(dLat / 2);
+	const sinLon = Math.sin(dLon / 2);
+	const h =
+		sinLat * sinLat +
+		Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * sinLon * sinLon;
+	return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+};
+
+// Bus se šteje za "na tej postaji", če je bližje kot 700m
+const SNAP_DISTANCE_M = 700;
 
 const RouteTab = ({
 	selectedVehicle,
+	gpsPositions,
 	setActiveStation,
 	onDragPointerDown,
 	onDragPointerMove,
@@ -11,6 +41,54 @@ const RouteTab = ({
 	const isSZ = selectedVehicle?.isSZ;
 
 	const stops = selectedVehicle?.stops || [];
+
+	const busesByStopIndex = useMemo(() => {
+		const result = {};
+		if (!gpsPositions?.length || !stops.length) return result;
+
+		let candidates = [];
+		if (isLPP && selectedVehicle?.lineNumber != null) {
+			candidates = gpsPositions.filter(
+				(pos) =>
+					pos.lineNumber != null &&
+					String(pos.lineNumber) ===
+						String(selectedVehicle.lineNumber),
+			);
+		} else if (!isSZ && selectedVehicle?.tripName) {
+			// IJPP nima ID-ja linije, zato buse na isti liniji
+			// prepoznamo po istem "headsign" imenu
+			candidates = gpsPositions.filter(
+				(pos) =>
+					pos.vehicleId != null &&
+					pos.lineName === selectedVehicle.tripName,
+			);
+		}
+
+		candidates.forEach((bus, idx) => {
+			let bestIndex = -1;
+			let bestDist = Infinity;
+			stops.forEach((stop, stopIndex) => {
+				const d = distanceMeters(bus.gpsLocation, stop.gpsLocation);
+				if (d < bestDist) {
+					bestDist = d;
+					bestIndex = stopIndex;
+				}
+			});
+			if (bestIndex === -1 || bestDist > SNAP_DISTANCE_M) return;
+
+			if (!result[bestIndex]) result[bestIndex] = [];
+			result[bestIndex].push({
+				key: bus.tripId || bus.vehicleId || bus.busName || idx,
+				isSelf:
+					!!selectedVehicle?.tripId &&
+					bus.tripId === selectedVehicle.tripId,
+				label:
+					bus.busName || bus.lineDestination || bus.lineName || "Bus",
+			});
+		});
+
+		return result;
+	}, [gpsPositions, stops, isLPP, isSZ, selectedVehicle]);
 
 	// Formats arrival for LPP { eta_min } objects or IJPP "HH:MM:SS" strings
 	const formatArrivalTime = (arrival) => {
@@ -80,6 +158,7 @@ const RouteTab = ({
 							const isCurrent =
 								!isPassed &&
 								(isFirst || stops[key - 1]?.passed === true);
+							const busesHere = busesByStopIndex[key] || [];
 
 							return (
 								<li
@@ -119,6 +198,24 @@ const RouteTab = ({
 										aria-hidden="true">
 										<span className="stop__dot" />
 									</span>
+									{busesHere.length > 0 && (
+										<span
+											className="stop__buses"
+											aria-hidden="true">
+											{busesHere.map((bus) => (
+												<span
+													key={bus.key}
+													className={
+														"stop__bus" +
+														(bus.isSelf
+															? " stop__bus--self"
+															: "")
+													}
+													title={bus.label}
+												/>
+											))}
+										</span>
+									)}
 									<h3>{stop.name}</h3>
 									{!isLPP && !isSZ && (
 										<p>
