@@ -57,7 +57,7 @@
 	--marprom-color: #ff000081;
 	--arriva-color: #00338081;
 	--murska-color: #00518081;
-    --kranj-color: #ff000081;
+	--kranj-color: #ff000081;
 	--default-color: #80808081;
 	--transition-speed: 0.2s;
 	--transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -138,7 +138,7 @@ body {
 					color var(--transition-speed) var(--transition-ease),
 					transform 0.1s var(--transition-ease);
 				cursor: pointer;
-                outline: none;
+				outline: none;
 			}
 
 			&:hover button {
@@ -147,7 +147,7 @@ body {
 
 			&:active button {
 				transform: scale(0.97);
-                outline: none;
+				outline: none;
 			}
 		}
 
@@ -586,13 +586,13 @@ body {
 
 				button:active {
 					transform: scale(0.98);
-                    outline: none;
+					outline: none;
 				}
 
 				button.active {
 					color: var(--active-color);
 					background: none;
-                    outline: none;
+					outline: none;
 				}
 			}
 
@@ -830,7 +830,6 @@ body {
 						display: flex;
 						align-items: center;
 						gap: 10px;
-						border-bottom: 1px solid var(--selector-border);
 						padding: 10px 5px 10px 34px;
 						transition:
 							background var(--transition-speed)
@@ -858,7 +857,6 @@ body {
 							border-bottom: none;
 						}
 
-						/* Dot-route timeline marker */
 						.stop__track {
 							position: absolute;
 							left: 16px;
@@ -915,30 +913,30 @@ body {
 						}
 
 						&.stop--current .stop__dot {
-							width: 14px;
-							height: 14px;
+							width: 18px;
+							height: 18px;
 							background: var(--active-color);
 							box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.25);
 							animation: currentStopPulse 1.6s ease-in-out
 								infinite;
 						}
 
-						/* Živi busi na tej liniji, priti na najbližjo postajo */
 						.stop__buses {
+							position: absolute;
+							left: 50%;
+							top: 50%;
+							transform: translate(-50%, -50%);
 							display: flex;
-							align-items: center;
-							flex-shrink: 0;
-							gap: 4px;
-							margin-right: 2px;
+							z-index: 2;
 						}
 
 						.stop__bus {
-							width: 7px;
-							height: 7px;
+							width: 11px;
+							height: 11px;
 							border-radius: 50%;
 							background: var(--active-color);
-							opacity: 0.65;
-							box-shadow: 0 0 0 2px var(--content-bg);
+							box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+							animation: busDotPulse 2.4s ease-in-out infinite;
 						}
 					}
 				}
@@ -1258,6 +1256,16 @@ body {
 	}
 	50% {
 		box-shadow: 0 0 0 7px rgba(96, 165, 250, 0.12);
+	}
+}
+
+@keyframes busDotPulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.18);
+	}
+	50% {
+		box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
 	}
 }
 

@@ -148,6 +148,7 @@ export const operatorToIcon = {
     "Arriva d.o.o.": "arriva",
     Marprom: "marprom",
     "AP Murska Sobota, d.d.": "murska",
+    "Avtobusni promet Murska Sobota d.d.": "murska",
     "MP_Kranj": "kranj",
     "SŽ - Potniški promet, d.o.o.": "sz",
 };

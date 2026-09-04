@@ -134,6 +134,22 @@ const RouteTab = ({
 		[stops],
 	);
 
+	// Za SZ vlake ni podatka "passed", zato ugotovimo trenutno postajo
+	// glede na to, katera postaja je prva, za katero čas še ni potekel
+	// (ETA bi bila 0 min, ker je vlak tam že bil/je tam)
+	const szCurrentIndex = useMemo(() => {
+		if (!isSZ) return null;
+		const now = Date.now();
+		for (let i = 0; i < stops.length; i++) {
+			const timeVal = stops[i]?.departure || stops[i]?.arrival;
+			if (!timeVal) continue;
+			const date = new Date(timeVal);
+			if (isNaN(date)) continue;
+			if (date.getTime() > now) return i;
+		}
+		return null;
+	}, [isSZ, stops]);
+
 	// Formats arrival for LPP { eta_min } objects or IJPP "HH:MM:SS" strings
 	const formatArrivalTime = (arrival) => {
 		if (!arrival) return "";
@@ -198,16 +214,22 @@ const RouteTab = ({
 						stops.map((stop, key) => {
 							const isFirst = key === 0;
 							const isLast = key === stops.length - 1;
-							const isPassed = stop.passed === true;
+							const isPassed =
+								stop.passed === true ||
+								(isSZ &&
+									szCurrentIndex !== null &&
+									key < szCurrentIndex);
 							const isCurrent =
 								selfStopIndex !== null
 									? key === selfStopIndex
-									: hasPassedData
-										? !isPassed &&
-											(isFirst ||
-												stops[key - 1]?.passed ===
-													true)
-										: false;
+									: isSZ
+										? key === szCurrentIndex
+										: hasPassedData
+											? !isPassed &&
+												(isFirst ||
+													stops[key - 1]?.passed ===
+														true)
+											: false;
 							const busesHere = (
 								busesByStopIndex[key] || []
 							).filter((bus) => !bus.isSelf);
@@ -245,20 +267,18 @@ const RouteTab = ({
 								}}>
 								<span className="stop__track" aria-hidden="true">
 									<span className="stop__dot" />
+									{busesHere.length > 0 && (
+										<span className="stop__buses">
+											{busesHere.map((bus) => (
+												<span
+													key={bus.key}
+													className="stop__bus"
+													title={bus.label}
+												/>
+											))}
+										</span>
+									)}
 								</span>
-								{busesHere.length > 0 && (
-									<span
-										className="stop__buses"
-										aria-hidden="true">
-										{busesHere.map((bus) => (
-											<span
-												key={bus.key}
-												className="stop__bus"
-												title={bus.label}
-											/>
-										))}
-									</span>
-								)}
 								<h3>{stop.name}</h3>
 								{!isLPP && !isSZ && (
 									<p>{formatArrivalTime(stop?.departure)}</p>
