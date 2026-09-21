@@ -46,7 +46,10 @@ const RouteTab = ({
 	const isLPP = selectedVehicle?.isLPP;
 	const isSZ = selectedVehicle?.isSZ;
 
-	const stops = useMemo(() => selectedVehicle?.stops || [], [selectedVehicle?.stops]);
+	const stops = useMemo(
+		() => selectedVehicle?.stops || [],
+		[selectedVehicle?.stops],
+	);
 
 	// Najde vse busse, ki trenutno vozijo isto linijo (v isto smer), in jih
 	// pripne na najbližjo postajo na tej poti (za prikaz na dot-route timeline)
@@ -282,9 +285,7 @@ const RouteTab = ({
 									</span>
 									<h3>{stop.name}</h3>
 									{!isLPP && !isSZ && (
-										<p
-                                            style={{ marginRight: "10px" }}
-                                        >
+										<p style={{ marginRight: "10px" }}>
 											{formatArrivalTime(stop?.departure)}
 										</p>
 									)}
@@ -296,7 +297,7 @@ const RouteTab = ({
 												gap: "20px",
 												whiteSpace: "pre-line",
 												textAlign: "center",
-                                                marginRight: "10px",
+												marginRight: "10px",
 											}}>
 											{stop.arrivals?.[0] && (
 												<p>
@@ -319,9 +320,9 @@ const RouteTab = ({
 											style={{
 												display: "flex",
 												gap: "20px",
-                                                textAlign: "center",
-                                                whiteSpace: "pre-line",
-                                                marginRight: "10px",
+												textAlign: "center",
+												whiteSpace: "pre-line",
+												marginRight: "10px",
 											}}>
 											{stop.departure ? (
 												<p>

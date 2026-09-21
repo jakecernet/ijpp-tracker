@@ -45,8 +45,7 @@ import {
 } from "./map/interactions";
 import RouteTab from "./route.jsx";
 
-import userPNG from "../img/user.png";
-import locationPNG from "../img/location.png";
+const PROVIDER_PREFIXES = ["ijpp", "lpp", "sz"];
 
 const getMapStyle = () => {
 	if (typeof window === "undefined") return OSM_STYLE_LIGHT;
@@ -54,51 +53,6 @@ const getMapStyle = () => {
 		? OSM_STYLE_DARK
 		: OSM_STYLE_LIGHT;
 };
-
-function refreshMarker({ map, markersRef, key, coords, img, size, popup }) {
-	const markerState = markersRef.current[key];
-	if (!coords) {
-		markerState?.marker?.remove();
-		markersRef.current[key] = null;
-		return;
-	}
-
-	const lngLat = [coords[1], coords[0]];
-	if (markerState?.marker) {
-		if (
-			markerState.coords?.[0] === lngLat[0] &&
-			markerState.coords?.[1] === lngLat[1]
-		) {
-			return;
-		}
-		markerState.marker.setLngLat(lngLat);
-		markerState.coords = lngLat;
-		return;
-	}
-
-	const element = document.createElement("img");
-	element.src = img;
-	element.alt = popup || "";
-	element.decoding = "async";
-	element.style.width = `${size[0]}px`;
-	element.style.height = `${size[1]}px`;
-	element.style.transform = "translate(-50%, -100%)";
-
-	const marker = new maplibregl.Marker({ element, anchor: "bottom" })
-		.setLngLat(lngLat)
-		.addTo(map);
-
-	if (popup) {
-		marker.setPopup(
-			new maplibregl.Popup({ closeButton: false }).setHTML(
-				`<h4>${popup}</h4>`,
-			),
-		);
-		element.style.cursor = "pointer";
-	}
-
-	markersRef.current[key] = { marker, coords: lngLat };
-}
 
 const Map = React.memo(function Map({
 	gpsPositions,
@@ -117,7 +71,6 @@ const Map = React.memo(function Map({
 }) {
 	const mapRef = useRef(null);
 	const mapInstanceRef = useRef(null);
-	const markersRef = useRef({ user: null, active: null });
 	const handlersRef = useRef({
 		setActiveStation,
 		setSelectedVehicle,
@@ -375,13 +328,14 @@ const Map = React.memo(function Map({
 			filtered,
 			(pos) => pos?.gpsLocation,
 			(pos) => {
-				const icon = operatorToIcon[pos?.operator] || "bus-generic";
+				const operatorIcon = operatorToIcon[pos?.operator];
 				const isLpp =
 					pos?.operator
 						?.toLowerCase?.()
 						.includes("ljubljanski potniški promet") ||
 					pos?.lineNumber !== undefined ||
 					pos?.lineId !== undefined;
+				const icon = operatorIcon || "bus-generic";
 				return {
 					...pos,
 					gpsLocation: undefined,
@@ -464,6 +418,103 @@ const Map = React.memo(function Map({
 		);
 	}, [trainPositions, filterByRoute, selectedVehicle?.tripId]);
 
+	const dataRef = useRef(null);
+	dataRef.current = {
+		buses: busesGeoJSON,
+		busStops: busStopsGeoJSON,
+		trainPositions: trainPositionsGeoJSON,
+		trainStops: trainStopsGeoJSON,
+	};
+
+	const initMapLayers = useCallback(async (map) => {
+		await ensureIcons(map, ICON_SOURCES);
+
+		setupSourcesAndLayers(map, dataRef.current);
+
+		PROVIDER_PREFIXES.forEach((prefix) =>
+			setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
+		);
+
+		configureBusStopPopup({
+			map,
+			onSelectStop: (stop) => {
+				const payload = {
+					name: stop.name,
+					coordinates: stop.gpsLocation,
+					ref_id: stop.ref_id,
+					gtfs_id: stop.gtfs_id,
+					ijpp_id: stop.ijpp_id,
+					type: "bus-stop",
+				};
+				handlersRef.current.setActiveStation(payload);
+				localStorage.setItem("activeStation", JSON.stringify(payload));
+				window.location.hash = "/lines";
+			},
+		});
+
+		configureTrainStopPopup({
+			map,
+			onSelectStop: (stop) => {
+				const coordinates = Array.isArray(stop?.gpsLocation)
+					? stop.gpsLocation
+					: [stop?.lat, stop?.lon];
+				if (
+					!Array.isArray(coordinates) ||
+					!Number.isFinite(coordinates[0]) ||
+					!Number.isFinite(coordinates[1])
+				) {
+					return;
+				}
+				const payload = {
+					name: stop.name,
+					coordinates,
+					gpsLocation: coordinates,
+					stopId: stop.stopId ?? null,
+					lat: coordinates[0],
+					lon: coordinates[1],
+					type: "train-stop",
+				};
+				handlersRef.current.setActiveStation(payload);
+				localStorage.setItem("activeStation", JSON.stringify(payload));
+				window.location.hash = "/lines";
+			},
+		});
+
+		configureTrainPopup({
+			map,
+			onSelectVehicle: (vehicle) => {
+				handlersRef.current.setSelectedVehicle(vehicle);
+				// Enable route-only SZ view and hide buses & stations
+				setFilterByRoute(true);
+				setRouteVisibilityOverride({
+					buses: false,
+					busStops: false,
+					trainPositions: true,
+					trainStops: false,
+				});
+			},
+		});
+
+		configureBusPopup({
+			map,
+			onSelectVehicle: (vehicle) => {
+				handlersRef.current.setSelectedVehicle(vehicle);
+				// Enable route-only bus view and hide stations & SZ markers
+				setFilterByRoute(true);
+				setRouteVisibilityOverride({
+					buses: true,
+					busStops: false,
+					trainPositions: false,
+					trainStops: false,
+				});
+			},
+		});
+
+		PROVIDER_PREFIXES.forEach((prefix) =>
+			configureTripStopsPopup(map, `${prefix}-trip-stops-points`),
+		);
+	}, []);
+
 	useEffect(() => {
 		if (mapInstanceRef.current) return;
 
@@ -501,113 +552,25 @@ const Map = React.memo(function Map({
 			);
 
 			map.on("load", async () => {
-				await ensureIcons(map, ICON_SOURCES);
-
-				setupSourcesAndLayers(map, {
-					buses: busesGeoJSON,
-					busStops: busStopsGeoJSON,
-					trainPositions: trainPositionsGeoJSON,
-					trainStops: trainStopsGeoJSON,
-				});
-
-				// Setup trip overlays for all providers
-				["ijpp", "lpp", "sz"].forEach((prefix) =>
-					setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
-				);
-
-				// Configure all popups
-				configureBusStopPopup({
-					map,
-					onSelectStop: (stop) => {
-						const payload = {
-							name: stop.name,
-							coordinates: stop.gpsLocation,
-							ref_id: stop.ref_id,
-							gtfs_id: stop.gtfs_id,
-							ijpp_id: stop.ijpp_id,
-							type: "bus-stop",
-						};
-						handlersRef.current.setActiveStation(payload);
-						localStorage.setItem(
-							"activeStation",
-							JSON.stringify(payload),
-						);
-						window.location.hash = "/lines";
-					},
-				});
-
-				configureTrainStopPopup({
-					map,
-					onSelectStop: (stop) => {
-						const coordinates = Array.isArray(stop?.gpsLocation)
-							? stop.gpsLocation
-							: [stop?.lat, stop?.lon];
-						if (
-							!Array.isArray(coordinates) ||
-							!Number.isFinite(coordinates[0]) ||
-							!Number.isFinite(coordinates[1])
-						) {
-							return;
-						}
-						const payload = {
-							name: stop.name,
-							coordinates,
-							gpsLocation: coordinates,
-							stopId: stop.stopId ?? null,
-							lat: coordinates[0],
-							lon: coordinates[1],
-							type: "train-stop",
-						};
-						handlersRef.current.setActiveStation(payload);
-						localStorage.setItem(
-							"activeStation",
-							JSON.stringify(payload),
-						);
-						window.location.hash = "/lines";
-					},
-				});
-
-				configureTrainPopup({
-					map,
-					onSelectVehicle: (vehicle) => {
-						handlersRef.current.setSelectedVehicle(vehicle);
-						// Enable route-only SZ view and hide buses & stations
-						setFilterByRoute(true);
-						setRouteVisibilityOverride({
-							buses: false,
-							busStops: false,
-							trainPositions: true,
-							trainStops: false,
-						});
-					},
-				});
-
-				configureBusPopup({
-					map,
-					onSelectVehicle: (vehicle) => {
-						handlersRef.current.setSelectedVehicle(vehicle);
-						// Enable route-only bus view and hide stations & SZ markers
-						setFilterByRoute(true);
-						setRouteVisibilityOverride({
-							buses: true,
-							busStops: false,
-							trainPositions: false,
-							trainStops: false,
-						});
-					},
-				});
-
-				// Configure trip stops popups for all providers
-				["ijpp", "lpp", "sz"].forEach((prefix) =>
-					configureTripStopsPopup(map, `${prefix}-trip-stops-points`),
-				);
-
+				await initMapLayers(map);
 				setIsMapLoaded(true);
 			});
-
-			// Listen for map theme changes
-			const handleMapThemeChange = () => {
-				map.setStyle(getMapStyle());
+            
+			const handleMapThemeChange = async () => {
+				if (!mapInstanceRef.current) return;
+				setIsMapLoaded(false);
+				try {
+					await new Promise((resolve) => {
+						map.once("style.load", resolve);
+						map.setStyle(getMapStyle());
+					});
+					if (!mapInstanceRef.current) return; // unmounted mid-restyle
+					await initMapLayers(map);
+					if (!mapInstanceRef.current) return;
+					setIsMapLoaded(true);
+				} catch (err) {
+					console.error("Failed to apply map theme:", err);
+				}
 			};
 			window.addEventListener("mapThemeChange", handleMapThemeChange);
 
@@ -626,12 +589,12 @@ const Map = React.memo(function Map({
 					'<div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f5f5f5;"><div style="text-align: center;"><p style="margin: 0; color: #333; font-size: 16px;">Zemljevid se ne more naložiti</p><p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Prosim, preverite grafični gonilnik ali poskusite osvežiti stran.</p></div></div>';
 			}
 		}
-	}, []);
+	}, [initMapLayers]);
 
 	// Update GeoJSON sources
 	useEffect(() => {
 		const map = mapInstanceRef.current;
-		if (!map) return;
+		if (!map || !isMapLoaded) return;
 		updateSourceData(map, "buses", busesGeoJSON);
 		updateSourceData(map, "busStops", busStopsGeoJSON);
 		updateSourceData(map, "trainPositions", trainPositionsGeoJSON);
@@ -641,12 +604,13 @@ const Map = React.memo(function Map({
 		busStopsGeoJSON,
 		trainPositionsGeoJSON,
 		trainStopsGeoJSON,
+		isMapLoaded,
 	]);
 
 	// Apply layer visibility (use override when route is selected)
 	useEffect(() => {
 		const map = mapInstanceRef.current;
-		if (!map) return;
+		if (!map || !isMapLoaded) return;
 		const effectiveVisibility = routeVisibilityOverride || visibility;
 		setPrefixVisible(map, "buses", effectiveVisibility.buses);
 		setPrefixVisible(map, "busStops", effectiveVisibility.busStops);
@@ -664,7 +628,7 @@ const Map = React.memo(function Map({
 		if (!map || !isMapLoaded) return;
 
 		// Clear all overlays first
-		["ijpp", "lpp", "sz"].forEach((p) => clearTripOverlay(map, p));
+		PROVIDER_PREFIXES.forEach((p) => clearTripOverlay(map, p));
 		if (!selectedVehicle) return;
 
 		const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
@@ -753,37 +717,11 @@ const Map = React.memo(function Map({
 		}
 	}, [selectedVehicle, isMapLoaded]);
 
-	// Update markers
-	useEffect(() => {
-		const map = mapInstanceRef.current;
-		if (!map) return;
-
-		refreshMarker({
-			map,
-			markersRef,
-			key: "user",
-			coords: userLocation,
-			img: userPNG,
-			size: [22, 22],
-			popup: "Vaša lokacija",
-		});
-
-		refreshMarker({
-			map,
-			markersRef,
-			key: "active",
-			coords: activeStation?.coordinates,
-			img: locationPNG,
-			size: [22, 22],
-			popup: "Aktivna postaja",
-		});
-	}, [userLocation, activeStation]);
-
 	//zbriše črto in postaje na poti iz zemljevida
 	const clearPathOverlays = useCallback(() => {
 		const map = mapInstanceRef.current;
 		if (map) {
-			["ijpp", "lpp", "sz"].forEach((prefix) =>
+			PROVIDER_PREFIXES.forEach((prefix) =>
 				clearTripOverlay(map, prefix),
 			);
 		}

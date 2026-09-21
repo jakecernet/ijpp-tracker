@@ -339,7 +339,6 @@ const fetchLPPPositions = async () => {
 			CACHE_TTL.positions,
 			() => fetchJson(lppLocationsLink),
 		);
-
 		return data.data.map((bus) => ({
 			gpsLocation: [bus.latitude, bus.longitude],
 			operator: "Ljubljanski potniški promet d.o.o.",
@@ -351,6 +350,7 @@ const fetchLPPPositions = async () => {
 			busName: bus.bus_name,
 			ignition: bus.ignition,
 			tripId: bus.trip_id,
+            heading: bus.direction, 
 		}));
 	} catch (error) {
 		console.error("Error fetching lpp positions:", error);

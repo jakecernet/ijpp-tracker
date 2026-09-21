@@ -84,7 +84,7 @@ const getRouteDisplayName = (item) => {
 };
 
 const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
-	<div className="route-item" onClick={onClick}>
+	<div className="route-item" onClick={() => onClick(item)}>
 		<div className="circle" style={{ background: bgColorMap(item) }}>
 			{item.lineNumber ??
 				item.routeName ??
@@ -96,7 +96,7 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
 		<h3>{getRouteDisplayName(item)}</h3>
 		<button
 			className={`like-btn ${isLiked ? "liked" : ""}`}
-			onClick={onToggleLike}
+			onClick={(e) => onToggleLike(item, e)}
 			aria-label={
 				isLiked ? "Odstrani iz priljubljenih" : "Dodaj med priljubljene"
 			}>
@@ -199,10 +199,10 @@ const LinesTab = ({
 
 	// Get unique station ID for liking
 	const getStationId = useCallback((station) => {
-		return station?.ref_id || station?.gtfs_id || station?.ijpp_id;
+		return station?.ref_id ?? station?.gtfs_id ?? station?.ijpp_id;
 	}, []);
 
-	const isCurrentStationLiked = useCallback(() => {
+	const isStationLiked = useMemo(() => {
 		if (!activeStation) return false;
 		const id = getStationId(activeStation);
 		return likedStations.some((s) => s.id === id);
@@ -281,11 +281,11 @@ const LinesTab = ({
 	// Get unique route ID for liking
 	const getRouteId = useCallback((route) => {
 		return (
-			route?.lineName ||
-			route?.route_name ||
-			route?.lineNumber ||
-			route?.routeName ||
-			route?.tripShort ||
+			route?.lineName ??
+			route?.route_name ??
+			route?.lineNumber ??
+			route?.routeName ??
+			route?.tripShort ??
 			route?.tripId
 		);
 	}, []);
@@ -464,6 +464,29 @@ const LinesTab = ({
 		);
 	}, [likedRoutes, debouncedSearchTerm]);
 
+	// Liked routes matched against live GPS data, precomputed once instead of
+	// calling allActiveRoutes.find() inside the render loop for every item.
+	const resolvedLikedRoutes = useMemo(() => {
+		return filteredLikedRoutes.map((liked) => {
+			const activeRoute = allActiveRoutes.find(
+				(r) => getRouteId(r) === liked.id,
+			);
+			return (
+				activeRoute || {
+					lineName: liked.name,
+					lineNumber: liked.lineNumber,
+					operator: liked.operator,
+					headsign: liked.headsign,
+					displayName: liked.displayName || liked.name,
+					tripId: liked.tripId,
+					tripShort: liked.tripShort,
+					lineId: liked.lineId,
+					routeId: liked.routeId,
+				}
+			);
+		});
+	}, [filteredLikedRoutes, allActiveRoutes, getRouteId]);
+
 	const handleRouteClick = useCallback(
 		async (item, type) => {
 			// Don't try to fetch if there's no valid ID
@@ -499,16 +522,16 @@ const LinesTab = ({
 			<div className="lines-header">
 				<h2>Linije {"(" + activeStation?.name + ")"}</h2>
 				<button
-					className={`like-btn ${isCurrentStationLiked() ? "liked" : ""}`}
+					className={`like-btn ${isStationLiked ? "liked" : ""}`}
 					onClick={toggleLikeStation}
 					aria-label={
-						isCurrentStationLiked()
+						isStationLiked
 							? "Odstrani iz priljubljenih"
 							: "Dodaj med priljubljene"
 					}>
 					<Heart
 						size={20}
-						fill={isCurrentStationLiked() ? "currentColor" : "none"}
+						fill={isStationLiked ? "currentColor" : "none"}
 					/>
 				</button>
 			</div>
@@ -560,7 +583,7 @@ const LinesTab = ({
 						{!arrivalsLoading &&
 							allArrivals.map((arrival, index) => (
 								<ArrivalItem
-									key={`arrival-${index}`}
+									key={`${arrival.type}-${arrival.tripId ?? arrival.routeId ?? index}`}
 									arrival={arrival}
 									onRouteClick={handleRouteClick}
 								/>
@@ -581,13 +604,11 @@ const LinesTab = ({
 						<ul className="route-list">
 							{filteredAllRoutes.map((route, index) => (
 								<RouteItem
-									key={`route-${index}`}
+									key={getRouteId(route) ?? index}
 									item={route}
 									isLiked={isRouteLiked(route)}
-									onToggleLike={(e) =>
-										toggleLikeRoute(route, e)
-									}
-									onClick={() => handleRouteClick(route)}
+									onToggleLike={toggleLikeRoute}
+									onClick={handleRouteClick}
 								/>
 							))}
 						</ul>
@@ -595,43 +616,22 @@ const LinesTab = ({
 				)}
 				{page === "liked" && (
 					<>
-						{filteredLikedRoutes.length === 0 && (
+						{resolvedLikedRoutes.length === 0 && (
 							<p className="empty-message">
 								Ni priljubljenih linij. Kliknite na ❤️ za
 								dodajanje.
 							</p>
 						)}
 						<ul className="route-list">
-							{filteredLikedRoutes.map((liked, index) => {
-								const activeRoute = allActiveRoutes.find(
-									(r) => getRouteId(r) === liked.id,
-								);
-								const routeData = activeRoute || {
-									lineName: liked.name,
-									lineNumber: liked.lineNumber,
-									operator: liked.operator,
-									headsign: liked.headsign,
-									displayName:
-										liked.displayName || liked.name,
-									tripId: liked.tripId,
-									tripShort: liked.tripShort,
-									lineId: liked.lineId,
-									routeId: liked.routeId,
-								};
-								return (
-									<RouteItem
-										key={`liked-${index}`}
-										item={routeData}
-										isLiked={true}
-										onToggleLike={(e) =>
-											toggleLikeRoute(routeData, e)
-										}
-										onClick={() =>
-											handleRouteClick(routeData)
-										}
-									/>
-								);
-							})}
+							{resolvedLikedRoutes.map((routeData, index) => (
+								<RouteItem
+									key={getRouteId(routeData) ?? index}
+									item={routeData}
+									isLiked={true}
+									onToggleLike={toggleLikeRoute}
+									onClick={handleRouteClick}
+								/>
+							))}
 						</ul>
 					</>
 				)}

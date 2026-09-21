@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, memo, useEffect, useRef } from "react";
 import { Heart, BusFrontIcon, TrainFrontIcon } from "lucide-react";
-import { VariableSizeList as List } from "react-window";
+import { List } from "react-window";
 
 const LIKED_STATIONS_KEY = "likedStations";
 const STATION_SEARCH_KEY = "stationSearchTerm";
@@ -71,6 +71,40 @@ const StationItem = memo(
 			</button>
 		</div>
 	),
+);
+
+const StationRow = memo(
+	({ index, style, stations, isStationLiked, onToggleLike, onSelect }) => {
+		const station = stations[index];
+		return (
+			<div style={style}>
+				<StationItem
+					station={station}
+					isLiked={isStationLiked(station)}
+					onToggleLike={(e) => onToggleLike(station, e)}
+					onSelect={() => onSelect(station)}
+					showDistance={true}
+				/>
+			</div>
+		);
+	},
+);
+
+const LikedStationRow = memo(
+	({ index, style, likedStations, onToggleLike, onSelect }) => {
+		const liked = likedStations[index];
+		return (
+			<div style={style}>
+				<StationItem
+					station={liked.data}
+					isLiked={true}
+					onToggleLike={(e) => onToggleLike(liked.data, e)}
+					onSelect={() => onSelect(liked.data)}
+					showDistance={true}
+				/>
+			</div>
+		);
+	},
 );
 
 const loadLikedItems = (key) => {
@@ -164,9 +198,9 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 	// Get unique station ID for liking
 	const getStationId = useCallback((station) => {
 		return (
-			station?.ref_id ||
-			station?.gtfs_id ||
-			station?.ijpp_id ||
+			station?.ref_id ??
+			station?.gtfs_id ??
+			station?.ijpp_id ??
 			station?.stopId
 		);
 	}, []);
@@ -242,12 +276,6 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 	const listContainerRef = useRef(null);
 	const [listHeight, setListHeight] = useState(400);
 
-	const nearMeListRef = useRef(null);
-	const allListRef = useRef(null);
-	const likedListRef = useRef(null);
-
-	const itemHeightsCache = useRef({});
-
 	useEffect(() => {
 		const container = listContainerRef.current;
 		if (!container) return;
@@ -296,58 +324,27 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 		};
 	}, []);
 
-	// Reset list cache when data changes
-	useEffect(() => {
-		itemHeightsCache.current = {};
-		nearMeListRef.current?.resetAfterIndex(0);
-	}, [nearMeStations]);
-
-	useEffect(() => {
-		itemHeightsCache.current = {};
-		allListRef.current?.resetAfterIndex(0);
-	}, [filteredAllStations]);
-
-	useEffect(() => {
-		itemHeightsCache.current = {};
-		likedListRef.current?.resetAfterIndex(0);
-	}, [filteredLikedStations]);
-
-	// Estimate item height based on content
-	const getItemHeight = useCallback((station, listKey, index) => {
-		const cacheKey = `${listKey}-${index}`;
-		if (itemHeightsCache.current[cacheKey]) {
-			return itemHeightsCache.current[cacheKey];
-		}
-		// Base height: padding (20px) + icon/text row (~30px) + border (1px)
+	const getItemHeight = useCallback((station) => {
 		let height = 52;
-		// Add height for routes if present
 		const routeCount = station?.routes_on_stop?.length || 0;
 		if (routeCount > 0) {
 			height += 26; // Route badges row
 		}
-		itemHeightsCache.current[cacheKey] = height;
 		return height;
 	}, []);
 
 	const getNearMeItemSize = useCallback(
-		(index) => {
-			return getItemHeight(nearMeStations[index], "nearMe", index);
-		},
+		(index) => getItemHeight(nearMeStations[index]),
 		[nearMeStations, getItemHeight],
 	);
 
 	const getAllItemSize = useCallback(
-		(index) => {
-			return getItemHeight(filteredAllStations[index], "all", index);
-		},
+		(index) => getItemHeight(filteredAllStations[index]),
 		[filteredAllStations, getItemHeight],
 	);
 
 	const getLikedItemSize = useCallback(
-		(index) => {
-			const liked = filteredLikedStations[index];
-			return getItemHeight(liked?.data, "liked", index);
-		},
+		(index) => getItemHeight(filteredLikedStations[index]?.data),
 		[filteredLikedStations, getItemHeight],
 	);
 
@@ -393,38 +390,18 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 						)}
 						{nearMeStations.length > 0 && (
 							<List
-								ref={nearMeListRef}
-								height={listHeight}
-								itemCount={nearMeStations.length}
-								itemSize={getNearMeItemSize}
-								estimatedItemSize={50}
-								width="100%"
-								overscanCount={5}>
-								{({ index, style }) => {
-									const station = nearMeStations[index];
-									return (
-										<div style={style}>
-											<StationItem
-												key={`near-${index}`}
-												station={station}
-												isLiked={isStationLiked(
-													station,
-												)}
-												onToggleLike={(e) =>
-													toggleLikeStation(
-														station,
-														e,
-													)
-												}
-												onSelect={() =>
-													handleStationSelect(station)
-												}
-												showDistance={true}
-											/>
-										</div>
-									);
+								rowCount={nearMeStations.length}
+								rowHeight={getNearMeItemSize}
+								rowComponent={StationRow}
+								rowProps={{
+									stations: nearMeStations,
+									isStationLiked,
+									onToggleLike: toggleLikeStation,
+									onSelect: handleStationSelect,
 								}}
-							</List>
+								overscanCount={5}
+								style={{ height: listHeight, width: "100%" }}
+							/>
 						)}
 					</>
 				)}
@@ -442,38 +419,18 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 							)}
 						{filteredAllStations.length > 0 && (
 							<List
-								ref={allListRef}
-								height={listHeight}
-								itemCount={filteredAllStations.length}
-								itemSize={getAllItemSize}
-								estimatedItemSize={50}
-								width="100%"
-								overscanCount={5}>
-								{({ index, style }) => {
-									const station = filteredAllStations[index];
-									return (
-										<div style={style}>
-											<StationItem
-												key={`all-${index}`}
-												station={station}
-												isLiked={isStationLiked(
-													station,
-												)}
-												onToggleLike={(e) =>
-													toggleLikeStation(
-														station,
-														e,
-													)
-												}
-												onSelect={() =>
-													handleStationSelect(station)
-												}
-												showDistance={true}
-											/>
-										</div>
-									);
+								rowCount={filteredAllStations.length}
+								rowHeight={getAllItemSize}
+								rowComponent={StationRow}
+								rowProps={{
+									stations: filteredAllStations,
+									isStationLiked,
+									onToggleLike: toggleLikeStation,
+									onSelect: handleStationSelect,
 								}}
-							</List>
+								overscanCount={5}
+								style={{ height: listHeight, width: "100%" }}
+							/>
 						)}
 					</>
 				)}
@@ -488,38 +445,17 @@ const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
 						)}
 						{filteredLikedStations.length > 0 && (
 							<List
-								ref={likedListRef}
-								height={listHeight}
-								itemCount={filteredLikedStations.length}
-								itemSize={getLikedItemSize}
-								estimatedItemSize={50}
-								width="100%"
-								overscanCount={5}>
-								{({ index, style }) => {
-									const liked = filteredLikedStations[index];
-									return (
-										<div style={style}>
-											<StationItem
-												key={`liked-${index}`}
-												station={liked.data}
-												isLiked={true}
-												onToggleLike={(e) =>
-													toggleLikeStation(
-														liked.data,
-														e,
-													)
-												}
-												onSelect={() =>
-													handleStationSelect(
-														liked.data,
-													)
-												}
-												showDistance={true}
-											/>
-										</div>
-									);
+								rowCount={filteredLikedStations.length}
+								rowHeight={getLikedItemSize}
+								rowComponent={LikedStationRow}
+								rowProps={{
+									likedStations: filteredLikedStations,
+									onToggleLike: toggleLikeStation,
+									onSelect: handleStationSelect,
 								}}
-							</List>
+								overscanCount={5}
+								style={{ height: listHeight, width: "100%" }}
+							/>
 						)}
 					</>
 				)}
