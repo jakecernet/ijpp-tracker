@@ -84,23 +84,18 @@ const inFlight = new Map();
 
 /**
  * Helper za fetchanje s cachingom
- * @returns
  */
 async function cachedFetch(key, ttl, fetcher) {
 	const cached = cache.get(key);
 	if (cached && Date.now() - cached.time < ttl) return cached.data;
-
 	if (inFlight.has(key)) return inFlight.get(key);
 
-	const promise = (async () => {
-		try {
-			const data = await fetcher();
+	const promise = fetcher()
+		.then((data) => {
 			cache.set(key, { data, time: Date.now() });
 			return data;
-		} finally {
-			inFlight.delete(key);
-		}
-	})();
+		})
+		.finally(() => inFlight.delete(key));
 
 	inFlight.set(key, promise);
 	return promise;
@@ -210,36 +205,33 @@ export function formatPrecomputedArrival(arrival) {
  * @param {Array} points - Tabelo točk
  */
 function decodePolylineOnce(str, precision) {
-	const factor = Math.pow(10, precision);
+	const factor = 10 ** precision;
 	let index = 0;
 	let lat = 0;
 	let lng = 0;
-	const pts = [];
-	while (index < str.length) {
+	const points = [];
+
+	const read = () => {
 		let result = 0;
 		let shift = 0;
 		let byte;
+
 		do {
 			byte = str.charCodeAt(index++) - 63;
 			result |= (byte & 0x1f) << shift;
 			shift += 5;
 		} while (byte >= 0x20);
-		const dlat = result & 1 ? ~(result >> 1) : result >> 1;
-		lat += dlat;
 
-		result = 0;
-		shift = 0;
-		do {
-			byte = str.charCodeAt(index++) - 63;
-			result |= (byte & 0x1f) << shift;
-			shift += 5;
-		} while (byte >= 0x20);
-		const dlng = result & 1 ? ~(result >> 1) : result >> 1;
-		lng += dlng;
+		return result & 1 ? ~(result >> 1) : result >> 1;
+	};
 
-		pts.push([lng / factor, lat / factor]);
+	while (index < str.length) {
+		lat += read();
+		lng += read();
+		points.push([lng / factor, lat / factor]);
 	}
-	return pts;
+
+	return points;
 }
 
 /**
