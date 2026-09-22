@@ -46,13 +46,16 @@ import {
 import RouteTab from "./route.jsx";
 
 const PROVIDER_PREFIXES = ["ijpp", "lpp", "sz"];
+const ROUTE_DRAWER_PEEK_HEIGHT = 140;
 
-const getMapStyle = () => {
-	if (typeof window === "undefined") return OSM_STYLE_LIGHT;
-	return localStorage.getItem("mapTheme") === "dark"
-		? OSM_STYLE_DARK
-		: OSM_STYLE_LIGHT;
-};
+const isValidCoord = (coord) => Array.isArray(coord) && coord.length >= 2;
+
+const getMapStyle = () =>
+	typeof window === "undefined"
+		? OSM_STYLE_LIGHT
+		: localStorage.getItem("mapTheme") === "dark"
+			? OSM_STYLE_DARK
+			: OSM_STYLE_LIGHT;
 
 const Map = React.memo(function Map({
 	gpsPositions,
@@ -213,11 +216,10 @@ const Map = React.memo(function Map({
 		return () => ro.disconnect();
 	}, []);
 
-	const routeDrawerPeekHeight = 140;
-	const routeDrawerPeekTranslateY = useMemo(() => {
-		if (!routeDrawerHeight) return 0;
-		return Math.max(0, routeDrawerHeight - routeDrawerPeekHeight);
-	}, [routeDrawerHeight]);
+	const routeDrawerPeekTranslateY = Math.max(
+		0,
+		routeDrawerHeight - ROUTE_DRAWER_PEEK_HEIGHT,
+	);
 
 	// Apply snap when opening/closing or when height changes.
 	useEffect(() => {
@@ -555,7 +557,7 @@ const Map = React.memo(function Map({
 				await initMapLayers(map);
 				setIsMapLoaded(true);
 			});
-            
+
 			const handleMapThemeChange = async () => {
 				if (!mapInstanceRef.current) return;
 				setIsMapLoaded(false);
@@ -595,10 +597,12 @@ const Map = React.memo(function Map({
 	useEffect(() => {
 		const map = mapInstanceRef.current;
 		if (!map || !isMapLoaded) return;
-		updateSourceData(map, "buses", busesGeoJSON);
-		updateSourceData(map, "busStops", busStopsGeoJSON);
-		updateSourceData(map, "trainPositions", trainPositionsGeoJSON);
-		updateSourceData(map, "trainStops", trainStopsGeoJSON);
+		[
+			["buses", busesGeoJSON],
+			["busStops", busStopsGeoJSON],
+			["trainPositions", trainPositionsGeoJSON],
+			["trainStops", trainStopsGeoJSON],
+		].forEach(([source, data]) => updateSourceData(map, source, data));
 	}, [
 		busesGeoJSON,
 		busStopsGeoJSON,
@@ -612,13 +616,13 @@ const Map = React.memo(function Map({
 		const map = mapInstanceRef.current;
 		if (!map || !isMapLoaded) return;
 		const effectiveVisibility = routeVisibilityOverride || visibility;
-		setPrefixVisible(map, "buses", effectiveVisibility.buses);
-		setPrefixVisible(map, "busStops", effectiveVisibility.busStops);
-		setPrefixVisible(map, "trainStops", effectiveVisibility.trainStops);
-		setPrefixVisible(
-			map,
-			"trainPositions",
-			effectiveVisibility.trainPositions,
+		[
+			["buses", effectiveVisibility.buses],
+			["busStops", effectiveVisibility.busStops],
+			["trainStops", effectiveVisibility.trainStops],
+			["trainPositions", effectiveVisibility.trainPositions],
+		].forEach(([prefix, visible]) =>
+			setPrefixVisible(map, prefix, visible),
 		);
 	}, [visibility, routeVisibilityOverride, isMapLoaded]);
 
@@ -633,7 +637,6 @@ const Map = React.memo(function Map({
 
 		const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
 		const geo = selectedVehicle.geometry || [];
-		const validCoord = (c) => Array.isArray(c) && c.length >= 2;
 
 		// Determine provider and collect coords/stops for overlay + fitBounds
 		const hasLppPoints = geo[0]?.points !== undefined;
@@ -647,13 +650,13 @@ const Map = React.memo(function Map({
 		if (isLpp) {
 			prefix = "lpp";
 			lineCoords = hasLppPoints
-				? geo[0].points.filter(validCoord).map((c) => [c[1], c[0]])
+				? geo[0].points.filter(isValidCoord).map((c) => [c[1], c[0]])
 				: [];
 			stopsFeatures = stopsToFeatures(selectedVehicle.stops, "lpp");
 			overlayBrand = "lpp";
 		} else if (isSz) {
 			prefix = "sz";
-			lineCoords = geo.filter(validCoord);
+			lineCoords = geo.filter(isValidCoord);
 			stopsFeatures = stopsToFeatures(
 				selectedVehicle.stops,
 				"sz",
@@ -663,7 +666,7 @@ const Map = React.memo(function Map({
 			overlayBrand = "sz";
 		} else if (selectedVehicle.tripId !== undefined) {
 			prefix = "ijpp";
-			lineCoords = geo.filter(validCoord);
+			lineCoords = geo.filter(isValidCoord);
 			stopsFeatures = stopsToFeatures(selectedVehicle.stops, brand);
 			overlayBrand = brand;
 		} else {
@@ -707,7 +710,7 @@ const Map = React.memo(function Map({
 					padding: {
 						top: 60,
 						right: 60,
-						bottom: routeDrawerPeekHeight + 60,
+						bottom: ROUTE_DRAWER_PEEK_HEIGHT + 60,
 						left: 60,
 					},
 					maxZoom: 15,
