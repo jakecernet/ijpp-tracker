@@ -106,12 +106,12 @@ const RouteTab = ({
 
 			if (!result[bestIndex]) result[bestIndex] = [];
 			result[bestIndex].push({
-				key: bus.tripId || bus.vehicleId || bus.busName || idx,
+				key: bus.tripId || bus.vehicleId || bus.registrska || idx,
 				isSelf:
 					!!selectedVehicle?.tripId &&
 					bus.tripId === selectedVehicle.tripId,
 				label:
-					bus.busName || bus.lineDestination || bus.lineName || "Bus",
+					bus.registrska || bus.lineDestination || bus.lineName || "Bus",
 			});
 		});
 

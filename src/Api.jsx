@@ -33,7 +33,6 @@ function buildSzLocationsLink() {
 
 /**
  * Univerzalni objekt izbrane rute
- * @type {Object}
  */
 let selectedRoute = {
 	tripId: "",
@@ -329,7 +328,7 @@ const fetchSzStops = async () => {
 };
 
 /**
- * Fetcha LPP bus pozicije
+ * Fetcha LPP buse
  * @returns Tabela z LPP pozicijami
  */
 const fetchLPPPositions = async () => {
@@ -347,10 +346,10 @@ const fetchLPPPositions = async () => {
 			lineName: bus.line_name,
 			lineDestination: bus.line_destination,
 			speed: bus.speed,
-			busName: bus.bus_name,
+			registrska: bus.bus_name,
 			ignition: bus.ignition,
 			tripId: bus.trip_id,
-            heading: bus.direction, 
+			heading: bus.direction,
 		}));
 	} catch (error) {
 		console.error("Error fetching lpp positions:", error);
@@ -358,7 +357,7 @@ const fetchLPPPositions = async () => {
 };
 
 /**
- * Fetcha IJPP podatke o vozilih
+ * Fetcha IJPP buse
  * @returns Tabelo z IJPP pozicijami in routami ('stops' lastnost)
  */
 const fetchIJPPPositions = async () => {
@@ -383,13 +382,13 @@ const fetchIJPPPositions = async () => {
 					)
 					.map((vehicle) => ({
 						gpsLocation: [vehicle?.lat || 0, vehicle?.lon || 0],
-						heading: vehicle?.heading || 0,
 						operator: vehicle?.vehicle?.operator_name || "/",
 						lineName: vehicle?.trip_headsign,
 						tripId: vehicle?.trip_id,
 						vehicleId: vehicle?.vehicle?.id,
 						stop: vehicle?.stop?.name ?? "/",
 						stopStatus: vehicle?.stop_status,
+						heading: vehicle?.heading || 0,
 					}))
 			: [];
 	} catch (error) {
@@ -881,7 +880,7 @@ const fetchIjppArrivals = async (ijppId) => {
 };
 
 /**
- * Fetcha naslednjih 100 prihodov za izbrano železniško postajo
+ * Fetcha prihode za izbrano železniško postajo
  * @returns Tabelo prihodov
  */
 const fetchSzArrivals = async (stationCode) => {
@@ -945,7 +944,7 @@ const fetchSzArrivals = async (stationCode) => {
 					departureDelay,
 					etaMinutes: etaData.etaMinutes,
 					arrivalTime: etaData.arrivalTime,
-					operatorName: "Slovenske železnice, d.o.o.",
+					operatorName: "Slovenske železnice d.o.o.",
 				};
 			});
 	} catch (error) {

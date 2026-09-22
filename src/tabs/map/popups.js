@@ -92,10 +92,10 @@ export async function renderLppPopup(properties) {
 		.map((value) => escapeHTML(String(value)))
 		.join(" | ");
 	const isUrban =
-		properties.busName?.includes("U1") ||
-		properties.busName?.includes("U2");
+		properties.registrska?.includes("U1") ||
+		properties.registrska?.includes("U2");
 
-	const busNumber = getLppBusNumber(properties.busName);
+	const busNumber = getLppBusNumber(properties.registrska);
 	const info = await fetchLppBusInfo(busNumber);
 
 	const imageHTML = imageWrapper(
@@ -107,7 +107,7 @@ export async function renderLppPopup(properties) {
 
 	const rows =
 		createRow("Prevoznik", "Ljubljanski potniški promet") +
-		createRow("Registrska", properties.busName) +
+		createRow("Registrska", properties.registrska) +
 		(isUrban
 			? createModelRow("Turistični vlakec Urban", info?.hasRamp)
 			: createModelRow(info?.model, info?.hasRamp)) +
