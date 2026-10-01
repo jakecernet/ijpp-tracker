@@ -6,7 +6,11 @@ import { useElementHeight } from "../hooks/useElementHeight";
 import { useLikedList } from "../hooks/useLikedList";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { haversineMeters } from "../utils/geo";
-import { LIKED_STATIONS_KEY, getStationId } from "../utils/likes";
+import {
+	LIKED_STATIONS_KEY,
+	getStationId,
+	getStationKind,
+} from "../utils/likes";
 
 const STATION_SEARCH_KEY = "stationSearchTerm";
 const DEFAULT_RADIUS = { busRadius: 5, szRadius: 20 }; // km
@@ -223,7 +227,7 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 				.map((liked) =>
 					toEntry(
 						liked.data,
-						liked.data?.type === "sz" ? "sz" : "bus",
+						getStationKind(liked.data),
 						userLocation,
 					),
 				),
@@ -236,13 +240,13 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 	);
 
 	const toggleLike = useCallback(
-		({ station }, event) => {
+		({ station, kind }, event) => {
 			event?.stopPropagation();
 			const id = getStationId(station);
 			if (id == null) return; // brez ID-ja postaje ni mogoče ločiti od drugih
 			toggleLikedStation(id, () => ({
 				name: station.name,
-				data: station,
+				data: { ...station, type: kind },
 			}));
 		},
 		[toggleLikedStation],
