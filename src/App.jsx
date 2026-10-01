@@ -1,53 +1,65 @@
 import {
-	useState,
-	useEffect,
-	lazy,
 	Suspense,
+	lazy,
 	useCallback,
 	useDeferredValue,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
 	useRef,
+	useState,
 } from "react";
 import {
 	HashRouter as Router,
+	Navigate,
 	NavLink,
-	Routes,
 	Route,
+	Routes,
 	useLocation,
+	useNavigate,
 } from "react-router-dom";
-import { Map, Route as RouteIcon, Settings2, TramFront } from "lucide-react";
+import {
+	Map as MapIcon,
+	Route as RouteIcon,
+	Settings2,
+	TramFront,
+} from "lucide-react";
 import "./App.css";
 
 import {
+	detectVehicleType,
 	fetchAllBusStops,
-	fetchLPPPositions,
 	fetchIJPPPositions,
-	fetchTrainPositions,
-	fetchLppArrivals,
+	fetchIJPPTrip,
 	fetchIjppArrivals,
+	fetchLPPPositions,
+	fetchLppArrivals,
 	fetchLppRoute,
+	fetchSzArrivals,
 	fetchSzStops,
 	fetchSzTrip,
-	fetchSzArrivals,
-	fetchIJPPTrip,
-	getInterpolatedPosition,
-} from "./Api.jsx";
+	fetchTrainPositions,
+} from "./Api";
 
-const MapTab = lazy(() => import("./tabs/map"));
-const StationsTab = lazy(() => import("./tabs/stations"));
-const LinesTab = lazy(() => import("./tabs/lines"));
-const SettingsTab = lazy(() => import("./tabs/settings"));
+import ErrorBoundary from "./components/ErrorBoundary";
+import { usePersistentState } from "./hooks/usePersistentState";
+import { usePolling } from "./hooks/usePolling";
+import { isLppOperator } from "./utils/operators";
 
-function RouteTracker({ onMapChange, onLinesChange }) {
-	const location = useLocation();
+const loadMapTab = () => import("./tabs/map");
+const loadStationsTab = () => import("./tabs/stations");
+const loadLinesTab = () => import("./tabs/lines");
+const loadSettingsTab = () => import("./tabs/settings");
 
-	useEffect(() => {
-		const path = location.pathname;
-		onMapChange(path === "/" || path === "/map" || path === "");
-		onLinesChange(path === "/lines");
-	}, [location.pathname, onMapChange, onLinesChange]);
+const MapTab = lazy(loadMapTab);
+const StationsTab = lazy(loadStationsTab);
+const LinesTab = lazy(loadLinesTab);
+const SettingsTab = lazy(loadSettingsTab);
 
-	return null;
-}
+const POSITIONS_POLL_MS = 3000;
+const POSITIONS_POLL_BACKGROUND_MS = 15000; // na zavihku "Linije" zadostuje redkeje
+const TRAINS_POLL_MS = 30000;
+const ARRIVALS_POLL_MS = 30000;
 
 const DEFAULT_VISIBILITY = {
 	buses: true,
@@ -66,502 +78,347 @@ const DEFAULT_BUS_OPERATORS = {
 	generic: true,
 };
 
-function loadMapLayerSettings() {
-	let saved = null;
-	try {
-		const raw = localStorage.getItem("mapLayerSettings");
-		if (raw) saved = JSON.parse(raw);
-	} catch {
-		saved = null;
-	}
+const DEFAULT_STATION = {
+	name: "Izberite postajo",
+	coordinates: [46.057, 14.295],
+	id: 123456789,
+};
+const DEFAULT_USER_LOCATION = [46.056, 14.5058];
 
-	const isPlainObject = (v) =>
-		v && typeof v === "object" && !Array.isArray(v);
+const isPlainObject = (value) =>
+	Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
+function normalizeLayerSettings(saved, fallback) {
 	const legacyVisibility =
 		isPlainObject(saved) && saved.visibility === undefined ? saved : null;
-
-	const visibilitySource = isPlainObject(saved?.visibility)
+	const visibility = isPlainObject(saved?.visibility)
 		? saved.visibility
 		: legacyVisibility;
-
-	const busOperatorsSource = isPlainObject(saved?.busOperators)
+	const busOperators = isPlainObject(saved?.busOperators)
 		? saved.busOperators
 		: null;
 
 	return {
-		visibility: { ...DEFAULT_VISIBILITY, ...(visibilitySource || {}) },
-		busOperators: {
-			...DEFAULT_BUS_OPERATORS,
-			...(busOperatorsSource || {}),
-		},
+		visibility: { ...fallback.visibility, ...visibility },
+		busOperators: { ...fallback.busOperators, ...busOperators },
 	};
 }
 
-function App() {
-	const [activeStation, setActiveStation] = useState(
-		localStorage.getItem("activeStation")
-			? JSON.parse(localStorage.getItem("activeStation"))
-			: {
-					name: "Izberite postajo",
-					coordinates: [46.057, 14.295],
-					id: 123456789,
-				},
-	);
-	const [userLocation, setUserLocation] = useState(
-		localStorage.getItem("userLocation")
-			? JSON.parse(localStorage.getItem("userLocation"))
-			: [46.056, 14.5058],
-	);
+const normalizeTheme = (stored, fallback) =>
+	stored === "dark" || stored === "light" ? stored : fallback;
 
-	const [theme, setTheme] = useState(() => {
-		const saved = localStorage.getItem("theme");
-		return saved ? saved : "light";
+const systemTheme = () =>
+	window.matchMedia?.("(prefers-color-scheme: dark)").matches
+		? "dark"
+		: "light";
+
+const FALLBACK = <div className="suspense-fallback">Nalaganje...</div>;
+
+function AppShell() {
+	const { pathname } = useLocation();
+	const navigate = useNavigate();
+	const navigateRef = useRef(navigate);
+	useEffect(() => {
+		navigateRef.current = navigate;
 	});
 
-	const [isOnMapTab, setIsOnMapTab] = useState(true);
-	const [isOnLinesTab, setIsOnLinesTab] = useState(false);
+	const isOnMapTab = pathname === "/" || pathname === "/map";
+	const isOnLinesTab = pathname === "/lines";
 
-	const [visibility, setVisibility] = useState(
-		() => loadMapLayerSettings().visibility,
+	const [activeStation, setActiveStation] = usePersistentState(
+		"activeStation",
+		DEFAULT_STATION,
+	);
+	const [userLocation, setUserLocation] = usePersistentState(
+		"userLocation",
+		DEFAULT_USER_LOCATION,
+	);
+	const [theme, setTheme] = usePersistentState("theme", systemTheme, {
+		raw: true,
+		normalize: normalizeTheme,
+	});
+	const [mapTheme, setMapTheme] = usePersistentState("mapTheme", "light", {
+		raw: true,
+		normalize: normalizeTheme,
+	});
+	const [layerSettings, setLayerSettings] = usePersistentState(
+		"mapLayerSettings",
+		{ visibility: DEFAULT_VISIBILITY, busOperators: DEFAULT_BUS_OPERATORS },
+		{ normalize: normalizeLayerSettings },
 	);
 
-	const [busOperators, setBusOperators] = useState(
-		() => loadMapLayerSettings().busOperators,
+	const { visibility, busOperators } = layerSettings;
+	const setVisibility = useCallback(
+		(update) =>
+			setLayerSettings((s) => ({
+				...s,
+				visibility:
+					typeof update === "function"
+						? update(s.visibility)
+						: update,
+			})),
+		[setLayerSettings],
+	);
+	const setBusOperators = useCallback(
+		(update) =>
+			setLayerSettings((s) => ({
+				...s,
+				busOperators:
+					typeof update === "function"
+						? update(s.busOperators)
+						: update,
+			})),
+		[setLayerSettings],
 	);
 
-	useEffect(() => {
-		try {
-			const payload = {
-				visibility,
-				busOperators,
-			};
-			localStorage.setItem("mapLayerSettings", JSON.stringify(payload));
-		} catch (error) {
-			console.warn("Ni bilo mogoče shraniti nastavitev plasti:", error);
-		}
-	}, [visibility, busOperators]);
-
-	const [gpsPositions, setGpsPositions] = useState([]);
-	const [trainPositions, setTrainPositions] = useState([]);
-
-	const [selectedVehicle, setSelectedVehicle] = useState(null);
+	useLayoutEffect(() => {
+		const root = document.documentElement;
+		root.classList.remove("light", "dark");
+		root.classList.add(theme);
+		document
+			.querySelector('meta[name="theme-color"]')
+			?.setAttribute("content", theme === "dark" ? "#0f0f1a" : "#f5f3ff");
+	}, [theme]);
 
 	const [busStops, setBusStops] = useState([]);
 	const [szStops, setSzStops] = useState([]);
-
+	const [gpsPositions, setGpsPositions] = useState([]);
+	const [trains, setTrains] = useState([]);
 	const [ijppArrivals, setIjppArrivals] = useState([]);
 	const [lppArrivals, setLppArrivals] = useState([]);
 	const [szArrivals, setSzArrivals] = useState([]);
-
-	const [routeLoading, setRouteLoading] = useState(false);
 	const [arrivalsLoading, setArrivalsLoading] = useState(false);
+	const [selectedVehicle, setSelectedVehicle] = useState(null);
+	const [routeLoading, setRouteLoading] = useState(false);
 
-	const tripsWithTimingRef = useRef([]);
-	const animationFrameRef = useRef(null);
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
-	const deferredTrainPositions = useDeferredValue(trainPositions);
 
-	// Fetcha busne postaje ob zagonu
+	// Fetcha postaje ob zagonu
 	useEffect(() => {
-		const loadBusStops = async () => {
-			try {
-				const stops = await fetchAllBusStops();
-				setBusStops(stops);
-			} catch (error) {
-				console.error("Error loading bus stops:", error);
-				setBusStops([]);
-			}
-		};
-		loadBusStops();
+		fetchAllBusStops().then(setBusStops);
+		fetchSzStops().then(setSzStops);
 	}, []);
 
-	// Fetcha SZ postaje ob zagonu
+	// Uporabnikova lokacija
 	useEffect(() => {
-		const load = async () => {
-			try {
-				const stops = await fetchSzStops();
-				setSzStops(stops);
-			} catch (error) {
-				console.error("Error loading SZ stops:", error);
-			}
-		};
-		load();
-	}, []);
+		if (!navigator.geolocation) return;
+		navigator.geolocation.getCurrentPosition(
+			({ coords }) =>
+				setUserLocation([coords.latitude, coords.longitude]),
+			(error) => console.error("Error getting user's location:", error),
+			{ maximumAge: 5 * 60 * 1000, timeout: 15000 },
+		);
+	}, [setUserLocation]);
 
-	// Dobi userjevo lokacijo
-	useEffect(() => {
-		if (navigator.geolocation) {
-			navigator.geolocation.getCurrentPosition(
-				(position) => {
-					const { latitude, longitude } = position.coords;
-					setUserLocation([latitude, longitude]);
-					localStorage.setItem(
-						"userLocation",
-						JSON.stringify([latitude, longitude]),
-					);
-				},
-				(error) => {
-					console.error("Error getting user's location:", error);
-				},
-			);
-		} else {
-			console.error("Geolocation is not supported by this browser.");
-		}
-	}, []);
+	const lastBusPositions = useRef({ lpp: [], ijpp: [] });
+	usePolling(
+		async () => {
+			const [lpp, ijpp] = await Promise.all([
+				fetchLPPPositions(),
+				fetchIJPPPositions(),
+			]);
+			if (!lpp && !ijpp) return;
+			if (lpp) lastBusPositions.current.lpp = lpp;
+			if (ijpp) lastBusPositions.current.ijpp = ijpp;
+			setGpsPositions([
+				...lastBusPositions.current.lpp,
+				...lastBusPositions.current.ijpp,
+			]);
+		},
+		isOnMapTab ? POSITIONS_POLL_MS : POSITIONS_POLL_BACKGROUND_MS,
+		isOnMapTab || isOnLinesTab,
+	);
 
-	useEffect(() => {
-		if (!isOnMapTab) return;
+	usePolling(
+		async () => {
+			const data = await fetchTrainPositions();
+			if (data) setTrains(data);
+		},
+		TRAINS_POLL_MS,
+		isOnMapTab || isOnLinesTab,
+	);
 
-		let disposed = false;
-		let requestInFlight = false;
-		let intervalId = null;
+	const lppId = activeStation?.ref_id || activeStation?.station_code;
+	const ijppId = activeStation?.gtfs_id;
+	const extraId = activeStation?.ijpp_id;
+	const szId = activeStation?.stopId;
 
-		const fetchPositions = async () => {
-			if (disposed || document.hidden || requestInFlight) return;
-			requestInFlight = true;
-			try {
-				const [lpp, ijpp] = await Promise.all([
-					fetchLPPPositions(),
-					fetchIJPPPositions(),
-				]);
-				if (disposed) return;
-				setGpsPositions([
-					...(Array.isArray(lpp) ? lpp : []),
-					...(Array.isArray(ijpp) ? ijpp : []),
-				]);
-			} catch (error) {
-				if (!disposed)
-					console.error("Error fetching positions:", error);
-			} finally {
-				requestInFlight = false;
-			}
-		};
-
-		const stopPolling = () => {
-			if (intervalId !== null) {
-				clearInterval(intervalId);
-				intervalId = null;
-			}
-		};
-		const startPolling = () => {
-			stopPolling();
-			if (!document.hidden)
-				intervalId = setInterval(fetchPositions, 3000);
-		};
-		const handleVisibilityChange = () => {
-			if (document.hidden) stopPolling();
-			else {
-				fetchPositions();
-				startPolling();
-			}
-		};
-
-		fetchPositions();
-		document.addEventListener("visibilitychange", handleVisibilityChange);
-		startPolling();
-		return () => {
-			disposed = true;
-			stopPolling();
-			document.removeEventListener(
-				"visibilitychange",
-				handleVisibilityChange,
-			);
-		};
-	}, [isOnMapTab]);
-
-	// fetcha pozicije vlakov, animacija je v useEffect spodi
-	useEffect(() => {
-		if (!isOnMapTab) return;
-
-		let disposed = false;
-		let requestInFlight = false;
-		const fetchTrains = async () => {
-			if (disposed || document.hidden || requestInFlight) return;
-			requestInFlight = true;
-			try {
-				const data = await fetchTrainPositions();
-				if (!disposed)
-					tripsWithTimingRef.current = Array.isArray(data)
-						? data
-						: [];
-			} catch (error) {
-				if (!disposed)
-					console.error(
-						"Error fetching train trips for animation:",
-						error,
-					);
-			} finally {
-				requestInFlight = false;
-			}
-		};
-		const intervalId = setInterval(fetchTrains, 30000);
-		const onVisibilityChange = () => {
-			if (!document.hidden) fetchTrains();
-		};
-		fetchTrains();
-		document.addEventListener("visibilitychange", onVisibilityChange);
-		return () => {
-			disposed = true;
-			clearInterval(intervalId);
-			document.removeEventListener(
-				"visibilitychange",
-				onVisibilityChange,
-			);
-		};
-	}, [isOnMapTab]);
-
-	// black magic za animacijo vlakov
-	useEffect(() => {
-		if (!isOnMapTab) return;
-
-		const animate = () => {
-			const now = Date.now();
-			const features = tripsWithTimingRef.current.map((train) => {
-				const { coord, bearing } = getInterpolatedPosition(
-					train.path,
-					now,
-				);
-				return {
-					tripId: train.tripId,
-					gpsLocation: coord,
-					bearing,
-					tripShort: train.tripShort,
-					delay: train.delay,
-					from: train.from,
-					to: train.to,
-					realtime: train.realtime,
-					departure: train.departure,
-					arrival: train.arrival,
-				};
-			});
-			setTrainPositions(features);
-			animationFrameRef.current = setTimeout(
-				() => requestAnimationFrame(animate),
-				1000,
-			);
-		};
-
-		animate();
-
-		return () => {
-			if (animationFrameRef.current) {
-				clearTimeout(animationFrameRef.current);
-			}
-		};
-	}, [isOnMapTab]);
-
-	// fetchanje in updejtanje prihodov
-	const fetchAndUpdateArrivals = useCallback(async () => {
-		const lppId = activeStation?.ref_id || activeStation?.station_code;
-		const ijppId = activeStation?.gtfs_id;
-		const extraId = activeStation?.ijpp_id;
-		const szId = activeStation?.stopId;
-
-		const results = await Promise.allSettled([
-			lppId ? fetchLppArrivals(lppId) : Promise.resolve([]),
-			ijppId ? fetchIjppArrivals(ijppId) : Promise.resolve([]),
-			extraId ? fetchIjppArrivals(extraId) : Promise.resolve([]),
-			szId ? fetchSzArrivals(szId) : Promise.resolve([]),
+	const arrivalsRequestRef = useRef(0);
+	const loadArrivals = useCallback(async () => {
+		const request = ++arrivalsRequestRef.current;
+		const settled = await Promise.allSettled([
+			lppId ? fetchLppArrivals(lppId) : [],
+			ijppId ? fetchIjppArrivals(ijppId) : [],
+			extraId ? fetchIjppArrivals(extraId) : [],
+			szId ? fetchSzArrivals(szId) : [],
 		]);
 
-		const lppData =
-			results[0].status === "fulfilled" ? results[0].value : [];
-		const ijppData =
-			results[1].status === "fulfilled" ? results[1].value : [];
-		const extraArrivals = (
-			results[2].status === "fulfilled" ? results[2].value : []
-		).filter(
-			(arrival) =>
-				!arrival?.operatorName
-					?.toLowerCase()
-					.includes("ljubljanski potniški promet"),
-		);
-		const szData =
-			results[3].status === "fulfilled" ? results[3].value : [];
+		if (request !== arrivalsRequestRef.current) return;
 
-		setLppArrivals(lppData);
-		setIjppArrivals([...ijppData, ...extraArrivals]);
-		setSzArrivals(szData);
-	}, [activeStation]);
+		const value = (i) =>
+			settled[i].status === "fulfilled" ? settled[i].value : [];
+		setLppArrivals(value(0));
+		setIjppArrivals([
+			...value(1),
+			...value(2).filter(
+				(arrival) => !isLppOperator(arrival?.operatorName),
+			),
+		]);
+		setSzArrivals(value(3));
+	}, [lppId, ijppId, extraId, szId]);
 
-	// Fetcha prihode + določi stanje če se še nalagajo
 	useEffect(() => {
-		const loadArrivals = async () => {
-			setArrivalsLoading(true);
-			try {
-				await fetchAndUpdateArrivals();
-			} finally {
-				setArrivalsLoading(false);
-			}
-		};
-
-		loadArrivals();
-	}, [activeStation, fetchAndUpdateArrivals]);
-
-	// refresha prihode vsakih 30 sekund
-	useEffect(() => {
-		if (!isOnLinesTab) {
-			return;
-		}
-
-		const pollArrivals = async () => {
-			try {
-				await fetchAndUpdateArrivals();
-			} catch (error) {
-				console.error("Error polling arrivals:", error);
-			}
-		};
-
-		const POLLING_INTERVAL = 30000;
-
-		const handleVisibilityChange = () => {
-			if (!document.hidden) pollArrivals();
-		};
-
-		document.addEventListener("visibilitychange", handleVisibilityChange);
-		const intervalId = setInterval(pollArrivals, POLLING_INTERVAL);
-
+		let current = true;
+		setArrivalsLoading(true);
+		loadArrivals().finally(() => {
+			if (current) setArrivalsLoading(false);
+		});
 		return () => {
-			clearInterval(intervalId);
-			document.removeEventListener(
-				"visibilitychange",
-				handleVisibilityChange,
-			);
+			current = false;
 		};
-	}, [isOnLinesTab, fetchAndUpdateArrivals]);
+	}, [loadArrivals]);
 
-	// Za fetchanje tripa iz ID-ja
+	usePolling(loadArrivals, ARRIVALS_POLL_MS, isOnLinesTab);
+
+	const tripRequestRef = useRef(0);
+
 	const getTripFromId = useCallback(async (tripData, type) => {
+		const request = ++tripRequestRef.current;
 		try {
-			let route = null;
-			const tripId =
-				typeof tripData === "object" ? tripData.tripId : tripData;
+			const isObject = typeof tripData === "object";
+			const tripId = isObject ? tripData.tripId : tripData;
 
+			let route;
 			if (type === "LPP") {
-				const param =
-					typeof tripData === "object"
-						? tripData
-						: { tripId: tripData };
-				route = await fetchLppRoute(param);
+				route = await fetchLppRoute(isObject ? tripData : { tripId });
 			} else if (type === "SZ") {
 				route = await fetchSzTrip(tripId);
 			} else {
 				route = await fetchIJPPTrip(tripData);
 			}
+			if (!route) return null;
 
-			if (route) {
-				setSelectedVehicle((prev) => {
-					if (prev && prev.tripId === route.tripId) {
-						return { ...prev, ...route };
-					}
-					return route;
-				});
-				return route;
+			if (request === tripRequestRef.current) {
+				setSelectedVehicle((prev) =>
+					prev && prev.tripId === route.tripId
+						? { ...prev, ...route }
+						: route,
+				);
 			}
+			return route;
 		} catch (error) {
 			console.error("Error loading trip from ID:", error);
+			return null;
 		}
 	}, []);
 
-	// Fetcha cel trip
 	useEffect(() => {
-		if (!selectedVehicle) {
+		const needsRoute =
+			selectedVehicle &&
+			!(selectedVehicle.geometry && selectedVehicle.stops) &&
+			(selectedVehicle.tripId || selectedVehicle.lineId);
+		if (!needsRoute) {
 			setRouteLoading(false);
 			return;
 		}
 
-		if (selectedVehicle.geometry && selectedVehicle.stops) {
-			setRouteLoading(false);
-			return;
-		}
-
-		if (!selectedVehicle.tripId && !selectedVehicle.lineId) {
-			setRouteLoading(false);
-			return;
-		}
-
-		let type = "IJPP";
-		if (
-			selectedVehicle.lineId ||
-			(selectedVehicle.operator &&
-				selectedVehicle.operator
-					.toLowerCase()
-					.includes("ljubljanski potniški promet"))
-		) {
-			type = "LPP";
-		} else if (
-			selectedVehicle.tripShort ||
-			(selectedVehicle.operator &&
-				selectedVehicle.operator
-					.toLowerCase()
-					.includes("slovenske železnice"))
-		) {
-			type = "SZ";
-		}
-
+		let current = true;
 		setRouteLoading(true);
-		getTripFromId(selectedVehicle, type).finally(() =>
-			setRouteLoading(false),
-		);
+		getTripFromId(
+			selectedVehicle,
+			detectVehicleType(selectedVehicle),
+		).finally(() => {
+			if (current) setRouteLoading(false);
+		});
+		return () => {
+			current = false;
+		};
 	}, [selectedVehicle, getTripFromId]);
 
-	// neki počisti
+	const handleSetSelectedVehicle = useCallback((vehicle) => {
+		if (vehicle === null) tripRequestRef.current++;
+		setSelectedVehicle(vehicle);
+	}, []);
 	const clearSelectedVehicle = useCallback(
-		() => setSelectedVehicle(null),
+		() => handleSetSelectedVehicle(null),
+		[handleSetSelectedVehicle],
+	);
+
+	const handleSelectStation = useCallback(
+		(station) => {
+			setActiveStation(station);
+			navigateRef.current("/lines");
+		},
+		[setActiveStation],
+	);
+
+	const handleSelectRoute = useCallback(
+		async (item, type) => {
+			const route = await getTripFromId(item, type);
+			if (route) navigateRef.current("/map");
+		},
+		[getTripFromId],
+	);
+
+	useEffect(() => {
+		const preload = () =>
+			[loadStationsTab, loadLinesTab, loadSettingsTab].forEach((load) =>
+				load(),
+			);
+		if ("requestIdleCallback" in window) {
+			const id = requestIdleCallback(preload, { timeout: 5000 });
+			return () => cancelIdleCallback(id);
+		}
+		const id = setTimeout(preload, 2000);
+		return () => clearTimeout(id);
+	}, []);
+
+	const navItems = useMemo(
+		() => [
+			{ to: "/map", label: "Zemljevid", Icon: MapIcon },
+			{ to: "/stations", label: "Postaje", Icon: TramFront },
+			{ to: "/lines", label: "Linije", Icon: RouteIcon },
+			{ to: "/settings", label: "Nastavitve", Icon: Settings2 },
+		],
 		[],
 	);
 
 	return (
-		<Router>
-			<RouteTracker
-				onMapChange={setIsOnMapTab}
-				onLinesChange={setIsOnLinesTab}
-			/>
-			<div className={`container ${theme}`}>
-				<div className="content">
-					<div
-						className={`persistent-map${
-							isOnMapTab ? "" : " persistent-map--hidden"
-						}`}>
-						<Suspense
-							fallback={
-								<div className="suspense-fallback">
-									Nalaganje...
-								</div>
-							}>
+		<div className="container">
+			<div className="content">
+				<div
+					className={`persistent-map${isOnMapTab ? "" : " persistent-map--hidden"}`}>
+					<ErrorBoundary>
+						<Suspense fallback={FALLBACK}>
 							<MapTab
 								gpsPositions={deferredGpsPositions}
+								trains={trains}
 								busStops={busStops}
 								trainStops={szStops}
 								activeStation={activeStation}
-								setActiveStation={setActiveStation}
+								onSelectStation={handleSelectStation}
 								userLocation={userLocation}
-								trainPositions={deferredTrainPositions}
-								setSelectedVehicle={setSelectedVehicle}
+								setSelectedVehicle={handleSetSelectedVehicle}
 								selectedVehicle={selectedVehicle}
 								routeLoading={routeLoading}
 								visibility={visibility}
-								setVisibility={setVisibility}
 								busOperators={busOperators}
-								setBusOperators={setBusOperators}
+								mapTheme={mapTheme}
 								isActive={isOnMapTab}
 							/>
 						</Suspense>
-					</div>
-					<Suspense
-						fallback={
-							<div className="suspense-fallback">
-								Nalaganje...
-							</div>
-						}>
+					</ErrorBoundary>
+				</div>
+				<ErrorBoundary key={pathname}>
+					<Suspense fallback={FALLBACK}>
 						<Routes>
-							<Route path="/*" element={null} />
+							<Route path="/" element={null} />
+							<Route path="/map" element={null} />
 							<Route
 								path="/stations"
 								element={
 									<StationsTab
-										setActiveStation={setActiveStation}
+										onSelectStation={handleSelectStation}
 										busStops={busStops}
 										szStops={szStops}
 										userLocation={userLocation}
@@ -577,9 +434,9 @@ function App() {
 										ijppArrivals={ijppArrivals}
 										lppArrivals={lppArrivals}
 										szArrivals={szArrivals}
-										getTripFromId={getTripFromId}
+										onSelectRoute={handleSelectRoute}
 										arrivalsLoading={arrivalsLoading}
-										trainPositions={trainPositions}
+										trains={trains}
 									/>
 								}
 							/>
@@ -593,41 +450,40 @@ function App() {
 										setBusOperators={setBusOperators}
 										theme={theme}
 										setTheme={setTheme}
+										mapTheme={mapTheme}
+										setMapTheme={setMapTheme}
 									/>
 								}
 							/>
+							<Route
+								path="*"
+								element={<Navigate to="/map" replace />}
+							/>
 						</Routes>
 					</Suspense>
-				</div>
-				<nav>
-					<NavLink to="/map">
-						<button>
-							<Map size={24} />
-							<h3>Zemljevid</h3>
-						</button>
-					</NavLink>
-					<NavLink to="/stations" onClick={clearSelectedVehicle}>
-						<button>
-							<TramFront size={24} />
-							<h3>Postaje</h3>
-						</button>
-					</NavLink>
-					<NavLink to="/lines" onClick={clearSelectedVehicle}>
-						<button>
-							<RouteIcon size={24} />
-							<h3>Linije</h3>
-						</button>
-					</NavLink>
-					<NavLink to="/settings" onClick={clearSelectedVehicle}>
-						<button>
-							<Settings2 size={24} />
-							<h3>Nastavitve</h3>
-						</button>
-					</NavLink>
-				</nav>
+				</ErrorBoundary>
 			</div>
-		</Router>
+			<nav aria-label="Glavna navigacija">
+				{navItems.map(({ to, label, Icon }) => (
+					<NavLink
+						key={to}
+						to={to}
+						onClick={
+							to === "/map" ? undefined : clearSelectedVehicle
+						}>
+						<Icon size={24} aria-hidden="true" />
+						<span>{label}</span>
+					</NavLink>
+				))}
+			</nav>
+		</div>
 	);
 }
 
-export default App;
+export default function App() {
+	return (
+		<Router>
+			<AppShell />
+		</Router>
+	);
+}

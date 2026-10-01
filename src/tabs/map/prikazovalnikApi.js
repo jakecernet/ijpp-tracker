@@ -18,11 +18,9 @@
 
 const KRANJBUS_BUSES_URL = `https://firestore.googleapis.com/v1/projects/kranjbus/databases/(default)/documents/avtobusi`;
 
-// Baza se ne spreminja prepogosto - osvežimo jo enkrat na uro, da po
-// nepotrebnem ne obremenjujemo tuje (skupnostne) Firestore baze z branji.
 const CACHE_TTL_MS = 60 * 1000;
 
-let cache = null; // { data, time }
+let cache = null;
 let inFlight = null;
 
 const clean = (value) =>
@@ -56,7 +54,7 @@ async function fetchKranjbusDatabase() {
 		if (pageToken) url.searchParams.set("pageToken", pageToken);
 
 		const response = await fetch(url.toString());
-		if (!response.ok) break;
+		if (!response.ok) throw new Error(`Firestore HTTP ${response.status}`);
 
 		const data = await response.json();
 		(data.documents || []).forEach((doc) =>
@@ -69,21 +67,25 @@ async function fetchKranjbusDatabase() {
 }
 
 async function getBusDatabase() {
-	if (cache && Date.now() - cache.time < CACHE_TTL_MS) return cache.data;
+	if (cache && Date.now() - cache.time < CACHE_TTL_MS) return cache;
 
-	if (inFlight) return inFlight;
-
-	inFlight = (async () => {
+	inFlight ??= (async () => {
 		try {
 			const data = await fetchKranjbusDatabase();
-			cache = { data, time: Date.now() };
-			return data;
+			const byTripId = new Map();
+			for (const bus of data) {
+				if (bus.lastTripId) byTripId.set(bus.lastTripId, bus);
+			}
+			cache = { data, byTripId, time: Date.now() };
 		} catch (error) {
 			console.error("Napaka pri nalaganju Kranjbus baze:", error);
-			return cache?.data || [];
+			cache = cache
+				? { ...cache, time: Date.now() }
+				: { data: [], byTripId: new Map(), time: Date.now() };
 		} finally {
 			inFlight = null;
 		}
+		return cache;
 	})();
 
 	return inFlight;
@@ -93,13 +95,11 @@ export async function findKranjbusInfo(tripId, plate, vehicleId) {
 	if (!tripId && !plate && !vehicleId) return null;
 
 	try {
-		const database = await getBusDatabase();
-		if (!database?.length) return null;
+		const { data: database, byTripId } = await getBusDatabase();
+		if (!database.length) return null;
 
 		// Primarno: ujemi po lastTripId
-		let match = tripId
-			? database.find((bus) => bus.lastTripId === tripId)
-			: null;
+		let match = tripId ? (byTripId.get(tripId) ?? null) : null;
 
 		// Rezervno: ujemi po registrski / stVozila (kot prej)
 		if (!match && (plate || vehicleId)) {
@@ -122,7 +122,9 @@ export async function findKranjbusInfo(tripId, plate, vehicleId) {
 		if (!match) return null;
 
 		return {
-			image: match?.registrska?.replace(/\s/g, "_") + ".jpg" || null,
+			image: match.registrska
+				? `${match.registrska.replace(/\s/g, "_")}.jpg`
+				: null,
 			model:
 				[match.proizvajalec, match.model].filter(Boolean).join(" ") ||
 				null,

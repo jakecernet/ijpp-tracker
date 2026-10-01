@@ -1,135 +1,138 @@
-import { escapeHTML } from "./utils";
-import { findKranjbusInfo } from "./prikazovalnikApi";
 import Camera from "../../img/camera.svg";
 import Center from "../../img/center.svg";
+import { operatorDisplayName } from "../../utils/operators";
+import { findKranjbusInfo } from "./prikazovalnikApi";
+import { escapeHTML } from "./utils";
 
-const ACCESSIBLE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="15" height="15" style="vertical-align:-2px; margin-left:6px">
-	<g fill="#60a5fa" transform="translate(85,55) scale(0.8)">
-		<path d="M161.988 98.124c24.9629-2.30469 44.3574-23.811 44.3574-48.9658C206.346 22.083 184.263 0 157.188 0s-49.1572 22.083-49.1572 49.1582c0 8.25684 2.30371 16.7056 6.14453 23.8105l17.5156 246.467 180.396.0488 73.9912 173.365 97.1445-38.0977-15.043-35.8203-54.3662 19.625-71.5908-165.28-167.729 1.12695-2.30273-31.2129 121.423.0483v-46.1831l-126.055-.0493L161.988 98.124Z"/>
-		<path d="M343.42 451.591c-30.4473 60.1875-94.1748 99.8398-162.15 99.8398C81.4297 551.431 0 470.001 0 370.161c0-70.1006 42.4854-135.244 105.882-164.121l4.10254 53.5376c-37.4971 23.6284-60.6123 66.2622-60.6123 110.951 0 72.4268 59.0713 131.497 131.497 131.497 66.2617 0 122.765-50.8516 130.47-116.087L343.42 451.591Z"/>
-	</g>
-</svg>`;
+const ACCESSIBLE_ICON = `<svg class="popup-accessible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="15" height="15" aria-label="Nizkopodni" role="img"><g fill="#60a5fa" transform="translate(85,55) scale(0.8)"><path d="M161.988 98.124c24.9629-2.30469 44.3574-23.811 44.3574-48.9658C206.346 22.083 184.263 0 157.188 0s-49.1572 22.083-49.1572 49.1582c0 8.25684 2.30371 16.7056 6.14453 23.8105l17.5156 246.467 180.396.0488 73.9912 173.365 97.1445-38.0977-15.043-35.8203-54.3662 19.625-71.5908-165.28-167.729 1.12695-2.30273-31.2129 121.423.0483v-46.1831l-126.055-.0493L161.988 98.124Z"/><path d="M343.42 451.591c-30.4473 60.1875-94.1748 99.8398-162.15 99.8398C81.4297 551.431 0 470.001 0 370.161c0-70.1006 42.4854-135.244 105.882-164.121l4.10254 53.5376c-37.4971 23.6284-60.6123 66.2622-60.6123 110.951 0 72.4268 59.0713 131.497 131.497 131.497 66.2617 0 122.765-50.8516 130.47-116.087L343.42 451.591Z"/></g></svg>`;
 
-const ijppImages = "https://jakecernet.github.io/prikazovalnik-slike/";
+const IJPP_IMAGES = "https://jakecernet.github.io/prikazovalnik-slike/";
+const LPP_IMAGES = "https://mestnipromet.cyou/tracker/img/avtobusi/";
+const LPP_IMAGES_INDEX =
+	"https://mestnipromet.cyou/tracker/js/json/images.json";
+
+// ---------------------------------------------------------------------------
+// Gradniki
+// ---------------------------------------------------------------------------
+
+const isEmpty = (value) =>
+	value === null || value === undefined || value === "";
+
+function row(label, valueHtml) {
+	return `<div class="popup-row"><span class="popup-row__label">${escapeHTML(label)}</span><span class="popup-row__value">${valueHtml}</span></div>`;
+}
+
+const textRow = (label, value) =>
+	isEmpty(value) ? "" : row(label, escapeHTML(value));
+
+// Model vozila z ikono dostopnosti (rampa) - skupno za LPP in ostale prevoznike.
+const modelRow = (label, model, hasRamp) =>
+	model
+		? row(label, escapeHTML(model) + (hasRamp ? ACCESSIBLE_ICON : ""))
+		: "";
+
+function imageBlock(src, caption) {
+	if (!src) return "";
+	return `<div class="popup-image-wrapper"><img loading="lazy" src="${escapeHTML(src)}" alt="Fotografija vozila" />${caption ? `<p>${caption}</p>` : ""}</div>`;
+}
+
+const authorCaption = (author) =>
+	`<img src="${Camera}" alt="" /> ${escapeHTML(author || "Neznan avtor")}`;
+
+const actionButton = (role, label) =>
+	`<button type="button" class="popup-button popup-button--block" data-role="${role}">${label}</button>`;
+
+const formatSpeed = (speed) =>
+	Number.isFinite(speed) ? `${Math.round(speed)} km/h` : null;
+
+const isUrbanRegistration = (registration) =>
+	Boolean(registration?.includes("U1") || registration?.includes("U2"));
 
 function getLppBusNumber(busName) {
 	if (!busName) return null;
-	return busName.includes("U1") || busName.includes("U2")
-		? "-U1"
-		: busName.slice(7);
+	return isUrbanRegistration(busName) ? "-U1" : busName.slice(7);
+}
+
+let lppImagesPromise = null;
+function loadLppImagesIndex() {
+	lppImagesPromise ??= fetch(LPP_IMAGES_INDEX)
+		.then((response) => (response.ok ? response.json() : []))
+		.catch(() => {
+			lppImagesPromise = null;
+			return [];
+		});
+	return lppImagesPromise;
 }
 
 async function fetchLppBusInfo(busNumber) {
 	if (!busNumber) return null;
-	try {
-		const response = await fetch(
-			"https://mestnipromet.cyou/tracker/js/json/images.json",
-		);
-		const data = await response.json();
-		const bus = data.find((b) => b.no === busNumber);
-		if (!bus) return null;
-		return {
-			model: bus.model ?? null,
-			author: bus.author || "Neznan avtor",
-			hasRamp: Boolean(bus.ramp),
-		};
-	} catch {
-		return null;
-	}
+	const data = await loadLppImagesIndex();
+	const bus = Array.isArray(data)
+		? data.find((b) => b.no === busNumber)
+		: null;
+	if (!bus) return null;
+	return {
+		model: bus.model ?? null,
+		author: bus.author || "Neznan avtor",
+		hasRamp: Boolean(bus.ramp),
+	};
 }
 
-// Splošen ovojnik za slike v popupih - `caption` je poljubna HTML vsebina
-// (npr. ikona + ime avtorja), ki se izriše čez sliko v spodnjem desnem kotu.
-function imageWrapper(src, caption) {
-	if (!src) return "";
-	return `<div class="popup-image-wrapper">
-              <img loading="lazy" src="${src}" alt="Slika" />
-              ${caption ? `<p>${caption}</p>` : ""}
-            </div>`;
-}
-
-function authorCaption(author) {
-	return `<img src="${Camera}" alt="Author" /> ${escapeHTML(
-		author || "Neznan avtor",
-	)}`;
-}
-
-export function createRow(label, value) {
-	if (value === null || value === undefined || value === "") return "";
-	return (
-		`<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
-		`<span style="opacity:0.7">${escapeHTML(label)}</span>` +
-		`<span style="font-weight:600; text-align:right">${escapeHTML(
-			String(value),
-		)}</span>` +
-		`</div>`
-	);
-}
-
-// Vrstica za model vozila z opcijsko ikono dostopnosti (rampa/nizka
-// stopnica) - skupna za LPP in ne-LPP (IJPP) popupe, da je prikaz
-// modela in dostopnosti enak ne glede na prevoznika.
-function createModelRow(model, hasRamp) {
-	if (!model) return "";
-	return (
-		`<div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:6px">` +
-		`<span style="opacity:0.7">Model</span>` +
-		`<span style="font-weight:600; text-align:right">${escapeHTML(
-			model,
-		)}${hasRamp ? ACCESSIBLE_ICON : ""}</span>` +
-		`</div>`
-	);
-}
-
-function formatSpeed(speed) {
-	if (!Number.isFinite(speed)) return null;
-	return `${Math.round(speed)} km/h`;
-}
-
-export async function renderLppPopup(properties) {
+function buildLppPopupHtml(properties, info) {
 	const title = [properties.lineNumber, properties.lineName]
 		.filter(Boolean)
-		.map((value) => escapeHTML(String(value)))
+		.map((value) => escapeHTML(value))
 		.join(" | ");
-	const isUrban =
-		properties.registrska?.includes("U1") ||
-		properties.registrska?.includes("U2");
-
+	const isUrban = isUrbanRegistration(properties.registrska);
 	const busNumber = getLppBusNumber(properties.registrska);
-	const info = await fetchLppBusInfo(busNumber);
-
-	const imageHTML = imageWrapper(
-		busNumber
-			? `https://mestnipromet.cyou/tracker/img/avtobusi/${busNumber}.jpg`
-			: "",
-		authorCaption(info?.author),
-	);
-
-	const rows =
-		createRow("Prevoznik", "Ljubljanski potniški promet") +
-		createRow("Registrska", properties.registrska) +
-		(isUrban
-			? createModelRow("Turistični vlakec Urban", info?.hasRamp)
-			: createModelRow(info?.model, info?.hasRamp)) +
-		createRow("Smer", properties.lineDestination) +
-		createRow("Hitrost", formatSpeed(properties.speed)) +
-		(isUrban
-			? ""
-			: createRow(
-					"Vžig",
-					properties.ignition ? "Vključen" : "Izključen",
-				));
 
 	return (
-		`<div style="min-width:240px">` +
-		imageHTML +
-		(title
-			? `<div style="font-weight:500; font-size:16px; margin-bottom:8px">${title}</div>`
-			: "") +
-		rows +
-		`<button type="button" class="popup-button" style="margin-top:12px; width:100%" data-role="view-lpp-route">Prikaži linijo</button>` +
+		`<div class="popup">` +
+		imageBlock(
+			busNumber ? `${LPP_IMAGES}${busNumber}.jpg` : "",
+			authorCaption(info?.author),
+		) +
+		(title ? `<div class="popup-title">${title}</div>` : "") +
+		textRow("Prevoznik", "Ljubljanski potniški promet") +
+		textRow("Registrska", properties.registrska) +
+		(isUrban
+			? modelRow("Model", "Turistični vlakec Urban", info?.hasRamp)
+			: modelRow("Model", info?.model, info?.hasRamp)) +
+		textRow("Smer", properties.lineDestination) +
+		textRow("Hitrost", formatSpeed(properties.speed)) +
+		(isUrban
+			? ""
+			: textRow("Vžig", properties.ignition ? "Vključen" : "Izključen")) +
+		actionButton("view-lpp-route", "Prikaži linijo") +
 		`</div>`
 	);
+}
+
+export function renderLppPopup(properties, onUpdate) {
+	const busNumber = getLppBusNumber(properties.registrska);
+	fetchLppBusInfo(busNumber)
+		.then((info) => {
+			if (info) onUpdate?.(buildLppPopupHtml(properties, info));
+		})
+		.catch(() => {});
+	return buildLppPopupHtml(properties, null);
+}
+
+function formatLastSeen(iso) {
+	if (!iso) return null;
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return String(iso);
+	return date.toLocaleString("sl-SI", {
+		dateStyle: "short",
+		timeStyle: "short",
+	});
+}
+
+function isSameLine(heading, currentLine) {
+	if (!currentLine) return false;
+	const [h1, h2] = String(heading).split(" - ");
+	const [c1, c2] = String(currentLine).split(" - ");
+	return (h1 === c1 && h2 === c2) || (h1 === c2 && h2 === c1);
 }
 
 function buildIjppPopupHtml(properties, busInfo) {
@@ -138,229 +141,111 @@ function buildIjppPopupHtml(properties, busInfo) {
 		properties.title ||
 		properties.routeId ||
 		"Vozilo";
-
-	const imageHTML = imageWrapper(
-		busInfo?.hasImage ? `${ijppImages}${busInfo.image}` : "",
-		authorCaption("prikazovalnik.gt.tc"),
-	);
-
-	// Prevoznik: Kranjbus baza ima zanesljivejše ime kot IJPP API.
 	const operatorName =
-		busInfo?.operator ||
-		(properties.operator === "MP_Kranj"
-			? "Mestni promet Kranj"
-			: properties.operator) ||
-		null;
-
-	const stop = createRow(
-		properties.stopStatus === "STOPPED_AT"
-			? "Na postaji"
-			: "Naslednja postaja",
-		properties.stop,
-	);
-
-	// Datum zadnjega stika - pretvori ISO niz v berljiv format.
-	let lastSeenFormatted = null;
-	if (busInfo?.lastSeen) {
-		try {
-			lastSeenFormatted = new Date(busInfo.lastSeen).toLocaleString(
-				"sl-SI",
-				{ dateStyle: "short", timeStyle: "short" },
-			);
-		} catch {
-			lastSeenFormatted = busInfo.lastSeen;
-		}
-	}
-
-	const headingParts = String(heading).split(" - ");
-	const linePart = String(busInfo?.currentLine).split(" - ");
-	const isSame =
-		(headingParts[0] === linePart[0] && headingParts[1] === linePart[1]) ||
-		(headingParts[0] === linePart[1] && headingParts[1] === linePart[0]) ||
-		(headingParts[0] === linePart[1] && headingParts[1] === linePart[0]);
-
-	const rows =
-		createRow("Prevoznik", operatorName) +
-		createModelRow(busInfo?.model, busInfo?.hasRamp) +
-		createRow("Registrska", busInfo?.registration || properties.plate) +
-		(busInfo?.currentLine && !isSame
-			? createRow("Linija (stara)", busInfo.currentLine)
-			: "") +
-		stop +
-		createRow("Zadnji stik", lastSeenFormatted);
+		busInfo?.operator || operatorDisplayName(properties.operator) || null;
 
 	return (
-		`<div style="min-width:240px">` +
-		imageHTML +
-		`<div style="font-weight:700; font-size:16px; margin-bottom:8px">${escapeHTML(
-			String(heading),
-		)}</div>` +
-		rows +
-		'<button type="button" class="popup-button" data-role="view-route" style="margin-top:12px; width:100%">Prikaži linijo</button>' +
+		`<div class="popup">` +
+		imageBlock(
+			busInfo?.hasImage && busInfo.image
+				? `${IJPP_IMAGES}${busInfo.image}`
+				: "",
+			authorCaption("prikazovalnik.gt.tc"),
+		) +
+		`<div class="popup-title popup-title--bold">${escapeHTML(heading)}</div>` +
+		textRow("Prevoznik", operatorName) +
+		modelRow("Model", busInfo?.model, busInfo?.hasRamp) +
+		textRow("Registrska", busInfo?.registration || properties.plate) +
+		(busInfo?.currentLine && !isSameLine(heading, busInfo.currentLine)
+			? textRow("Linija (stara)", busInfo.currentLine)
+			: "") +
+		textRow(
+			properties.stopStatus === "STOPPED_AT"
+				? "Na postaji"
+				: "Naslednja postaja",
+			properties.stop,
+		) +
+		textRow("Zadnji stik", formatLastSeen(busInfo?.lastSeen)) +
+		actionButton("view-route", "Prikaži linijo") +
 		`</div>`
 	);
 }
 
 export function renderIjppPopup(properties, onUpdate) {
-	const basicHtml = buildIjppPopupHtml(properties, null);
-
-	// Primarno ujemanje po tripId, rezervno po registrski/vehicleId.
 	findKranjbusInfo(properties.tripId, properties.plate, properties.vehicleId)
 		.then((busInfo) => {
-			if (!busInfo) return;
-			const updatedHtml = buildIjppPopupHtml(properties, busInfo);
-			onUpdate?.(updatedHtml, busInfo);
+			if (busInfo) onUpdate?.(buildIjppPopupHtml(properties, busInfo));
 		})
 		.catch(() => {
-			// Tiho prezri napako - popup ostane prikazan z osnovnimi podatki.
+			// Popup ostane prikazan z osnovnimi podatki.
 		});
-
-	return basicHtml;
+	return buildIjppPopupHtml(properties, null);
 }
+
+// ---------------------------------------------------------------------------
+// Vlaki in postaje
+// ---------------------------------------------------------------------------
+
+const trainRow = (label, value, strong) =>
+	isEmpty(value)
+		? ""
+		: `<div class="popup-row popup-row--train"><span class="popup-row__label">${escapeHTML(label)}</span><span class="${strong ? "popup-row__value" : "popup-row__plain"}">${escapeHTML(value)}</span></div>`;
 
 export function renderTrainPopup(properties) {
 	const number = properties.tripShort || properties.id || "";
-	const { fromStation, toStation, departure, arrival } = properties;
-
 	return (
-		`<div style="min-width:220px">` +
-		(number
-			? `<div style="font-weight:600; font-size:16px; margin-bottom:4px">${escapeHTML(
-					number,
-				)}</div>`
-			: "") +
-		(departure
-			? `<div style="display:flex; justify-content:space-between; margin-top:6px">
-          <p style="color:gray">Odhod iz prejšnje postaje:</p>
-          <h4 style="font-weight:700">${escapeHTML(departure)}</h4>
-        </div>`
-			: "") +
-		(arrival !== null
-			? `<div style="display:flex; justify-content:space-between; margin-top:6px">
-          <p style="color:gray">Prihod na naslednjo postajo:</p>
-          <h4 style="font-weight:700">${escapeHTML(arrival)}</h4>
-        </div>`
-			: "") +
-		(fromStation
-			? `<div style="display:flex; justify-content:space-between; margin-top:6px">
-          <p style="color:gray">Prejšnja postaja: </p>
-          <p>${escapeHTML(fromStation)}</p> 
-        </div>`
-			: "") +
-		(toStation
-			? `<div style="display:flex; justify-content:space-between; margin-top:6px">
-          <p style="color:gray">Naslednja postaja: </p>
-          <p>${escapeHTML(toStation)}</p>
-        </div>`
-			: "") +
-		`<button type="button" class="popup-button" data-role="view-sz-route" style="margin-top:12px; width:100%">Prikaži linijo</button>` +
+		`<div class="popup popup--train">` +
+		(number ? `<div class="popup-title">${escapeHTML(number)}</div>` : "") +
+		trainRow("Odhod iz prejšnje postaje:", properties.departure, true) +
+		trainRow("Prihod na naslednjo postajo:", properties.arrival, true) +
+		trainRow("Prejšnja postaja:", properties.fromStation, false) +
+		trainRow("Naslednja postaja:", properties.toStation, false) +
+		actionButton("view-sz-route", "Prikaži linijo") +
 		`</div>`
 	);
 }
 
-export function createBusStopPopup(
-	{ name, id, ref_id, gtfs_id, ijpp_id, vCenter, routes_on_stop },
-	coordinates,
-	onSelect,
-) {
-	const wrapper = document.createElement("div");
-	const title = document.createElement("h3");
-	title.innerHTML =
-		(name || "") + (vCenter ? `<img src="${Center}" alt="Center" />` : "");
-	wrapper.appendChild(title);
-
-	// Parse routes (may be JSON string from GeoJSON properties)
-	let routes = [];
+function parseRoutes(value) {
+	if (Array.isArray(value)) return value;
 	try {
-		routes =
-			typeof routes_on_stop === "string"
-				? JSON.parse(routes_on_stop)
-				: routes_on_stop || [];
-	} catch (e) {
-		routes = [];
+		const parsed = JSON.parse(value);
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
 	}
-
-	// Display routes if available
-	if (routes.length > 0) {
-		const routesContainer = document.createElement("div");
-		routesContainer.style.cssText =
-			"display:flex; flex-wrap:wrap; gap:4px; margin:8px 0;";
-
-		const maxDisplay = 5;
-		const displayRoutes = routes.slice(0, maxDisplay);
-
-		displayRoutes.forEach((route) => {
-			const badge = document.createElement("span");
-			badge.textContent = route;
-			badge.style.cssText =
-				"background:#2a9d8f; color:white; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600;";
-			routesContainer.appendChild(badge);
-		});
-
-		if (routes.length > maxDisplay) {
-			const more = document.createElement("span");
-			more.textContent = `+${routes.length - maxDisplay}`;
-			more.style.cssText =
-				"background:#6c757d; color:white; padding:2px 8px; border-radius:4px; font-size:12px; font-weight:600;";
-			routesContainer.appendChild(more);
-		}
-
-		wrapper.appendChild(routesContainer);
-	}
-
-	const button = document.createElement("button");
-	button.textContent = "Tukaj sem";
-	button.className = "popup-button";
-	wrapper.appendChild(button);
-
-	button.addEventListener("click", () => {
-		onSelect({
-			id: id ?? name,
-			name,
-			gpsLocation: coordinates,
-			ref_id: ref_id ?? null,
-			gtfs_id: gtfs_id ?? null,
-			ijpp_id: ijpp_id ?? null,
-			vCenter: Boolean(vCenter),
-		});
-	});
-
-	return wrapper;
 }
 
-export function createTrainStopPopup(
-	{ name, stopId, id },
-	coordinates,
-	onSelect,
-) {
-	const wrapper = document.createElement("div");
-	const title = document.createElement("h3");
-	title.textContent = name || "";
-	wrapper.appendChild(title);
+const MAX_ROUTE_BADGES = 5;
 
-	if (stopId) {
-		const code = document.createElement("p");
-		code.textContent = stopId;
-		code.style.margin = "4px 0";
-		code.style.opacity = "0.75";
-		wrapper.appendChild(code);
-	}
+export function renderBusStopPopup({ name, vCenter, routes_on_stop }) {
+	const routes = parseRoutes(routes_on_stop);
+	const badges = routes
+		.slice(0, MAX_ROUTE_BADGES)
+		.map((route) => `<span class="popup-badge">${escapeHTML(route)}</span>`)
+		.join("");
+	const more =
+		routes.length > MAX_ROUTE_BADGES
+			? `<span class="popup-badge popup-badge--muted">+${routes.length - MAX_ROUTE_BADGES}</span>`
+			: "";
 
-	const button = document.createElement("button");
-	button.textContent = "Izberi postajo";
-	button.className = "popup-button";
-	wrapper.appendChild(button);
-
-	button.addEventListener("click", () => {
-		onSelect({
-			id: stopId ?? id ?? name,
-			name,
-			stopId: stopId ?? null,
-			gpsLocation: coordinates,
-			lat: coordinates?.[0] ?? null,
-			lon: coordinates?.[1] ?? null,
-		});
-	});
-
-	return wrapper;
+	return (
+		`<div class="popup popup--stop">` +
+		`<h3>${escapeHTML(name || "")}${vCenter ? `<img src="${Center}" alt="Proti centru" />` : ""}</h3>` +
+		(badges ? `<div class="popup-badges">${badges}${more}</div>` : "") +
+		`<button type="button" class="popup-button" data-role="select-stop">Tukaj sem</button>` +
+		`</div>`
+	);
 }
+
+export function renderTrainStopPopup({ name, stopId }) {
+	return (
+		`<div class="popup popup--stop">` +
+		`<h3>${escapeHTML(name || "")}</h3>` +
+		(stopId ? `<p class="popup-stop-code">${escapeHTML(stopId)}</p>` : "") +
+		`<button type="button" class="popup-button" data-role="select-stop">Izberi postajo</button>` +
+		`</div>`
+	);
+}
+
+export const renderTripStopPopup = (name) =>
+	`<div class="popup"><div class="popup-title popup-title--bold">${escapeHTML(name || "Postaja")}</div></div>`;

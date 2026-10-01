@@ -24,9 +24,10 @@ export const OSM_STYLE_LIGHT = {
 	},
 	glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
 	layers: [{ id: "osm", type: "raster", source: "osm" }],
-}; 
+};
 
-export const OSM_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key=cb1_31r1_1_de984037cd54e589a6e6ce68";
+export const OSM_STYLE_DARK =
+	"https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json?key=cb1_31r1_1_de984037cd54e589a6e6ce68";
 
 export const ICON_SOURCES = [
 	{ id: "bus-stop", image: busStopPNG },
@@ -38,8 +39,6 @@ export const ICON_SOURCES = [
 	{ id: "marprom", image: marpromPNG },
 	{ id: "murska", image: murskaPNG },
 	{ id: "kranj", image: kranjPNG },
-	{ id: "bus-generic", image: busStopPNG },
-	{ id: "train-generic", image: szPNG },
 ];
 
 export const CLUSTER_CONFIG = {
@@ -49,59 +48,19 @@ export const CLUSTER_CONFIG = {
 	trainStops: { radius: 70, maxZoom: 14, color: "#FF7043" },
 };
 
+/** Velikost ikone glede na zoom: pari [zoom, velikost]. */
+const zoomRamp = (...stops) => [
+	"interpolate",
+	["linear"],
+	["zoom"],
+	...stops.flat(),
+];
+
 export const ICON_SIZE_BY_LAYER = {
-	buses: [
-		"interpolate",
-		["linear"],
-		["zoom"],
-		10,
-		0.32,
-		13,
-		0.42,
-		15,
-		0.52,
-		17,
-		0.6,
-	],
-	busStops: [
-		"interpolate",
-		["linear"],
-		["zoom"],
-		10,
-		0.28,
-		13,
-		0.36,
-		15,
-		0.44,
-		17,
-		0.52,
-	],
-	trainPositions: [
-		"interpolate",
-		["linear"],
-		["zoom"],
-		10,
-		0.34,
-		13,
-		0.44,
-		15,
-		0.54,
-		17,
-		0.62,
-	],
-	trainStops: [
-		"interpolate",
-		["linear"],
-		["zoom"],
-		10,
-		0.28,
-		13,
-		0.36,
-		15,
-		0.44,
-		17,
-		0.52,
-	],
+	buses: zoomRamp([10, 0.32], [13, 0.42], [15, 0.52], [17, 0.6]),
+	busStops: zoomRamp([10, 0.28], [13, 0.36], [15, 0.44], [17, 0.52]),
+	trainPositions: zoomRamp([10, 0.34], [13, 0.44], [15, 0.54], [17, 0.62]),
+	trainStops: zoomRamp([10, 0.28], [13, 0.36], [15, 0.44], [17, 0.52]),
 };
 
 export const ICON_ANCHOR_BY_LAYER = {
@@ -132,16 +91,4 @@ export const operatorToIcon = {
 	"SŽ - Potniški promet, d.o.o.": "sz",
 };
 
-export const HALO_RADIUS = [
-	"interpolate",
-	["linear"],
-	["zoom"],
-	10,
-	12,
-	13,
-	16,
-	15,
-	20,
-	17,
-	24,
-];
+export const HALO_RADIUS = zoomRamp([10, 12], [13, 16], [15, 20], [17, 24]);

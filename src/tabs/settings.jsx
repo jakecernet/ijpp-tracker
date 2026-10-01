@@ -1,292 +1,209 @@
-import { useState } from "react";
+import { memo, useId } from "react";
+import { usePersistentState } from "../hooks/usePersistentState";
+
+const DEFAULT_RADIUS = { busRadius: 5, szRadius: 20 };
+
+const MARKER_OPTIONS = [
+	["buses", "Avtobusi"],
+	["busStops", "Avtobusne postaje"],
+	["trainPositions", "Vlaki"],
+	["trainStops", "Železniške postaje"],
+];
+
+const OPERATOR_OPTIONS = [
+	["lpp", "LPP"],
+	["arriva", "Arriva"],
+	["nomago", "Nomago"],
+	["marprom", "Marprom"],
+	["murska", "Murska Sobota"],
+	["kranj", "MP Kranj"],
+	["generic", "Ostali"],
+];
+
+const SOURCE_LINKS = [
+	["https://data.lpp.si/doc", "LPP"],
+	["https://mestnipromet.cyou/tracker/", "Mestni promet"],
+	["https://beta.brezavta.si/", "Brezavta"],
+	["https://mapper-motis.ojpp-gateway.derp.si/", "SŽ Mapper"],
+	["https://gitlab.com/derp-si/ojpp-docs", "(DERP)"],
+	["https://prikazovalnik.gt.tc/zemljevid.html", "Prikazovalnik"],
+];
+
+function ExternalLink({ href, children }) {
+	return (
+		<a href={href} target="_blank" rel="noopener noreferrer">
+			{children}
+		</a>
+	);
+}
+
+function CheckboxGroup({ title, options, values, onChange }) {
+	return (
+		<div className="map-settings__group">
+			<h3>{title}</h3>
+			{options.map(([key, label]) => (
+				<label key={key}>
+					<input
+						type="checkbox"
+						checked={Boolean(values[key])}
+						onChange={(event) =>
+							onChange(key, event.target.checked)
+						}
+					/>
+					{label}
+				</label>
+			))}
+		</div>
+	);
+}
+
+function ThemeSwitch({ title, label, isDark, onToggle }) {
+	return (
+		<>
+			<h3 className="settings__heading settings__heading--divided">
+				{title}
+			</h3>
+			<div className="theme-switcher">
+				<p>Temno</p>
+				<button
+					type="button"
+					role="switch"
+					aria-checked={isDark}
+					aria-label={label}
+					onClick={onToggle}>
+					<span aria-hidden />
+				</button>
+				<p>Svetlo</p>
+			</div>
+		</>
+	);
+}
+
+function RadiusSlider({ label, value, min, max, onChange }) {
+	const id = useId();
+	return (
+		<label htmlFor={id}>
+			{label}: {value} km
+			<input
+				id={id}
+				type="range"
+				min={min}
+				max={max}
+				value={value}
+				onChange={(event) => onChange(Number(event.target.value))}
+			/>
+		</label>
+	);
+}
 
 const SettingsTab = ({
-    visibility,
-    setVisibility,
-    busOperators,
-    setBusOperators,
-    theme,
-    setTheme,
+	visibility,
+	setVisibility,
+	busOperators,
+	setBusOperators,
+	theme,
+	setTheme,
+	mapTheme,
+	setMapTheme,
 }) => {
-    const isDark = theme === "dark";
-    const [mapTheme, setMapTheme] = useState(() => {
-        return typeof window !== "undefined"
-            ? localStorage.getItem("mapTheme") || "light"
-            : "light";
-    });
-    const [radius, setRadius] = useState(() => {
-        const stored = localStorage.getItem("stationRadius");
-        return stored ? JSON.parse(stored) : { busRadius: 5, szRadius: 20 };
-    });
+	const [radius, setRadius] = usePersistentState(
+		"stationRadius",
+		DEFAULT_RADIUS,
+	);
 
-    return (
-        <div className="settings">
-            <h2>Nastavitve</h2>
-            <div className="inside">
-                <h3 style={{ textAlign: "center", padding: "5px" }}>
-                    Zemljevid
-                </h3>
-                <div className="map-settings">
-                    <div style={{ margin: 0, padding: 0 }}>
-                        <h3>Aktivni markerji</h3>
-                        <label>
-                            <input
-                                type="checkbox"
-                                checked={visibility.buses}
-                                onChange={(e) =>
-                                    setVisibility((v) => ({
-                                        ...v,
-                                        buses: e.target.checked,
-                                    }))
-                                }
-                            />
-                            Avtobusi
-                        </label>
-                        <label>
-                            <input
-                                type="checkbox"
-                                checked={visibility.busStops}
-                                onChange={(e) =>
-                                    setVisibility((v) => ({
-                                        ...v,
-                                        busStops: e.target.checked,
-                                    }))
-                                }
-                            />
-                            Avtobusne postaje
-                        </label>
-                        <label>
-                            <input
-                                type="checkbox"
-                                checked={visibility.trainPositions}
-                                onChange={(e) =>
-                                    setVisibility((v) => ({
-                                        ...v,
-                                        trainPositions: e.target.checked,
-                                    }))
-                                }
-                            />
-                            Vlaki
-                        </label>
-                        <label>
-                            <input
-                                type="checkbox"
-                                checked={visibility.trainStops}
-                                onChange={(e) =>
-                                    setVisibility((v) => ({
-                                        ...v,
-                                        trainStops: e.target.checked,
-                                    }))
-                                }
-                            />
-                            Železniške postaje
-                        </label>
-                    </div>
-                    <div style={{ margin: 0, padding: 0 }}>
-                        <h3>Prevozniki</h3>
-                        {Object.entries({
-                            lpp: "LPP",
-                            arriva: "Arriva",
-                            nomago: "Nomago",
-                            marprom: "Marprom",
-                            murska: "Murska Sobota",
-                            kranj: "MP Kranj",
-                            generic: "Ostali",
-                        }).map(([key, label]) => (
-                            <label key={key}>
-                                <input
-                                    type="checkbox"
-                                    checked={busOperators[key]}
-                                    onChange={(e) =>
-                                        setBusOperators((prev) => ({
-                                            ...prev,
-                                            [key]: e.target.checked,
-                                        }))
-                                    }
-                                />
-                                {label}
-                            </label>
-                        ))}
-                    </div>
-                </div>
-                <h3
-                    style={{
-                        textAlign: "center",
-                        padding: "5px",
-                        borderTop: "1px solid var(--selector-border)",
-                    }}
-                >
-                    Temni način (aplikacija)
-                </h3>
-                <div className="theme-switcher">
-                    <p>Temno</p>
-                    <button
-                        type="button"
-                        role="switch"
-                        aria-checked={isDark}
-                        aria-label="Preklopi temni način"
-                        onClick={() => {
-                            const next = isDark ? "light" : "dark";
-                            setTheme(next);
-                            try {
-                                localStorage.setItem("theme", next);
-                            } catch {}
-                            const container = document.querySelector('.container');
-                            if (container) {
-                                container.className = `container ${next}`;
-                            }
-                        }}
-                    >
-                        <span aria-hidden />
-                    </button>
-                    <p>Svetlo</p>
-                </div>
-                <h3 style={
-                    {
-                        textAlign: "center",
-                        padding: "5px",
-                        borderTop: "1px solid var(--selector-border)",
-                    }
-                }>
-                    Temni način (zemljevid)
-                </h3>
-                <div className="theme-switcher">
-                    <p>Temno</p>
-                    <button
-                        type="button"
-                        role="switch"
-                        aria-checked={mapTheme === "dark"}
-                        aria-label="Preklopi temni način zemljevida"
-                        onClick={() => {
-                            const next = mapTheme === "dark" ? "light" : "dark";
-                            setMapTheme(next);
-                            try {
-                                localStorage.setItem("mapTheme", next);
-                            } catch {}
-                            window.dispatchEvent(new Event("mapThemeChange"));
-                        }}
-                    >
-                        <span aria-hidden />
-                    </button>
-                    <p>Svetlo</p>
-                </div>
-                <h3
-                    style={{
-                        textAlign: "center",
-                        padding: "5px",
-                        borderTop: "1px solid var(--selector-border)",
-                    }}
-                >
-                    Radij postaj
-                </h3>
-                <div className="ranges">
-                    <label>
-                        Avtobusne postaje: {radius.busRadius} km
-                        <input
-                            type="range"
-                            min="1"
-                            max="20"
-                            value={radius.busRadius}
-                            onChange={(e) => {
-                                const newRadius = {
-                                    ...radius,
-                                    busRadius: Number(e.target.value),
-                                };
-                                setRadius(newRadius);
-                                localStorage.setItem(
-                                    "stationRadius",
-                                    JSON.stringify(newRadius)
-                                );
-                            }}
-                        />
-                    </label>
-                    <label>
-                        Železniške postaje: {radius.szRadius} km
-                        <input
-                            type="range"
-                            min="5"
-                            max="300"
-                            value={radius.szRadius}
-                            onChange={(e) => {
-                                const newRadius = {
-                                    ...radius,
-                                    szRadius: Number(e.target.value),
-                                };
-                                setRadius(newRadius);
-                                localStorage.setItem(
-                                    "stationRadius",
-                                    JSON.stringify(newRadius)
-                                );
-                            }}
-                        />
-                    </label>
-                </div>
-                <h3
-                    style={{
-                        textAlign: "center",
-                        padding: "5px",
-                        borderTop: "1px solid var(--selector-border)",
-                    }}
-                >
-                    O aplikaciji
-                </h3>
-                <p className="about">
-                    Avtor:{" "}
-                    <a href="https://cernetic.cc" target="_blank">
-                        Jaka Černetič
-                    </a>
-                    <br />
-                    Viri podatkov:
-                    {" "}
-                    <a href="https://data.lpp.si/doc" target="_blank">
-                        LPP
-                    </a>
+	return (
+		<div className="settings">
+			<h2>Nastavitve</h2>
+			<div className="inside">
+				<h3 className="settings__heading">Zemljevid</h3>
+				<div className="map-settings">
+					<CheckboxGroup
+						title="Aktivni markerji"
+						options={MARKER_OPTIONS}
+						values={visibility}
+						onChange={(key, checked) =>
+							setVisibility((v) => ({ ...v, [key]: checked }))
+						}
+					/>
+					<CheckboxGroup
+						title="Prevozniki"
+						options={OPERATOR_OPTIONS}
+						values={busOperators}
+						onChange={(key, checked) =>
+							setBusOperators((prev) => ({
+								...prev,
+								[key]: checked,
+							}))
+						}
+					/>
+				</div>
 
-                    ,{" "}
-                    <a
-                        href="https://mestnipromet.cyou/tracker/"
-                        target="_blank"
-                    >
-                        Mestni promet
-                    </a>
-                    ,{" "}
-                    <a href="https://beta.brezavta.si/" target="_blank">
-                        Brezavta
-                    </a>
-                    ,{" "}
-                    <a
-                        href="https://mapper-motis.ojpp-gateway.derp.si/"
-                        target="_blank"
-                    >
-                        SŽ Mapper
-                    </a>
-                    ,{" "}
-                    <a
-                        href="https://gitlab.com/derp-si/ojpp-docs"
-                        target="_blank"
-                    >
-                        (DERP)
-                    </a>
-                    ,{" "}
-                    <a
-                        href="https://prikazovalnik.gt.tc/zemljevid.html"
-                        target="_blank"
-                    >
-                        Prikazovalnik
-                    </a>
-                    
-                    <br />
-                    Izvirna koda:{" "}
-                    <a
-                        href="https://github.com/jakecernet/ijpp-tracker"
-                        target="_blank"
-                    >
-                        GitHub
-                    </a>
-                </p>
-            </div>
-        </div>
-    );
+				<ThemeSwitch
+					title="Temni način (aplikacija)"
+					label="Preklopi temni način"
+					isDark={theme === "dark"}
+					onToggle={() =>
+						setTheme(theme === "dark" ? "light" : "dark")
+					}
+				/>
+				<ThemeSwitch
+					title="Temni način (zemljevid)"
+					label="Preklopi temni način zemljevida"
+					isDark={mapTheme === "dark"}
+					onToggle={() =>
+						setMapTheme(mapTheme === "dark" ? "light" : "dark")
+					}
+				/>
+
+				<h3 className="settings__heading settings__heading--divided">
+					Radij postaj
+				</h3>
+				<div className="ranges">
+					<RadiusSlider
+						label="Avtobusne postaje"
+						value={radius.busRadius}
+						min={1}
+						max={20}
+						onChange={(busRadius) =>
+							setRadius((r) => ({ ...r, busRadius }))
+						}
+					/>
+					<RadiusSlider
+						label="Železniške postaje"
+						value={radius.szRadius}
+						min={5}
+						max={300}
+						onChange={(szRadius) =>
+							setRadius((r) => ({ ...r, szRadius }))
+						}
+					/>
+				</div>
+
+				<h3 className="settings__heading settings__heading--divided">
+					O aplikaciji
+				</h3>
+				<p className="about">
+					Avtor:{" "}
+					<ExternalLink href="https://cernetic.cc">
+						Jaka Černetič
+					</ExternalLink>
+					<br />
+					Viri podatkov:{" "}
+					{SOURCE_LINKS.map(([href, label], index) => (
+						<span key={href}>
+							{index > 0 && ", "}
+							<ExternalLink href={href}>{label}</ExternalLink>
+						</span>
+					))}
+					<br />
+					Izvirna koda:{" "}
+					<ExternalLink href="https://github.com/jakecernet/ijpp-tracker">
+						GitHub
+					</ExternalLink>
+				</p>
+			</div>
+		</div>
+	);
 };
 
-export default SettingsTab;
+export default memo(SettingsTab);

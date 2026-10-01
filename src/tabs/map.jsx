@@ -1,529 +1,222 @@
-import React, {
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-
 import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 
-maplibregl.setWorkerUrl(maplibreWorkerUrl);
-
+import { useBottomSheet } from "../hooks/useBottomSheet";
 import {
 	DEFAULT_CENTER,
 	DEFAULT_ZOOM,
 	ICON_SOURCES,
-	operatorToIcon,
 	OSM_STYLE_DARK,
 	OSM_STYLE_LIGHT,
 } from "./map/config";
 import {
-	toGeoJSONPoints,
-	ensureIcons,
-	stopsToFeatures,
-	parseTrainCoord,
-	getStopCoord,
-} from "./map/utils";
+	buildBusesGeoJSON,
+	buildBusStopsGeoJSON,
+	buildTripOverlay,
+	buildTrainsGeoJSON,
+	buildTrainStopsGeoJSON,
+	isTrainRoute,
+} from "./map/geojson";
+import { registerMapInteractions } from "./map/interactions";
 import {
-	setupSourcesAndLayers,
-	updateSourceData,
-	setPrefixVisible,
-	setupTripOverlay,
-	clearTripOverlay,
-	updateTripOverlay,
 	BRAND_COLOR_EXPR,
+	clearTripOverlay,
+	registerClusterInteractions,
+	setPrefixVisible,
+	setupSourcesAndLayers,
+	setupTripOverlay,
+	updateSourceData,
+	updateTripOverlay,
 } from "./map/layers";
-import {
-	configureBusStopPopup,
-	configureTrainStopPopup,
-	configureTrainPopup,
-	configureBusPopup,
-	configureTripStopsPopup,
-} from "./map/interactions";
+import { ensureIcons } from "./map/utils";
 import RouteTab from "./route.jsx";
+
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 const PROVIDER_PREFIXES = ["ijpp", "lpp", "sz"];
 const ROUTE_DRAWER_PEEK_HEIGHT = 140;
+const EMPTY_COLLECTION = { type: "FeatureCollection", features: [] };
 
-const isValidCoord = (coord) => Array.isArray(coord) && coord.length >= 2;
+const FIT_OPTIONS = {
+	padding: {
+		top: 60,
+		right: 60,
+		bottom: ROUTE_DRAWER_PEEK_HEIGHT + 60,
+		left: 60,
+	},
+	maxZoom: 15,
+	duration: 800,
+};
 
-const getMapStyle = () =>
-	typeof window === "undefined"
-		? OSM_STYLE_LIGHT
-		: localStorage.getItem("mapTheme") === "dark"
-			? OSM_STYLE_DARK
-			: OSM_STYLE_LIGHT;
+const getMapStyle = (theme) =>
+	theme === "dark" ? OSM_STYLE_DARK : OSM_STYLE_LIGHT;
 
-const Map = React.memo(function Map({
+/** Ikone, viri in sloji - po vsaki (ponovni) naložitvi sloga. */
+async function setupMapContent(map, data) {
+	await ensureIcons(map, ICON_SOURCES);
+	setupSourcesAndLayers(map, data);
+	PROVIDER_PREFIXES.forEach((prefix) =>
+		setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
+	);
+}
+
+/** Stabilen ključ izbrane vožnje (za odpiranje spodnjega lista). */
+function getVehicleKey(vehicle) {
+	if (!vehicle) return null;
+	if (vehicle.tripId != null) return String(vehicle.tripId);
+	return JSON.stringify([
+		vehicle.lineNumber ?? null,
+		vehicle.lineId ?? null,
+		vehicle.routeId ?? null,
+		vehicle.vehicleId ?? null,
+		vehicle.from?.stopId ?? vehicle.from?.name ?? null,
+		vehicle.to?.stopId ?? vehicle.to?.name ?? null,
+	]);
+}
+
+const MapTab = memo(function MapTab({
 	gpsPositions,
+	trains,
 	busStops,
 	trainStops = [],
 	activeStation,
-	setActiveStation,
+	onSelectStation,
 	userLocation,
-	trainPositions,
 	setSelectedVehicle,
 	selectedVehicle,
 	routeLoading,
 	visibility,
 	busOperators,
+	mapTheme,
 	isActive = true,
 }) {
+	const containerRef = useRef(null);
 	const mapRef = useRef(null);
-	const mapInstanceRef = useRef(null);
-	const handlersRef = useRef({
-		setActiveStation,
-		setSelectedVehicle,
-	});
-	const routeDrawerRef = useRef(null);
+	const [isMapLoaded, setIsMapLoaded] = useState(false);
+	const [mapError, setMapError] = useState(false);
 	const initialCenterRef = useRef(
 		userLocation || activeStation?.coordinates || DEFAULT_CENTER,
 	);
+	const appliedThemeRef = useRef(mapTheme);
+	const pendingFitRef = useRef(null);
+	const fittedKeyRef = useRef(null);
 
-	useEffect(() => {
-		if (!isActive) return;
-		const map = mapInstanceRef.current;
-		if (!map) return;
-		const id = requestAnimationFrame(() => map.resize());
-		return () => cancelAnimationFrame(id);
-	}, [isActive]);
+	// --- Stanje izbrane poti (vse izpeljano iz selectedVehicle) ---------------
 
-	const [filterByRoute, setFilterByRoute] = useState(false);
-	const [routeDrawerOpen, setRouteDrawerOpen] = useState(false);
-	const [routeDrawerSnap, setRouteDrawerSnap] = useState("peek");
-	const [routeDrawerHeight, setRouteDrawerHeight] = useState(0);
-	const [routeDrawerTranslateY, setRouteDrawerTranslateY] = useState(null);
-	const [routeVisibilityOverride, setRouteVisibilityOverride] =
-		useState(null);
-	const [isMapLoaded, setIsMapLoaded] = useState(false);
-
-	useEffect(() => {
-		handlersRef.current = {
-			setActiveStation,
-			setSelectedVehicle,
-		};
-	}, [setActiveStation, setSelectedVehicle]);
-
-	useEffect(() => {
-		try {
-			const requested = sessionStorage.getItem("openRouteDrawer") === "1";
-			if (!requested) return;
-			sessionStorage.removeItem("openRouteDrawer");
-			setRouteDrawerOpen(true);
-			setRouteDrawerSnap("peek");
-		} catch {}
-	}, []);
-
-	const selectedVehicleKey = useMemo(() => {
-		if (!selectedVehicle) return null;
-
-		if (selectedVehicle.tripId != null) {
-			return String(selectedVehicle.tripId);
-		}
-
-		return JSON.stringify({
-			lineNumber: selectedVehicle.lineNumber ?? null,
-			lineId: selectedVehicle.lineId ?? null,
-			routeId: selectedVehicle.routeId ?? null,
-			vehicleId: selectedVehicle.vehicleId ?? null,
-			from:
-				selectedVehicle.from?.stopId ??
-				selectedVehicle.from?.name ??
-				null,
-			to: selectedVehicle.to?.stopId ?? selectedVehicle.to?.name ?? null,
-		});
-	}, [selectedVehicle]);
-
-	const didMountRef = useRef(false);
-	const lastSelectedVehicleKeyRef = useRef(null);
-	const [pendingDrawerOpen, setPendingDrawerOpen] = useState(false);
-
-	// When a new vehicle is selected, mark the drawer as pending-open
-	useEffect(() => {
-		if (!didMountRef.current) {
-			didMountRef.current = true;
-			lastSelectedVehicleKeyRef.current = selectedVehicleKey;
-			return;
-		}
-
-		if (!selectedVehicleKey) {
-			lastSelectedVehicleKeyRef.current = null;
-			setPendingDrawerOpen(false);
-			return;
-		}
-
-		if (lastSelectedVehicleKeyRef.current !== selectedVehicleKey) {
-			lastSelectedVehicleKeyRef.current = selectedVehicleKey;
-			setPendingDrawerOpen(true);
-		}
-	}, [selectedVehicleKey]);
-
-	// Open the drawer once loading is done
-	useEffect(() => {
-		if (pendingDrawerOpen && !routeLoading) {
-			setPendingDrawerOpen(false);
-			setRouteDrawerOpen(true);
-			setRouteDrawerSnap("peek");
-		}
-	}, [pendingDrawerOpen, routeLoading]);
-	// When the drawer is open for a selected route, show only the route path + route stops overlays.
-	// (Arrivals selection bypasses map popups that normally set this up.)
-	useEffect(() => {
-		if (!routeDrawerOpen || !selectedVehicle) {
-			setRouteVisibilityOverride(null);
-			return;
-		}
-
-		const operatorText =
-			typeof selectedVehicle?.operator === "string"
-				? selectedVehicle.operator.toLowerCase()
-				: "";
-		const isTrainRoute =
-			selectedVehicle?.brand === "sz" ||
-			operatorText.includes("sž") ||
-			operatorText.includes("slovenske železnice") ||
-			(selectedVehicle?.tripShort != null &&
-				selectedVehicle?.lineNumber == null &&
-				selectedVehicle?.lineId == null);
-
-		setFilterByRoute(true);
-		setRouteVisibilityOverride({
-			buses: !isTrainRoute,
-			busStops: false,
-			trainPositions: isTrainRoute,
-			trainStops: false,
-		});
-	}, [routeDrawerOpen, selectedVehicleKey, selectedVehicle]);
-
-	// Measure drawer height
-	useEffect(() => {
-		const el = routeDrawerRef.current;
-		if (!el) return;
-
-		const update = () => {
-			const next = Math.round(el.getBoundingClientRect().height);
-			if (Number.isFinite(next) && next > 0) setRouteDrawerHeight(next);
-		};
-
-		update();
-
-		if (typeof ResizeObserver === "undefined") return;
-		const ro = new ResizeObserver(() => update());
-		ro.observe(el);
-		return () => ro.disconnect();
-	}, []);
-
-	const routeDrawerPeekTranslateY = Math.max(
-		0,
-		routeDrawerHeight - ROUTE_DRAWER_PEEK_HEIGHT,
+	const routeMode = selectedVehicle != null;
+	const routeIsTrain = useMemo(
+		() => isTrainRoute(selectedVehicle),
+		[selectedVehicle],
+	);
+	const selectedRoute = routeMode ? selectedVehicle : null;
+	const selectedVehicleKey = useMemo(
+		() => getVehicleKey(selectedVehicle),
+		[selectedVehicle],
 	);
 
-	// Apply snap when opening/closing or when height changes.
-	useEffect(() => {
-		if (!routeDrawerOpen) {
-			setRouteDrawerTranslateY(null);
-			return;
-		}
-
-		if (routeDrawerSnap === "full") {
-			setRouteDrawerTranslateY(0);
-			return;
-		}
-
-		setRouteDrawerTranslateY(routeDrawerPeekTranslateY);
-	}, [routeDrawerOpen, routeDrawerSnap, routeDrawerPeekTranslateY]);
-
-	const dragStateRef = useRef({
-		dragging: false,
-		startY: 0,
-		startTranslateY: 0,
-	});
-
-	const prevRouteDrawerOpenRef = useRef(false);
-
-	const onRouteDrawerPointerDown = (e) => {
-		if (!routeDrawerOpen) return;
-		if (e.button != null && e.button !== 0) return;
-
-		const startTranslate =
-			routeDrawerTranslateY != null
-				? routeDrawerTranslateY
-				: routeDrawerSnap === "full"
-					? 0
-					: routeDrawerPeekTranslateY;
-
-		dragStateRef.current = {
-			dragging: true,
-			startY: e.clientY,
-			startTranslateY: startTranslate,
-		};
-
-		try {
-			e.currentTarget.setPointerCapture(e.pointerId);
-		} catch {}
-	};
-
-	const onRouteDrawerPointerMove = (e) => {
-		if (!dragStateRef.current.dragging) return;
-
-		const delta = e.clientY - dragStateRef.current.startY;
-		const next = dragStateRef.current.startTranslateY + delta;
-
-		const maxY = routeDrawerHeight || routeDrawerPeekTranslateY;
-		const clamped = Math.min(maxY, Math.max(0, next));
-		setRouteDrawerTranslateY(clamped);
-	};
-
-	const onRouteDrawerPointerUpOrCancel = () => {
-		if (!dragStateRef.current.dragging) return;
-		dragStateRef.current.dragging = false;
-
-		const y =
-			routeDrawerTranslateY != null
-				? routeDrawerTranslateY
-				: routeDrawerPeekTranslateY;
-
-		const dismissThreshold = routeDrawerPeekTranslateY + 60;
-		if (y >= dismissThreshold) {
-			resetRouteView();
-			setRouteDrawerOpen(false);
-			return;
-		}
-
-		const threshold = routeDrawerPeekTranslateY / 2;
-		if (y <= threshold) setRouteDrawerSnap("full");
-		else setRouteDrawerSnap("peek");
-	};
-
-	const busesGeoJSON = useMemo(() => {
-		const filtered = (gpsPositions || []).filter((pos) => {
-			const brandKey = operatorToIcon[pos?.operator] || "generic";
-			if (!busOperators[brandKey]) return false;
-
-			if (filterByRoute && selectedVehicle) {
-				const hasLine =
-					pos.lineNumber !== undefined || pos.lineId !== undefined;
-				if (hasLine) {
-					const match =
-						(selectedVehicle.lineNumber &&
-							pos.lineNumber === selectedVehicle.lineNumber) ||
-						(selectedVehicle.routeName &&
-							pos.lineNumber === selectedVehicle.routeName) ||
-						(selectedVehicle.tripId &&
-							pos.tripId === selectedVehicle.tripId);
-					if (!match) return false;
-				} else if (
-					pos.tripId !== undefined &&
-					selectedVehicle.tripId &&
-					pos.tripId !== selectedVehicle.tripId
-				) {
-					return false;
-				}
-			}
-			return true;
-		});
-
-		return toGeoJSONPoints(
-			filtered,
-			(pos) => pos?.gpsLocation,
-			(pos) => {
-				const operatorIcon = operatorToIcon[pos?.operator];
-				const isLpp =
-					pos?.operator
-						?.toLowerCase?.()
-						.includes("ljubljanski potniški promet") ||
-					pos?.lineNumber !== undefined ||
-					pos?.lineId !== undefined;
-				const icon = operatorIcon || "bus-generic";
-				return {
-					...pos,
-					gpsLocation: undefined,
-					sourceType: isLpp ? "lpp" : "ijpp",
-					icon,
-					brand: icon === "bus-generic" ? "generic" : icon,
-					operator: pos?.operator || "",
-				};
-			},
-		);
-	}, [gpsPositions, busOperators, filterByRoute, selectedVehicle]);
-
-	const busStopsGeoJSON = useMemo(
+	// Med prikazom poti so vidni samo vozila/vlaki te poti, ne pa postaje.
+	const effectiveVisibility = useMemo(
 		() =>
-			toGeoJSONPoints(
-				busStops,
-				(stop) => stop?.gpsLocation,
-				(stop) => ({
-					id:
-						stop?.ijppID ??
-						stop?.refID ??
-						stop?.ref_id ??
-						stop?.id ??
-						stop?.name,
-					name: stop?.name,
-					icon: "bus-stop",
-					ref_id: stop?.ref_id ?? stop?.refID ?? null,
-					gtfs_id: stop?.gtfs_id ?? null,
-					ijpp_id: stop?.ijpp_id ?? null,
-					vCenter: stop?.vCenter ?? false,
-					routes_on_stop: JSON.stringify(stop?.routes_on_stop ?? []),
-				}),
-			),
+			routeMode
+				? {
+						buses: !routeIsTrain,
+						busStops: false,
+						trainPositions: routeIsTrain,
+						trainStops: false,
+					}
+				: visibility,
+		[routeMode, routeIsTrain, visibility],
+	);
+
+	// --- GeoJSON ---------------------------------------------------------------
+
+	const busesGeoJSON = useMemo(
+		() => buildBusesGeoJSON(gpsPositions, busOperators, selectedRoute),
+		[gpsPositions, busOperators, selectedRoute],
+	);
+	const busStopsGeoJSON = useMemo(
+		() => buildBusStopsGeoJSON(busStops),
 		[busStops],
 	);
-
 	const trainStopsGeoJSON = useMemo(
-		() =>
-			toGeoJSONPoints(trainStops, getStopCoord, (stop, coord) => ({
-				id: stop?.stopId ?? stop?.id ?? stop?.name,
-				name: stop?.name ?? "",
-				stopId: stop?.stopId ?? null,
-				icon: "train-stop",
-				lat: coord?.[0] ?? null,
-				lon: coord?.[1] ?? null,
-			})),
+		() => buildTrainStopsGeoJSON(trainStops),
 		[trainStops],
 	);
 
-	const trainPositionsGeoJSON = useMemo(() => {
-		const filtered =
-			filterByRoute && selectedVehicle?.tripId
-				? (trainPositions || []).filter(
-						(t) => t.tripId === selectedVehicle.tripId,
-					)
-				: trainPositions || [];
-
-		return toGeoJSONPoints(
-			filtered,
-			(train) => parseTrainCoord(train?.gpsLocation),
-			(train) => ({
-				id: train?.tripId,
-				relation: [train?.from?.name, train?.to?.name]
-					.filter(Boolean)
-					.join(" - "),
-				fromStation: train?.from?.name,
-				toStation: train?.to?.name,
-				departure: train?.departure,
-				arrival: train?.arrival,
-				icon: "train",
-				brand: "sz",
-				tripId: train?.tripId ?? null,
-				tripShort: train?.tripShort ?? null,
-				realTime: train?.realtime ?? false,
-				from: JSON.stringify(train?.from ?? null),
-				to: JSON.stringify(train?.to ?? null),
-				bearing: train?.bearing ?? 0,
-				delay: train?.delay ?? 0,
-			}),
-		);
-	}, [trainPositions, filterByRoute, selectedVehicle?.tripId]);
-
-	const dataRef = useRef(null);
+	// Ob (ponovni) postavitvi slojev potrebujemo trenutne podatke.
+	const dataRef = useRef({});
 	dataRef.current = {
 		buses: busesGeoJSON,
 		busStops: busStopsGeoJSON,
-		trainPositions: trainPositionsGeoJSON,
+		trainPositions: EMPTY_COLLECTION, // animacija jih takoj nadomesti
 		trainStops: trainStopsGeoJSON,
 	};
 
-	const initMapLayers = useCallback(async (map) => {
-		await ensureIcons(map, ICON_SOURCES);
+	const handlersRef = useRef({});
+	useEffect(() => {
+		handlersRef.current = {
+			onSelectStation,
+			onSelectVehicle: setSelectedVehicle,
+		};
+	}, [onSelectStation, setSelectedVehicle]);
 
-		setupSourcesAndLayers(map, dataRef.current);
+	// --- Spodnji list z potjo --------------------------------------------------
 
-		PROVIDER_PREFIXES.forEach((prefix) =>
-			setupTripOverlay(map, prefix, BRAND_COLOR_EXPR),
-		);
-
-		configureBusStopPopup({
-			map,
-			onSelectStop: (stop) => {
-				const payload = {
-					name: stop.name,
-					coordinates: stop.gpsLocation,
-					ref_id: stop.ref_id,
-					gtfs_id: stop.gtfs_id,
-					ijpp_id: stop.ijpp_id,
-					type: "bus-stop",
-				};
-				handlersRef.current.setActiveStation(payload);
-				localStorage.setItem("activeStation", JSON.stringify(payload));
-				window.location.hash = "/lines";
-			},
-		});
-
-		configureTrainStopPopup({
-			map,
-			onSelectStop: (stop) => {
-				const coordinates = Array.isArray(stop?.gpsLocation)
-					? stop.gpsLocation
-					: [stop?.lat, stop?.lon];
-				if (
-					!Array.isArray(coordinates) ||
-					!Number.isFinite(coordinates[0]) ||
-					!Number.isFinite(coordinates[1])
-				) {
-					return;
-				}
-				const payload = {
-					name: stop.name,
-					coordinates,
-					gpsLocation: coordinates,
-					stopId: stop.stopId ?? null,
-					lat: coordinates[0],
-					lon: coordinates[1],
-					type: "train-stop",
-				};
-				handlersRef.current.setActiveStation(payload);
-				localStorage.setItem("activeStation", JSON.stringify(payload));
-				window.location.hash = "/lines";
-			},
-		});
-
-		configureTrainPopup({
-			map,
-			onSelectVehicle: (vehicle) => {
-				handlersRef.current.setSelectedVehicle(vehicle);
-				// Enable route-only SZ view and hide buses & stations
-				setFilterByRoute(true);
-				setRouteVisibilityOverride({
-					buses: false,
-					busStops: false,
-					trainPositions: true,
-					trainStops: false,
-				});
-			},
-		});
-
-		configureBusPopup({
-			map,
-			onSelectVehicle: (vehicle) => {
-				handlersRef.current.setSelectedVehicle(vehicle);
-				// Enable route-only bus view and hide stations & SZ markers
-				setFilterByRoute(true);
-				setRouteVisibilityOverride({
-					buses: true,
-					busStops: false,
-					trainPositions: false,
-					trainStops: false,
-				});
-			},
-		});
-
-		PROVIDER_PREFIXES.forEach((prefix) =>
-			configureTripStopsPopup(map, `${prefix}-trip-stops-points`),
-		);
+	const clearPathOverlays = useCallback(() => {
+		const map = mapRef.current;
+		if (!map) return;
+		PROVIDER_PREFIXES.forEach((prefix) => clearTripOverlay(map, prefix));
 	}, []);
 
-	useEffect(() => {
-		if (mapInstanceRef.current) return;
+	const resetRouteView = useCallback(() => {
+		clearPathOverlays();
+		setSelectedVehicle(null);
+	}, [clearPathOverlays, setSelectedVehicle]);
 
+	const sheet = useBottomSheet({
+		peekHeight: ROUTE_DRAWER_PEEK_HEIGHT,
+		onDismiss: resetRouteView,
+	});
+	const { open: openSheet, close: closeSheet, isOpen: isSheetOpen } = sheet;
+
+	const lastKeyRef = useRef(selectedVehicleKey);
+	const [pendingOpen, setPendingOpen] = useState(false);
+
+	// Nova vožnja -> list se odpre, ko so podatki naloženi.
+	useEffect(() => {
+		if (!selectedVehicleKey) {
+			lastKeyRef.current = null;
+			setPendingOpen(false);
+			return;
+		}
+		if (lastKeyRef.current !== selectedVehicleKey) {
+			lastKeyRef.current = selectedVehicleKey;
+			setPendingOpen(true);
+		}
+	}, [selectedVehicleKey]);
+
+	useEffect(() => {
+		if (pendingOpen && !routeLoading) {
+			setPendingOpen(false);
+			openSheet();
+		}
+	}, [pendingOpen, routeLoading, openSheet]);
+
+	// Izbira je bila od zunaj počiščena (npr. menjava zavihka) -> zapri list.
+	useEffect(() => {
+		if (!selectedVehicle && isSheetOpen) closeSheet();
+	}, [selectedVehicle, isSheetOpen, closeSheet]);
+
+	// --- Zemljevid: ustvarjanje ---------------------------------------------------
+
+	useEffect(() => {
+		let map;
 		try {
-			const map = new maplibregl.Map({
-				container: mapRef.current,
-				style: getMapStyle(),
+			map = new maplibregl.Map({
+				container: containerRef.current,
+				style: getMapStyle(appliedThemeRef.current),
 				center: [
 					initialCenterRef.current[1],
 					initialCenterRef.current[0],
@@ -532,90 +225,123 @@ const Map = React.memo(function Map({
 				attributionControl: true,
 				maxZoom: 22,
 			});
-
-			mapInstanceRef.current = map;
-			map.addControl(
-				new maplibregl.NavigationControl({ showCompass: true }),
-				"top-right",
-			);
-			map.addControl(
-				new maplibregl.GeolocateControl({
-					positionOptions: { enableHighAccuracy: true },
-					trackUserLocation: true,
-					showUserLocation: true,
-					showAccuracyCircle: true,
-					fitBoundsOptions: { maxZoom: 15 },
-				}),
-				"top-right",
-			);
-			map.addControl(
-				new maplibregl.FullscreenControl({ container: document.body }),
-				"top-right",
-			);
-
-			map.on("load", async () => {
-				await initMapLayers(map);
-				setIsMapLoaded(true);
-			});
-
-			const handleMapThemeChange = async () => {
-				if (!mapInstanceRef.current) return;
-				setIsMapLoaded(false);
-				try {
-					await new Promise((resolve) => {
-						map.once("style.load", resolve);
-						map.setStyle(getMapStyle());
-					});
-					if (!mapInstanceRef.current) return; // unmounted mid-restyle
-					await initMapLayers(map);
-					if (!mapInstanceRef.current) return;
-					setIsMapLoaded(true);
-				} catch (err) {
-					console.error("Failed to apply map theme:", err);
-				}
-			};
-			window.addEventListener("mapThemeChange", handleMapThemeChange);
-
-			return () => {
-				window.removeEventListener(
-					"mapThemeChange",
-					handleMapThemeChange,
-				);
-				map.remove();
-				mapInstanceRef.current = null;
-			};
-		} catch (err) {
-			console.error("Failed to initialize map:", err);
-			if (mapRef.current) {
-				mapRef.current.innerHTML =
-					'<div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f5f5f5;"><div style="text-align: center;"><p style="margin: 0; color: #333; font-size: 16px;">Zemljevid se ne more naložiti</p><p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Prosim, preverite grafični gonilnik ali poskusite osvežiti stran.</p></div></div>';
-			}
+		} catch (error) {
+			console.error("Failed to initialize map:", error);
+			setMapError(true);
+			return;
 		}
-	}, [initMapLayers]);
 
-	// Update GeoJSON sources
-	useEffect(() => {
-		const map = mapInstanceRef.current;
-		if (!map || !isMapLoaded) return;
-		[
-			["buses", busesGeoJSON],
-			["busStops", busStopsGeoJSON],
-			["trainPositions", trainPositionsGeoJSON],
-			["trainStops", trainStopsGeoJSON],
-		].forEach(([source, data]) => updateSourceData(map, source, data));
-	}, [
-		busesGeoJSON,
-		busStopsGeoJSON,
-		trainPositionsGeoJSON,
-		trainStopsGeoJSON,
-		isMapLoaded,
-	]);
+		mapRef.current = map;
+		map.addControl(
+			new maplibregl.NavigationControl({ showCompass: true }),
+			"top-right",
+		);
+		map.addControl(
+			new maplibregl.GeolocateControl({
+				positionOptions: { enableHighAccuracy: true },
+				trackUserLocation: true,
+				showUserLocation: true,
+				showAccuracyCircle: true,
+				fitBoundsOptions: { maxZoom: 15 },
+			}),
+			"top-right",
+		);
+		map.addControl(
+			new maplibregl.FullscreenControl({ container: document.body }),
+			"top-right",
+		);
 
-	// Apply layer visibility (use override when route is selected)
+		map.on("load", async () => {
+			await setupMapContent(map, dataRef.current);
+			if (mapRef.current !== map) return; // odstranjen med nalaganjem
+			// Poslušalce registriramo ENKRAT - preživijo menjavo sloga.
+			registerClusterInteractions(map);
+			registerMapInteractions(map, () => handlersRef.current);
+			setIsMapLoaded(true);
+		});
+
+		return () => {
+			map.remove();
+			mapRef.current = null;
+			setIsMapLoaded(false);
+		};
+	}, []);
+
+	// Menjava teme: nov slog, nato znova postavimo naše vire in sloje.
 	useEffect(() => {
-		const map = mapInstanceRef.current;
+		const map = mapRef.current;
+		if (!map || !isMapLoaded || appliedThemeRef.current === mapTheme)
+			return;
+
+		appliedThemeRef.current = mapTheme;
+		setIsMapLoaded(false);
+		map.once("style.load", async () => {
+			await setupMapContent(map, dataRef.current);
+			if (mapRef.current === map) setIsMapLoaded(true);
+		});
+		map.setStyle(getMapStyle(mapTheme));
+	}, [mapTheme, isMapLoaded]);
+
+	// Skrit zavihek ima velikost 0: ob vrnitvi popravimo velikost in izvedemo zamaknjen fitBounds.
+	useEffect(() => {
+		if (!isActive) return;
+		const map = mapRef.current;
+		if (!map) return;
+		const frame = requestAnimationFrame(() => {
+			map.resize();
+			if (pendingFitRef.current) {
+				map.fitBounds(pendingFitRef.current, FIT_OPTIONS);
+				pendingFitRef.current = null;
+			}
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [isActive, isMapLoaded]);
+
+	// --- Zemljevid: podatki (vsak vir posebej, da posodobitev avtobusov
+	// ne pošilja znova 11.000+ postaj v worker) ---------------------------------
+
+	useEffect(() => {
+		if (isMapLoaded)
+			updateSourceData(mapRef.current, "buses", busesGeoJSON);
+	}, [busesGeoJSON, isMapLoaded]);
+
+	useEffect(() => {
+		if (isMapLoaded)
+			updateSourceData(mapRef.current, "busStops", busStopsGeoJSON);
+	}, [busStopsGeoJSON, isMapLoaded]);
+
+	useEffect(() => {
+		if (isMapLoaded) {
+			updateSourceData(mapRef.current, "trainStops", trainStopsGeoJSON);
+		}
+	}, [trainStopsGeoJSON, isMapLoaded]);
+
+	// Vlaki: pozicijo interpoliramo vsako sekundo neposredno v viru zemljevida,
+	// brez React stanja (prej je to ponovno izrisalo celotno aplikacijo).
+	const onlyTripId = routeMode ? (selectedVehicle?.tripId ?? null) : null;
+	const trainsVisible = effectiveVisibility.trainPositions;
+	useEffect(() => {
+		const map = mapRef.current;
 		if (!map || !isMapLoaded) return;
-		const effectiveVisibility = routeVisibilityOverride || visibility;
+
+		const render = () =>
+			updateSourceData(
+				map,
+				"trainPositions",
+				buildTrainsGeoJSON(trains, Date.now(), onlyTripId),
+			);
+		render();
+
+		if (!isActive || !trainsVisible || !trains?.length) return;
+		const timer = setInterval(() => {
+			if (!document.hidden) render();
+		}, 1000);
+		return () => clearInterval(timer);
+	}, [trains, isMapLoaded, isActive, trainsVisible, onlyTripId]);
+
+	useEffect(() => {
+		const map = mapRef.current;
+		if (!map || !isMapLoaded) return;
 		[
 			["buses", effectiveVisibility.buses],
 			["busStops", effectiveVisibility.busStops],
@@ -624,162 +350,81 @@ const Map = React.memo(function Map({
 		].forEach(([prefix, visible]) =>
 			setPrefixVisible(map, prefix, visible),
 		);
-	}, [visibility, routeVisibilityOverride, isMapLoaded]);
+	}, [effectiveVisibility, isMapLoaded]);
 
-	// Update all trip overlays in a single effect
+	// Črta in postaje izbrane poti + prilagoditev pogleda.
 	useEffect(() => {
-		const map = mapInstanceRef.current;
+		const map = mapRef.current;
 		if (!map || !isMapLoaded) return;
 
-		// Clear all overlays first
-		PROVIDER_PREFIXES.forEach((p) => clearTripOverlay(map, p));
-		if (!selectedVehicle) return;
-
-		const brand = operatorToIcon[selectedVehicle?.operator] || "generic";
-		const geo = selectedVehicle.geometry || [];
-
-		// Determine provider and collect coords/stops for overlay + fitBounds
-		const hasLppPoints = geo[0]?.points !== undefined;
-		const isLpp = selectedVehicle.lineId !== undefined || hasLppPoints;
-		const isSz =
-			selectedVehicle.tripShort !== undefined &&
-			selectedVehicle.lineNumber === undefined;
-
-		let prefix, lineCoords, stopsFeatures, overlayBrand;
-
-		if (isLpp) {
-			prefix = "lpp";
-			lineCoords = hasLppPoints
-				? geo[0].points.filter(isValidCoord).map((c) => [c[1], c[0]])
-				: [];
-			stopsFeatures = stopsToFeatures(selectedVehicle.stops, "lpp");
-			overlayBrand = "lpp";
-		} else if (isSz) {
-			prefix = "sz";
-			lineCoords = geo.filter(isValidCoord);
-			stopsFeatures = stopsToFeatures(
-				selectedVehicle.stops,
-				"sz",
-				selectedVehicle.from,
-				selectedVehicle.to,
-			);
-			overlayBrand = "sz";
-		} else if (selectedVehicle.tripId !== undefined) {
-			prefix = "ijpp";
-			lineCoords = geo.filter(isValidCoord);
-			stopsFeatures = stopsToFeatures(selectedVehicle.stops, brand);
-			overlayBrand = brand;
-		} else {
+		PROVIDER_PREFIXES.forEach((prefix) => clearTripOverlay(map, prefix));
+		if (!selectedVehicle) {
+			fittedKeyRef.current = null;
+			pendingFitRef.current = null;
 			return;
 		}
 
-		updateTripOverlay(map, prefix, lineCoords, stopsFeatures, overlayBrand);
+		const overlay = buildTripOverlay(selectedVehicle);
+		if (!overlay) return;
+		updateTripOverlay(
+			map,
+			overlay.prefix,
+			overlay.lineCoords,
+			overlay.stopsFeatures,
+			overlay.brand,
+		);
 
-		// Fit the map viewport to the route path + stops
-		const isMulti =
-			lineCoords.length > 0 &&
-			Array.isArray(lineCoords[0]) &&
-			Array.isArray(lineCoords[0][0]);
-
-		const allCoords = [];
-		if (isMulti) {
-			lineCoords.forEach((seg) => seg.forEach((c) => allCoords.push(c)));
-		} else {
-			lineCoords.forEach((c) => allCoords.push(c));
+		// Pogled prilagodimo le enkrat na vožnjo (ne ob menjavi teme ipd.).
+		if (
+			overlay.fitCoords.length === 0 ||
+			fittedKeyRef.current === selectedVehicleKey
+		) {
+			return;
 		}
-		stopsFeatures.forEach((f) => {
-			if (f?.geometry?.coordinates)
-				allCoords.push(f.geometry.coordinates);
-		});
+		fittedKeyRef.current = selectedVehicleKey;
+		const bounds = new maplibregl.LngLatBounds();
+		overlay.fitCoords.forEach((coord) => bounds.extend(coord));
+		if (bounds.isEmpty()) return;
 
-		if (allCoords.length > 0) {
-			const bounds = new maplibregl.LngLatBounds();
-			allCoords.forEach((c) => {
-				if (
-					Array.isArray(c) &&
-					c.length >= 2 &&
-					Number.isFinite(c[0]) &&
-					Number.isFinite(c[1]) &&
-					(Math.abs(c[0]) > 0.001 || Math.abs(c[1]) > 0.001)
-				) {
-					bounds.extend([c[0], c[1]]);
-				}
-			});
-			if (!bounds.isEmpty()) {
-				map.fitBounds(bounds, {
-					padding: {
-						top: 60,
-						right: 60,
-						bottom: ROUTE_DRAWER_PEEK_HEIGHT + 60,
-						left: 60,
-					},
-					maxZoom: 15,
-					duration: 800,
-				});
-			}
-		}
-	}, [selectedVehicle, isMapLoaded]);
+		if (isActive) map.fitBounds(bounds, FIT_OPTIONS);
+		else pendingFitRef.current = bounds; // skrit zemljevid nima velikosti
+	}, [selectedVehicle, selectedVehicleKey, isMapLoaded, isActive]);
 
-	//zbriše črto in postaje na poti iz zemljevida
-	const clearPathOverlays = useCallback(() => {
-		const map = mapInstanceRef.current;
-		if (map) {
-			PROVIDER_PREFIXES.forEach((prefix) =>
-				clearTripOverlay(map, prefix),
-			);
-		}
-	}, []);
-
-	const resetRouteView = useCallback(() => {
-		setFilterByRoute(false);
-		setRouteVisibilityOverride(null);
-		clearPathOverlays();
-		setSelectedVehicle(null);
-	}, [clearPathOverlays, setSelectedVehicle]);
-
-	useEffect(() => {
-		const wasOpen = prevRouteDrawerOpenRef.current;
-		prevRouteDrawerOpenRef.current = routeDrawerOpen;
-		if (wasOpen && !routeDrawerOpen) {
-			resetRouteView();
-		}
-	}, [routeDrawerOpen, resetRouteView]);
+	const handleClose = (event) => {
+		event.stopPropagation();
+		closeSheet();
+		resetRouteView();
+	};
 
 	return (
 		<div>
-			<div className="map-container" style={{ position: "relative" }}>
-				<div ref={mapRef} style={{ height: "100%", width: "100%" }} />
+			<div className="map-container">
+				<div ref={containerRef} className="map-canvas" />
+				{mapError && (
+					<div className="map-error" role="alert">
+						<p>Zemljevid se ne more naložiti</p>
+						<p>Preverite grafični gonilnik ali osvežite stran.</p>
+					</div>
+				)}
 				{routeLoading && (
-					<div className="map-route-loading">
+					<div className="map-route-loading" role="status">
 						<span className="map-route-loading_spinner" />
 						Nalaganje poti...
 					</div>
 				)}
 				<div
 					className={
-						routeDrawerOpen
+						isSheetOpen
 							? "route-drawer route-drawer--open"
 							: "route-drawer"
 					}
-					ref={routeDrawerRef}
-					style={
-						routeDrawerOpen
-							? {
-									transform: `translateY(${
-										routeDrawerTranslateY ??
-										routeDrawerPeekTranslateY
-									}px)`,
-								}
-							: undefined
-					}
+					ref={sheet.ref}
+					style={sheet.style}
 					role="dialog"
 					aria-label="Pot">
 					<div
 						className="route-drawer__header"
-						onPointerDown={onRouteDrawerPointerDown}
-						onPointerMove={onRouteDrawerPointerMove}
-						onPointerUp={onRouteDrawerPointerUpOrCancel}
-						onPointerCancel={onRouteDrawerPointerUpOrCancel}>
+						{...sheet.dragHandlers}>
 						<div
 							className="route-drawer__grab"
 							aria-hidden="true"
@@ -788,14 +433,8 @@ const Map = React.memo(function Map({
 							type="button"
 							className="route-drawer__close"
 							aria-label="Zapri"
-							onPointerDown={(e) => {
-								e.stopPropagation();
-							}}
-							onClick={(e) => {
-								e.stopPropagation();
-								resetRouteView();
-								setRouteDrawerOpen(false);
-							}}>
+							onPointerDown={(event) => event.stopPropagation()}
+							onClick={handleClose}>
 							×
 						</button>
 					</div>
@@ -804,17 +443,13 @@ const Map = React.memo(function Map({
 							<RouteTab
 								selectedVehicle={selectedVehicle}
 								gpsPositions={gpsPositions}
-								setActiveStation={setActiveStation}
-								onDragPointerDown={onRouteDrawerPointerDown}
-								onDragPointerMove={onRouteDrawerPointerMove}
-								onDragPointerUpOrCancel={
-									onRouteDrawerPointerUpOrCancel
-								}
+								onSelectStation={onSelectStation}
+								dragHandlers={sheet.dragHandlers}
 							/>
 						) : (
-							<div style={{ padding: 12 }}>
-								<p>Ni izbrane linije.</p>
-							</div>
+							<p className="route-drawer__empty">
+								Ni izbrane linije.
+							</p>
 						)}
 					</div>
 				</div>
@@ -823,4 +458,4 @@ const Map = React.memo(function Map({
 	);
 });
 
-export default Map;
+export default MapTab;

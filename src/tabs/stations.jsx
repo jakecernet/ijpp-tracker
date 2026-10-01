@@ -1,67 +1,106 @@
-import { useState, useMemo, useCallback, memo, useEffect, useRef } from "react";
-import { Heart, BusFrontIcon, TrainFrontIcon } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { BusFrontIcon, Heart, TrainFrontIcon } from "lucide-react";
 import { List } from "react-window";
+import SubTabs from "../components/SubTabs";
+import { useElementHeight } from "../hooks/useElementHeight";
+import { useLikedList } from "../hooks/useLikedList";
+import { usePersistentState } from "../hooks/usePersistentState";
+import { haversineMeters } from "../utils/geo";
+import { LIKED_STATIONS_KEY, getStationId } from "../utils/likes";
 
-const LIKED_STATIONS_KEY = "likedStations";
 const STATION_SEARCH_KEY = "stationSearchTerm";
+const DEFAULT_RADIUS = { busRadius: 5, szRadius: 20 }; // km
+const SEARCH_DEBOUNCE_MS = 300;
+const MIN_ALL_SEARCH_LENGTH = 3;
+const MIN_LIST_HEIGHT = 200;
+const BASE_ROW_HEIGHT = 52;
+const ROUTES_ROW_HEIGHT = 26;
+const MAX_ROUTE_BADGES = 6;
 
-const StationItem = memo(
-	({ station, onSelect, isLiked, onToggleLike, showDistance }) => (
-		<div className="station-item-search" onClick={onSelect}>
+const STATION_TABS = [
+	["nearMe", "V bližini"],
+	["all", "Vse"],
+	["liked", "Priljubljene"],
+];
+
+const formatDistance = (km) =>
+	km < 1 ? `${Math.round(km * 10) * 100} m` : `${km.toFixed(1)} km`;
+
+/** Razdalja uporabnik → postaja v km (Infinity, če postaja nima koordinat). */
+function distanceKm(userLocation, station) {
+	const lat = station?.gpsLocation?.[0] ?? station?.lat;
+	const lon = station?.gpsLocation?.[1] ?? station?.lon;
+	if (!Number.isFinite(lat) || !Number.isFinite(lon) || !userLocation) {
+		return Infinity;
+	}
+	return haversineMeters(userLocation[0], userLocation[1], lat, lon) / 1000;
+}
+
+/** Postaja z vnaprej izračunano razdaljo in imenom za iskanje (brez kopiranja postaje). */
+const toEntry = (station, kind, userLocation) => ({
+	station,
+	kind,
+	distance: distanceKm(userLocation, station),
+	nameLower: (station?.name ?? "").toLowerCase(),
+});
+
+const getRowHeight = (entry) =>
+	BASE_ROW_HEIGHT +
+	(entry?.station?.routes_on_stop?.length ? ROUTES_ROW_HEIGHT : 0);
+
+const StationItem = memo(({ entry, isLiked, onSelect, onToggleLike }) => {
+	const { station, kind, distance } = entry;
+	const routes = station?.routes_on_stop;
+
+	return (
+		<div
+			className="station-item-search"
+			role="button"
+			tabIndex={0}
+			onClick={() => onSelect(entry)}
+			onKeyDown={(event) => {
+				if (event.key === "Enter" || event.key === " ") {
+					event.preventDefault();
+					onSelect(entry);
+				}
+			}}>
 			<div className="station-content">
 				<div className="name">
-					{station?.type === "sz" ? (
+					{kind === "sz" ? (
 						<TrainFrontIcon size={24} />
 					) : (
 						<BusFrontIcon size={24} />
 					)}
 					<h3>{station?.name}</h3>
-					{station?.vCenter !== null && station?.type !== "sz" && (
+					{kind !== "sz" && typeof station?.vCenter === "boolean" && (
 						<span
-							style={{
-								fontSize: "11px",
-								backgroundColor:
-									station?.vCenter === true
-										? "darkgreen"
-										: "#BA8E23",
-								color: "var(--text-color)",
-								padding: "2px 6px",
-								borderRadius: "4px",
-								height: "fit-content",
-								marginTop: "auto",
-								marginBottom: "auto",
-								textWrap: "nowrap",
-							}}>
-							{station?.vCenter === true
-								? "V center"
-								: "Iz centra"}
+							className={`direction-badge ${station.vCenter ? "direction-badge--in" : "direction-badge--out"}`}>
+							{station.vCenter ? "V center" : "Iz centra"}
 						</span>
 					)}
 				</div>
-				<br></br>
 				<ul className="station-info">
-					{station?.routes_on_stop
-						?.slice(0, 6)
-						.map((route, index) => (
-							<li key={index}>
-								<p>{route}</p>
-							</li>
-						))}
-					{station?.routes_on_stop?.length > 6 && (
+					{routes?.slice(0, MAX_ROUTE_BADGES).map((route, index) => (
+						<li key={index}>
+							<p>{route}</p>
+						</li>
+					))}
+					{routes?.length > MAX_ROUTE_BADGES && (
 						<li>
-							<p>+ {station.routes_on_stop.length - 6}</p>
+							<p>+ {routes.length - MAX_ROUTE_BADGES}</p>
 						</li>
 					)}
 				</ul>
 			</div>
-			{showDistance && station?.distance && (
-				<span className="distance">
-					{station.distance.toFixed(1)} km
-				</span>
+			{Number.isFinite(distance) && (
+				<span className="distance">{formatDistance(distance)}</span>
 			)}
 			<button
+				type="button"
 				className={`like-btn ${isLiked ? "liked" : ""}`}
-				onClick={onToggleLike}
+				onClick={(event) => onToggleLike(entry, event)}
+				onKeyDown={(event) => event.stopPropagation()}
+				aria-pressed={isLiked}
 				aria-label={
 					isLiked
 						? "Odstrani iz priljubljenih"
@@ -70,398 +109,219 @@ const StationItem = memo(
 				<Heart size={20} fill={isLiked ? "currentColor" : "none"} />
 			</button>
 		</div>
-	),
-);
+	);
+});
 
 const StationRow = memo(
-	({ index, style, stations, isStationLiked, onToggleLike, onSelect }) => {
-		const station = stations[index];
+	({
+		index,
+		style,
+		ariaAttributes,
+		entries,
+		likedIds,
+		onToggleLike,
+		onSelect,
+	}) => {
+		const entry = entries[index];
 		return (
-			<div style={style}>
+			<div style={style} {...ariaAttributes}>
 				<StationItem
-					station={station}
-					isLiked={isStationLiked(station)}
-					onToggleLike={(e) => onToggleLike(station, e)}
-					onSelect={() => onSelect(station)}
-					showDistance={true}
+					entry={entry}
+					isLiked={likedIds.has(getStationId(entry.station))}
+					onToggleLike={onToggleLike}
+					onSelect={onSelect}
 				/>
 			</div>
 		);
 	},
 );
 
-const LikedStationRow = memo(
-	({ index, style, likedStations, onToggleLike, onSelect }) => {
-		const liked = likedStations[index];
-		return (
-			<div style={style}>
-				<StationItem
-					station={liked.data}
-					isLiked={true}
-					onToggleLike={(e) => onToggleLike(liked.data, e)}
-					onSelect={() => onSelect(liked.data)}
-					showDistance={true}
-				/>
-			</div>
-		);
-	},
-);
-
-const loadLikedItems = (key) => {
-	try {
-		const stored = localStorage.getItem(key);
-		return stored ? JSON.parse(stored) : [];
-	} catch {
-		return [];
-	}
-};
-
-const saveLikedItems = (key, items) => {
-	try {
-		localStorage.setItem(key, JSON.stringify(items));
-	} catch {}
-};
-
-const loadSearchTerm = () => {
-	try {
-		return localStorage.getItem(STATION_SEARCH_KEY) || "";
-	} catch {
-		return "";
-	}
-};
-
-const StationsTab = ({ userLocation, setActiveStation, busStops, szStops }) => {
-	const [searchTerm, setSearchTerm] = useState(loadSearchTerm);
-	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-	const [page, setPage] = useState("nearMe"); // nearMe, all, liked
-	const [likedStations, setLikedStations] = useState(() =>
-		loadLikedItems(LIKED_STATIONS_KEY),
+const StationList = ({ entries, height, likedIds, onToggleLike, onSelect }) => {
+	const rowProps = useMemo(
+		() => ({ entries, likedIds, onToggleLike, onSelect }),
+		[entries, likedIds, onToggleLike, onSelect],
 	);
-	const [radius] = useState(() => {
-		const stored = localStorage.getItem("stationRadius");
-		return stored ? JSON.parse(stored) : { busRadius: 5, szRadius: 20 };
-	});
+	const rowHeight = useCallback(
+		(index) => getRowHeight(entries[index]),
+		[entries],
+	);
+
+	return (
+		<List
+			rowCount={entries.length}
+			rowHeight={rowHeight}
+			rowComponent={StationRow}
+			rowProps={rowProps}
+			overscanCount={5}
+			style={{ height, width: "100%" }}
+		/>
+	);
+};
+
+const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
+	const [searchTerm, setSearchTerm] = usePersistentState(
+		STATION_SEARCH_KEY,
+		"",
+		{
+			raw: true,
+		},
+	);
+	// Začetna vrednost = shranjeni niz, sicer bi se seznam ~300 ms prikazoval nefiltriran.
+	const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
+	const [page, setPage] = useState("nearMe"); // nearMe | all | liked
+	const [likedStations, toggleLikedStation] =
+		useLikedList(LIKED_STATIONS_KEY);
+	const [radius] = usePersistentState("stationRadius", DEFAULT_RADIUS);
+	const [listRef, measuredHeight] = useElementHeight(400);
+	const listHeight = Math.max(MIN_LIST_HEIGHT, measuredHeight);
 
 	useEffect(() => {
-		try {
-			localStorage.setItem(STATION_SEARCH_KEY, searchTerm);
-		} catch {
-			// Storage may be unavailable in private browsing.
-		}
-	}, [searchTerm]);
-
-	// Debounce search term for better performance
-	useEffect(() => {
-		const timer = setTimeout(() => {
-			setDebouncedSearchTerm(searchTerm);
-		}, 300);
+		const timer = setTimeout(
+			() => setDebouncedTerm(searchTerm),
+			SEARCH_DEBOUNCE_MS,
+		);
 		return () => clearTimeout(timer);
 	}, [searchTerm]);
 
-	// Calculate distances and create allStations in one memo
-	const allStations = useMemo(() => {
-		const toRadians = (degrees) => degrees * (Math.PI / 180);
-		const earthRadius = 6371;
+	const term = debouncedTerm.toLowerCase();
 
-		const calculateDistance = (stop) => {
-			const lat1 = userLocation[0];
-			const lon1 = userLocation[1];
-			const lat2 = stop.gpsLocation?.[0] ?? stop.lat;
-			const lon2 = stop.gpsLocation?.[1] ?? stop.lon;
-			const dLat = toRadians(lat2 - lat1);
-			const dLon = toRadians(lon2 - lon1);
-
-			const a =
-				Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-				Math.cos(toRadians(lat1)) *
-					Math.cos(toRadians(lat2)) *
-					Math.sin(dLon / 2) *
-					Math.sin(dLon / 2);
-			const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-			return earthRadius * c;
-		};
-
-		return [
-			...busStops.map((stop) => ({
-				...stop,
-				type: "bus",
-				distance: calculateDistance(stop),
-			})),
-			...szStops.map((stop) => ({
-				...stop,
-				type: "sz",
-				distance: calculateDistance(stop),
-			})),
-		];
-	}, [busStops, szStops, userLocation]);
-
-	// Get unique station ID for liking
-	const getStationId = useCallback((station) => {
-		return (
-			station?.ref_id ??
-			station?.gtfs_id ??
-			station?.ijpp_id ??
-			station?.stopId
-		);
-	}, []);
-
-	const isStationLiked = useCallback(
-		(station) => {
-			const id = getStationId(station);
-			return likedStations.some((s) => s.id === id);
-		},
-		[likedStations, getStationId],
+	// Razdalje za ~12.000 postaj računamo le ob spremembi postaj ali lokacije.
+	const allEntries = useMemo(
+		() => [
+			...busStops.map((stop) => toEntry(stop, "bus", userLocation)),
+			...szStops.map((stop) => toEntry(stop, "sz", userLocation)),
+		],
+		[busStops, szStops, userLocation],
 	);
 
-	const toggleLikeStation = useCallback(
-		(station, e) => {
-			e?.stopPropagation();
-			const id = getStationId(station);
-			setLikedStations((prev) => {
-				const exists = prev.some((s) => s.id === id);
-				const newLiked = exists
-					? prev.filter((s) => s.id !== id)
-					: [...prev, { id, name: station.name, data: station }];
-				saveLikedItems(LIKED_STATIONS_KEY, newLiked);
-				return newLiked;
-			});
-		},
-		[getStationId],
-	);
-
-	// Filtered stations for "Near Me"
-	const nearMeStations = useMemo(() => {
-		return allStations
-			.filter((stop) => {
-				const maxDistance =
-					stop.type === "bus" ? radius?.busRadius : radius?.szRadius;
-				return stop.distance <= maxDistance && stop.distance > 0;
-			})
-			.filter((stop) =>
-				stop.name
-					.toLowerCase()
-					.includes(debouncedSearchTerm.toLowerCase()),
+	const nearMeEntries = useMemo(() => {
+		const busMax = radius?.busRadius ?? DEFAULT_RADIUS.busRadius;
+		const szMax = radius?.szRadius ?? DEFAULT_RADIUS.szRadius;
+		return allEntries
+			.filter(
+				(entry) =>
+					entry.distance <= (entry.kind === "bus" ? busMax : szMax) &&
+					entry.nameLower.includes(term),
 			)
 			.sort((a, b) => a.distance - b.distance);
-	}, [allStations, debouncedSearchTerm, radius]);
+	}, [allEntries, term, radius]);
 
-	const filteredAllStations = useMemo(() => {
-		if (debouncedSearchTerm.length < 3) return [];
-		return allStations
-			.filter((stop) =>
-				stop.name
-					.toLowerCase()
-					.includes(debouncedSearchTerm.toLowerCase()),
-			)
-			.sort((a, b) => a.name.localeCompare(b.name));
-	}, [allStations, debouncedSearchTerm]);
+	const allSearchEntries = useMemo(() => {
+		if (term.length < MIN_ALL_SEARCH_LENGTH) return [];
+		return allEntries
+			.filter((entry) => entry.nameLower.includes(term))
+			.sort((a, b) => a.nameLower.localeCompare(b.nameLower));
+	}, [allEntries, term]);
 
-	const filteredLikedStations = useMemo(() => {
-		return likedStations.filter((liked) =>
-			liked.name
-				.toLowerCase()
-				.includes(debouncedSearchTerm.toLowerCase()),
-		);
-	}, [likedStations, debouncedSearchTerm]);
+	// Priljubljenim postajam razdaljo izračunamo na novo (shranjena bi bila zastarela).
+	const likedEntries = useMemo(
+		() =>
+			likedStations
+				.filter((liked) =>
+					(liked.name ?? "").toLowerCase().includes(term),
+				)
+				.map((liked) =>
+					toEntry(
+						liked.data,
+						liked.data?.type === "sz" ? "sz" : "bus",
+						userLocation,
+					),
+				),
+		[likedStations, term, userLocation],
+	);
 
-	const handleStationSelect = useCallback(
-		(station) => {
-			setActiveStation(station);
-			window.location.hash = "/lines";
-			localStorage.setItem("activeStation", JSON.stringify(station));
+	const likedIds = useMemo(
+		() => new Set(likedStations.map((station) => station.id)),
+		[likedStations],
+	);
+
+	const toggleLike = useCallback(
+		({ station }, event) => {
+			event?.stopPropagation();
+			const id = getStationId(station);
+			if (id == null) return; // brez ID-ja postaje ni mogoče ločiti od drugih
+			toggleLikedStation(id, () => ({
+				name: station.name,
+				data: station,
+			}));
 		},
-		[setActiveStation],
+		[toggleLikedStation],
 	);
 
-	const listContainerRef = useRef(null);
-	const [listHeight, setListHeight] = useState(400);
-
-	useEffect(() => {
-		const container = listContainerRef.current;
-		if (!container) return;
-
-		let rafId = null;
-		let lastHeight = null;
-
-		const applyHeight = (height) => {
-			if (!Number.isFinite(height)) return;
-			const rounded = Math.round(height);
-			if (rounded === lastHeight) return;
-			lastHeight = rounded;
-			setListHeight(Math.max(200, rounded));
-		};
-
-		const measure = () => {
-			if (rafId) cancelAnimationFrame(rafId);
-			rafId = requestAnimationFrame(() => {
-				rafId = null;
-				if (!container.isConnected) return;
-				applyHeight(container.getBoundingClientRect().height);
-			});
-		};
-
-		measure();
-
-		let ro = null;
-		if (typeof ResizeObserver !== "undefined") {
-			ro = new ResizeObserver((entries) => {
-				const entry = entries[0];
-				if (!entry) return;
-				const height =
-					entry.contentBoxSize?.[0]?.blockSize ??
-					entry.contentRect?.height;
-				applyHeight(height);
-			});
-			ro.observe(container);
-		} else {
-			window.addEventListener("resize", measure);
-		}
-
-		return () => {
-			if (rafId) cancelAnimationFrame(rafId);
-			if (ro) ro.disconnect();
-			else window.removeEventListener("resize", measure);
-		};
-	}, []);
-
-	const getItemHeight = useCallback((station) => {
-		let height = 52;
-		const routeCount = station?.routes_on_stop?.length || 0;
-		if (routeCount > 0) {
-			height += 26; // Route badges row
-		}
-		return height;
-	}, []);
-
-	const getNearMeItemSize = useCallback(
-		(index) => getItemHeight(nearMeStations[index]),
-		[nearMeStations, getItemHeight],
+	const handleSelect = useCallback(
+		({ station, kind }) => onSelectStation({ ...station, type: kind }),
+		[onSelectStation],
 	);
 
-	const getAllItemSize = useCallback(
-		(index) => getItemHeight(filteredAllStations[index]),
-		[filteredAllStations, getItemHeight],
-	);
-
-	const getLikedItemSize = useCallback(
-		(index) => getItemHeight(filteredLikedStations[index]?.data),
-		[filteredLikedStations, getItemHeight],
-	);
+	const listProps = {
+		height: listHeight,
+		likedIds,
+		onToggleLike: toggleLike,
+		onSelect: handleSelect,
+	};
 
 	return (
 		<div className="insideDiv">
 			<h2>Postaje</h2>
 			<input
-				type="text"
+				type="search"
 				placeholder={
 					page === "all"
 						? "Vnesite vsaj 3 znake..."
 						: "Išči postaje..."
 				}
+				aria-label="Iskanje postaj"
 				className="search-input"
 				value={searchTerm}
-				onChange={(e) => setSearchTerm(e.target.value)}
+				onChange={(event) => setSearchTerm(event.target.value)}
 			/>
-			<div className="top-nav">
-				<button
-					className={page === "nearMe" ? "active" : ""}
-					onClick={() => setPage("nearMe")}>
-					V bližini
-				</button>
-				<button
-					className={page === "all" ? "active" : ""}
-					onClick={() => setPage("all")}>
-					Vse
-				</button>
-				<button
-					className={page === "liked" ? "active" : ""}
-					onClick={() => setPage("liked")}>
-					Priljubljene
-				</button>
-			</div>
+			<SubTabs
+				label="Prikaz postaj"
+				tabs={STATION_TABS}
+				value={page}
+				onChange={setPage}
+			/>
 
-			<div className="results station-list" ref={listContainerRef}>
-				{page === "nearMe" && (
-					<>
-						{nearMeStations.length === 0 && (
-							<p className="empty-message">
-								Ni postaj v bližini.
-							</p>
-						)}
-						{nearMeStations.length > 0 && (
-							<List
-								rowCount={nearMeStations.length}
-								rowHeight={getNearMeItemSize}
-								rowComponent={StationRow}
-								rowProps={{
-									stations: nearMeStations,
-									isStationLiked,
-									onToggleLike: toggleLikeStation,
-									onSelect: handleStationSelect,
-								}}
-								overscanCount={5}
-								style={{ height: listHeight, width: "100%" }}
-							/>
-						)}
-					</>
-				)}
+			<div className="results station-list" ref={listRef}>
+				{page === "nearMe" &&
+					(nearMeEntries.length === 0 ? (
+						<p className="empty-message">Ni postaj v bližini.</p>
+					) : (
+						<StationList entries={nearMeEntries} {...listProps} />
+					))}
 
 				{page === "all" && (
 					<>
-						{searchTerm.length < 3 && (
+						{searchTerm.length < MIN_ALL_SEARCH_LENGTH && (
 							<p className="empty-message">
 								Vnesite vsaj 3 znake za iskanje.
 							</p>
 						)}
-						{searchTerm.length >= 3 &&
-							filteredAllStations.length === 0 && (
+						{searchTerm.length >= MIN_ALL_SEARCH_LENGTH &&
+							allSearchEntries.length === 0 && (
 								<p className="empty-message">Ni rezultatov.</p>
 							)}
-						{filteredAllStations.length > 0 && (
-							<List
-								rowCount={filteredAllStations.length}
-								rowHeight={getAllItemSize}
-								rowComponent={StationRow}
-								rowProps={{
-									stations: filteredAllStations,
-									isStationLiked,
-									onToggleLike: toggleLikeStation,
-									onSelect: handleStationSelect,
-								}}
-								overscanCount={5}
-								style={{ height: listHeight, width: "100%" }}
+						{allSearchEntries.length > 0 && (
+							<StationList
+								entries={allSearchEntries}
+								{...listProps}
 							/>
 						)}
 					</>
 				)}
 
-				{page === "liked" && (
-					<>
-						{filteredLikedStations.length === 0 && (
-							<p className="empty-message">
-								Ni priljubljenih postaj. Kliknite na ❤️ za
-								dodajanje.
-							</p>
-						)}
-						{filteredLikedStations.length > 0 && (
-							<List
-								rowCount={filteredLikedStations.length}
-								rowHeight={getLikedItemSize}
-								rowComponent={LikedStationRow}
-								rowProps={{
-									likedStations: filteredLikedStations,
-									onToggleLike: toggleLikeStation,
-									onSelect: handleStationSelect,
-								}}
-								overscanCount={5}
-								style={{ height: listHeight, width: "100%" }}
-							/>
-						)}
-					</>
-				)}
+				{page === "liked" &&
+					(likedEntries.length === 0 ? (
+						<p className="empty-message">
+							Ni priljubljenih postaj. Kliknite na ❤️ za
+							dodajanje.
+						</p>
+					) : (
+						<StationList entries={likedEntries} {...listProps} />
+					))}
 			</div>
 		</div>
 	);
 };
 
-export default StationsTab;
+export default memo(StationsTab);

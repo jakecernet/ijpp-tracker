@@ -1,47 +1,39 @@
-import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Heart } from "lucide-react";
-import { formatPrecomputedArrival } from "../Api";
+import { fetchLppAllRoutes, formatPrecomputedArrival } from "../Api";
+import SubTabs from "../components/SubTabs";
+import { useLikedList } from "../hooks/useLikedList";
+import {
+	LIKED_ROUTES_KEY,
+	LIKED_STATIONS_KEY,
+	getRouteId,
+	getStationId,
+} from "../utils/likes";
+import { isLppOperator, isSzOperator } from "../utils/operators";
 
-const LIKED_ROUTES_KEY = "likedRoutes";
-const LIKED_STATIONS_KEY = "likedStations";
-const lppRoutesApiUrl = "https://tracker.cernetic.cc/api/lpp-all-routes";
+const SEARCH_DEBOUNCE_MS = 300;
+const LINE_TABS = [
+	["arrivals", "Prihodi"],
+	["all", "Vse"],
+	["liked", "Priljubljene"],
+];
+const MAX_ANIMATED_ITEMS = 10;
 
-const loadLikedItems = (key) => {
-	try {
-		const stored = localStorage.getItem(key);
-		return stored ? JSON.parse(stored) : [];
-	} catch {
-		return [];
-	}
-};
-
-const saveLikedItems = (key, items) => {
-	try {
-		localStorage.setItem(key, JSON.stringify(items));
-	} catch {}
-};
+const includesTerm = (value, term) =>
+	typeof value === "string" && value.toLowerCase().includes(term);
 
 const bgColorMap = (item) => {
 	const operator = item?.operator || item?.operatorName;
 	const type = item?.type;
+	const name = typeof operator === "string" ? operator.toLowerCase() : "";
 
-	if (
-		type === "LPP" ||
-		operator?.toLowerCase().includes("ljubljanski potniški promet")
-	)
-		return "var(--lpp-color)";
-	if (
-		type === "SZ" ||
-		operator?.includes("slovenske železnice") ||
-		operator?.includes("SŽ")
-	)
-		return "var(--sz-color)";
-	if (operator?.includes("Nomago")) return "var(--nomago-color)";
-	if (operator?.includes("Marprom")) return "var(--marprom-color)";
-	if (operator?.includes("Arriva")) return "var(--arriva-color)";
-	if (operator?.includes("Murska")) return "var(--murska-color)";
-	if (operator?.includes("Kranj")) return "var(--kranj-color)";
-
+	if (type === "LPP" || isLppOperator(operator)) return "var(--lpp-color)";
+	if (type === "SZ" || isSzOperator(operator)) return "var(--sz-color)";
+	if (name.includes("nomago")) return "var(--nomago-color)";
+	if (name.includes("marprom")) return "var(--marprom-color)";
+	if (name.includes("arriva")) return "var(--arriva-color)";
+	if (name.includes("murska")) return "var(--murska-color)";
+	if (name.includes("kranj")) return "var(--kranj-color)";
 	return "var(--default-color)";
 };
 
@@ -49,102 +41,124 @@ const formatDelay = (scheduledDeparture, actualDeparture) => {
 	if (!scheduledDeparture || !actualDeparture) return "N/A";
 	const scheduled = new Date(scheduledDeparture);
 	const actual = new Date(actualDeparture);
-	if (isNaN(scheduled) || isNaN(actual)) return "N/A";
-	const diffMinutes = Math.round((actual - scheduled) / 60000);
-	if (diffMinutes === 0) return " 0 min";
-	return diffMinutes > 0 ? ` ${diffMinutes} min` : ` -${diffMinutes} min`;
+	if (Number.isNaN(scheduled.getTime()) || Number.isNaN(actual.getTime())) {
+		return "N/A";
+	}
+	// Negativna zamuda (prezgodaj) se je prej izpisala kot "--2 min".
+	return ` ${Math.round((actual - scheduled) / 60000)} min`;
 };
 
 const getEndpointName = (endpoint) => {
 	if (!endpoint) return "";
 	if (typeof endpoint === "string") return endpoint;
-	if (typeof endpoint === "object") {
-		return (
-			endpoint.name ||
-			endpoint.stopName ||
-			endpoint.stationName ||
-			endpoint.title ||
-			""
-		);
-	}
-	return "";
-};
-
-const getRouteDisplayName = (item) => {
 	return (
-		item.displayName ||
-		item.lineName ||
-		item.headsign ||
-		item.name ||
-		item.tripName ||
-		[getEndpointName(item.from), getEndpointName(item.to)]
-			.filter(Boolean)
-			.join(" - ")
+		endpoint.name ||
+		endpoint.stopName ||
+		endpoint.stationName ||
+		endpoint.title ||
+		""
 	);
 };
 
-const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => (
-	<div className="route-item" onClick={() => onClick(item)}>
-		<div className="circle" style={{ background: bgColorMap(item) }}>
-			{item.lineNumber ??
-				item.routeName ??
-				item.routeShortName ??
-				item.tripShort ??
-				item.tripId?.slice(5) ??
-				"?"}
-		</div>
-		<h3>{getRouteDisplayName(item)}</h3>
-		<button
-			className={`like-btn ${isLiked ? "liked" : ""}`}
-			onClick={(e) => onToggleLike(item, e)}
-			aria-label={
-				isLiked ? "Odstrani iz priljubljenih" : "Dodaj med priljubljene"
-			}>
-			<Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-		</button>
-	</div>
-));
+const joinEndpoints = (item) =>
+	[getEndpointName(item.from), getEndpointName(item.to)]
+		.filter(Boolean)
+		.join(" - ");
 
-const ArrivalItem = memo(({ arrival, onRouteClick }) => (
-	<div
-		className="arrival-item"
-		onClick={() => onRouteClick(arrival, arrival.type)}>
-		<div className="left">
-			<div className="circle" style={{ background: bgColorMap(arrival) }}>
-				<h2 className={arrival.type === "SZ" ? "sz" : ""}>
-					{arrival.type === "LPP"
-						? arrival.routeName
-						: arrival.routeShortName || arrival.tripName}
-				</h2>
+const getRouteDisplayName = (item) =>
+	item.displayName ||
+	item.lineName ||
+	item.headsign ||
+	item.name ||
+	item.tripName ||
+	joinEndpoints(item);
+
+const onActivateKey = (handler) => (event) => {
+	if (event.key === "Enter" || event.key === " ") {
+		event.preventDefault();
+		handler();
+	}
+};
+
+const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => {
+	const open = () => onClick(item);
+	return (
+		<li
+			className="route-item"
+			role="button"
+			tabIndex={0}
+			onClick={open}
+			onKeyDown={onActivateKey(open)}>
+			<div className="circle" style={{ background: bgColorMap(item) }}>
+				{item.lineNumber ??
+					item.routeName ??
+					item.routeShortName ??
+					item.tripShort ??
+					item.tripId?.slice(5) ??
+					"?"}
 			</div>
-			<div className="info">
-				<h3>{arrival.tripName || arrival.headsign}</h3>
-				<h4>{arrival.operatorName}</h4>
+			<h3>{getRouteDisplayName(item)}</h3>
+			<button
+				type="button"
+				className={`like-btn ${isLiked ? "liked" : ""}`}
+				onClick={(event) => onToggleLike(item, event)}
+				onKeyDown={(event) => event.stopPropagation()}
+				aria-pressed={isLiked}
+				aria-label={
+					isLiked
+						? "Odstrani iz priljubljenih"
+						: "Dodaj med priljubljene"
+				}>
+				<Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+			</button>
+		</li>
+	);
+});
+
+const ArrivalItem = memo(({ arrival, index, onRouteClick }) => {
+	const open = () => onRouteClick(arrival, arrival.type);
+	return (
+		<div
+			className="arrival-item"
+			role="button"
+			tabIndex={0}
+			style={{ "--i": Math.min(index, MAX_ANIMATED_ITEMS) }}
+			onClick={open}
+			onKeyDown={onActivateKey(open)}>
+			<div className="left">
+				<div
+					className="circle"
+					style={{ background: bgColorMap(arrival) }}>
+					<h2 className={arrival.type === "SZ" ? "sz" : ""}>
+						{arrival.type === "LPP"
+							? arrival.routeName
+							: arrival.routeShortName || arrival.tripName}
+					</h2>
+				</div>
+				<div className="info">
+					<h3>{arrival.tripName || arrival.headsign}</h3>
+					<h4>{arrival.operatorName}</h4>
+				</div>
 			</div>
-		</div>
-		<p
-			style={{
-				whiteSpace: "pre-line",
-				textAlign: "center",
-				fontSize: "14px",
-			}}>
-			{formatPrecomputedArrival(arrival)}
-		</p>
-		{arrival.type === "SZ" && arrival.realTime && (
-			<p>
-				Zamuda:
-				<br></br>
-				{formatDelay(
-					arrival.scheduledDeparture,
-					arrival.realtimeDeparture,
-				)}
+			<p className="arrival-item__eta">
+				{formatPrecomputedArrival(arrival)}
 			</p>
-		)}
-	</div>
-));
+			{arrival.type === "SZ" && arrival.realTime && (
+				<p>
+					Zamuda:
+					<br />
+					{formatDelay(
+						arrival.scheduledDeparture,
+						arrival.realtimeDeparture,
+					)}
+				</p>
+			)}
+		</div>
+	);
+});
 
 const SkeletonArrivalItem = memo(() => (
-	<div className="arrival-item skeleton">
+	<div className="arrival-item skeleton" aria-hidden="true">
 		<div className="left">
 			<div className="circle skeleton-circle"></div>
 			<div className="skeleton-text skeleton-title"></div>
@@ -153,263 +167,180 @@ const SkeletonArrivalItem = memo(() => (
 	</div>
 ));
 
+/** Polja, ki jih shranimo za priljubljeno linijo. */
+const createLikedRouteEntry = (route) => ({
+	name:
+		route.displayName ||
+		route.lineName ||
+		route.route_name ||
+		route.tripName ||
+		route.tripShort,
+	lineNumber: route.lineNumber || route.routeName || route.tripShort,
+	operator: route.operator || route.operatorName,
+	headsign:
+		route.headsign ||
+		route.displayName ||
+		route.tripName ||
+		joinEndpoints(route),
+	displayName: route.displayName || route.tripName || joinEndpoints(route),
+	tripId: route.tripId,
+	tripShort: route.tripShort,
+	lineId: route.lineId,
+	routeId: route.routeId,
+});
+
 const LinesTab = ({
 	gpsPositions,
 	activeStation,
 	ijppArrivals,
 	lppArrivals,
 	szArrivals,
-	getTripFromId,
+	onSelectRoute,
 	arrivalsLoading,
-	trainPositions,
+	trains,
 }) => {
 	const [searchTerm, setSearchTerm] = useState("");
-	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-	const [page, setPage] = useState("arrivals"); // all, arrivals, liked
-	const [likedRoutes, setLikedRoutes] = useState(() =>
-		loadLikedItems(LIKED_ROUTES_KEY),
-	);
-	const [likedStations, setLikedStations] = useState(() =>
-		loadLikedItems(LIKED_STATIONS_KEY),
-	);
+	const [debouncedTerm, setDebouncedTerm] = useState("");
+	const [page, setPage] = useState("arrivals"); // arrivals | all | liked
+	const [likedRoutes, toggleLikedRoute] = useLikedList(LIKED_ROUTES_KEY);
+	const [likedStations, toggleLikedStation] =
+		useLikedList(LIKED_STATIONS_KEY);
 	const [lppNumberedRoutes, setLppNumberedRoutes] = useState([]);
 
-	// Debounce search term for better performance
 	useEffect(() => {
-		const timer = setTimeout(() => {
-			setDebouncedSearchTerm(searchTerm);
-		}, 300);
+		const timer = setTimeout(
+			() => setDebouncedTerm(searchTerm),
+			SEARCH_DEBOUNCE_MS,
+		);
 		return () => clearTimeout(timer);
 	}, [searchTerm]);
 
 	useEffect(() => {
-		const fetchLppRoutes = async () => {
-			try {
-				const response = await fetch(lppRoutesApiUrl);
-				if (!response.ok)
-					throw new Error("Network response was not ok");
-				const data = await response.json();
-				setLppNumberedRoutes(data?.data || []);
-			} catch {
-				setLppNumberedRoutes([]);
-			}
+		if (page !== "all" || lppNumberedRoutes.length > 0) return;
+		let cancelled = false;
+		fetchLppAllRoutes().then((routes) => {
+			if (!cancelled) setLppNumberedRoutes(routes);
+		});
+		return () => {
+			cancelled = true;
 		};
-		fetchLppRoutes();
-	}, []);
+	}, [page, lppNumberedRoutes.length]);
 
-	// Get unique station ID for liking
-	const getStationId = useCallback((station) => {
-		return station?.ref_id ?? station?.gtfs_id ?? station?.ijpp_id;
-	}, []);
+	const term = debouncedTerm.toLowerCase();
 
-	const isStationLiked = useMemo(() => {
-		if (!activeStation) return false;
-		const id = getStationId(activeStation);
-		return likedStations.some((s) => s.id === id);
-	}, [activeStation, likedStations, getStationId]);
+	const stationId = getStationId(activeStation);
+	const isStationLiked =
+		stationId != null && likedStations.some((s) => s.id === stationId);
 
 	const toggleLikeStation = useCallback(
-		(e) => {
-			e?.stopPropagation();
-			const id = getStationId(activeStation);
-			setLikedStations((prev) => {
-				const exists = prev.some((s) => s.id === id);
-				const newLiked = exists
-					? prev.filter((s) => s.id !== id)
-					: [
-							...prev,
-							{
-								id,
-								name: activeStation.name,
-								data: activeStation,
-							},
-						];
-				saveLikedItems(LIKED_STATIONS_KEY, newLiked);
-				return newLiked;
-			});
+		(event) => {
+			event?.stopPropagation();
+			if (stationId == null) return;
+			toggleLikedStation(stationId, () => ({
+				name: activeStation.name,
+				data: activeStation,
+			}));
 		},
-		[activeStation, getStationId],
+		[stationId, activeStation, toggleLikedStation],
 	);
 
-	// All active routes from GPS positions
+	// Vse trenutno aktivne linije (iz GPS pozicij in vlakov), brez podvojenih imen.
 	const allActiveRoutes = useMemo(() => {
-		const shouldInclude = (pos) =>
-			!(
-				pos?.operator === "Ljubljanski potniški promet d.o.o." &&
-				!pos?.lineName
-			);
-
-		const uniqueRoutes = [];
+		const routes = [];
 		const seenNames = new Set();
 
-		for (const vehicle of gpsPositions.filter(shouldInclude)) {
+		for (const vehicle of gpsPositions) {
+			if (isLppOperator(vehicle?.operator) && !vehicle?.lineName)
+				continue;
 			const name = vehicle.lineName || vehicle.route_name;
 			if (name && !seenNames.has(name)) {
 				seenNames.add(name);
-				uniqueRoutes.push(vehicle);
+				routes.push(vehicle);
 			}
 		}
 
-		for (const train of trainPositions) {
+		for (const train of trains) {
 			const name = train.tripShort;
-			if (name && !seenNames.has(name)) {
-				seenNames.add(name);
-				uniqueRoutes.push({
-					...train,
-					lineName: name,
-					lineNumber: name,
-					tripName: [
-						getEndpointName(train.from),
-						getEndpointName(train.to),
-					]
-						.filter(Boolean)
-						.join(" - "),
-					displayName: [
-						getEndpointName(train.from),
-						getEndpointName(train.to),
-					]
-						.filter(Boolean)
-						.join(" - "),
-					operator: "Slovenske železnice d.o.o.",
-					type: "SZ",
-				});
-			}
+			if (!name || seenNames.has(name)) continue;
+			seenNames.add(name);
+			const relation = joinEndpoints(train);
+			routes.push({
+				...train,
+				lineName: name,
+				lineNumber: name,
+				tripName: relation,
+				displayName: relation,
+				operator: "Slovenske železnice d.o.o.",
+				type: "SZ",
+			});
 		}
-		return uniqueRoutes;
-	}, [gpsPositions, trainPositions]);
+		return routes;
+	}, [gpsPositions, trains]);
 
-	// Get unique route ID for liking
-	const getRouteId = useCallback((route) => {
-		return (
-			route?.lineName ??
-			route?.route_name ??
-			route?.lineNumber ??
-			route?.routeName ??
-			route?.tripShort ??
-			route?.tripId
-		);
-	}, []);
-
+	const likedRouteIds = useMemo(
+		() => new Set(likedRoutes.map((r) => r.id)),
+		[likedRoutes],
+	);
 	const isRouteLiked = useCallback(
-		(route) => {
-			const id = getRouteId(route);
-			return likedRoutes.some((r) => r.id === id);
-		},
-		[likedRoutes, getRouteId],
+		(route) => likedRouteIds.has(getRouteId(route)),
+		[likedRouteIds],
 	);
 
 	const toggleLikeRoute = useCallback(
-		(route, e) => {
-			e?.stopPropagation();
-			const id = getRouteId(route);
-			setLikedRoutes((prev) => {
-				const exists = prev.some((r) => r.id === id);
-				const newLiked = exists
-					? prev.filter((r) => r.id !== id)
-					: [
-							...prev,
-							{
-								id,
-								name:
-									route.displayName ||
-									route.lineName ||
-									route.route_name ||
-									route.tripName ||
-									route.tripShort,
-								lineNumber:
-									route.lineNumber ||
-									route.routeName ||
-									route.tripShort,
-								operator: route.operator || route.operatorName,
-								headsign:
-									route.headsign ||
-									route.displayName ||
-									route.tripName ||
-									[
-										getEndpointName(route.from),
-										getEndpointName(route.to),
-									]
-										.filter(Boolean)
-										.join(" - "),
-								displayName:
-									route.displayName ||
-									route.tripName ||
-									[
-										getEndpointName(route.from),
-										getEndpointName(route.to),
-									]
-										.filter(Boolean)
-										.join(" - "),
-								tripId: route.tripId,
-								tripShort: route.tripShort,
-								lineId: route.lineId,
-								routeId: route.routeId,
-							},
-						];
-				saveLikedItems(LIKED_ROUTES_KEY, newLiked);
-				return newLiked;
-			});
+		(route, event) => {
+			event?.stopPropagation();
+			toggleLikedRoute(getRouteId(route), () =>
+				createLikedRouteEntry(route),
+			);
 		},
-		[getRouteId],
+		[toggleLikedRoute],
 	);
 
-	// Combined arrivals for current station
 	const allArrivals = useMemo(() => {
-		const ijppFiltered = (ijppArrivals || [])
-			.filter((arrival) =>
-				arrival?.tripName
-					?.toLowerCase()
-					.includes(debouncedSearchTerm.toLowerCase()),
-			)
+		const ijpp = (ijppArrivals || [])
 			.filter(
 				(arrival) =>
-					!arrival?.operatorName
-						?.toLowerCase()
-						.includes("ljubljanski potniški promet") ||
-					arrival?.etaMinutes > 60,
+					includesTerm(arrival?.tripName, term) &&
+					(!isLppOperator(arrival?.operatorName) ||
+						arrival?.etaMinutes > 60),
 			)
 			.map((arrival) => ({ ...arrival, type: "IJPP" }));
 
-		const lppFiltered = (lppArrivals || [])
+		const lpp = (lppArrivals || [])
 			.filter(
 				(arrival) =>
-					arrival.tripName
-						?.toLowerCase()
-						.includes(debouncedSearchTerm.toLowerCase()) ||
-					arrival.routeName
-						?.toLowerCase()
-						.includes(debouncedSearchTerm.toLowerCase()),
+					includesTerm(arrival.tripName, term) ||
+					includesTerm(arrival.routeName, term),
 			)
 			.map((arrival) => ({ ...arrival, type: "LPP" }));
 
-		const szFiltered = (szArrivals || [])
-			.filter((arrival) =>
-				arrival.headsign
-					?.toLowerCase()
-					.includes(debouncedSearchTerm.toLowerCase()),
-			)
+		const sz = (szArrivals || [])
+			.filter((arrival) => includesTerm(arrival.headsign, term))
 			.map((arrival) => ({ ...arrival, type: "SZ" }));
 
-		return [...ijppFiltered, ...lppFiltered, ...szFiltered].sort(
+		return [...ijpp, ...lpp, ...sz].sort(
 			(a, b) => (a.etaMinutes ?? Infinity) - (b.etaMinutes ?? Infinity),
 		);
-	}, [ijppArrivals, lppArrivals, szArrivals, debouncedSearchTerm]);
+	}, [ijppArrivals, lppArrivals, szArrivals, term]);
 
-	// Filtered routes for "All" - combines LPP numbered routes and active routes
+	const arrivalKeys = useMemo(() => {
+		const seen = new Map();
+		return allArrivals.map((arrival) => {
+			const base = `${arrival.type}-${arrival.tripId ?? arrival.routeId ?? "x"}`;
+			const count = seen.get(base) ?? 0;
+			seen.set(base, count + 1);
+			return count === 0 ? base : `${base}#${count}`;
+		});
+	}, [allArrivals]);
+
 	const filteredAllRoutes = useMemo(() => {
-		if (debouncedSearchTerm.length < 1) return [];
+		if (term.length < 1) return [];
 
-		const term = debouncedSearchTerm.toLowerCase();
-
-		// Search in LPP numbered routes (works with short queries)
-		const filteredLpp = lppNumberedRoutes
+		const lpp = lppNumberedRoutes
 			.filter(
 				(route) =>
-					route?.route_number
-						?.toString()
-						.toLowerCase()
-						.includes(term) ||
-					route?.route_name?.toLowerCase().includes(term),
+					includesTerm(route?.route_number?.toString(), term) ||
+					includesTerm(route?.route_name, term),
 			)
 			.map((route) => ({
 				lineName: route.route_name,
@@ -420,114 +351,88 @@ const LinesTab = ({
 				operator: "Ljubljanski potniški promet d.o.o.",
 			}));
 
-		// For longer searches, also include active routes
-		if (debouncedSearchTerm.length >= 3) {
-			const filteredActive = allActiveRoutes.filter((route) =>
-				(
-					route.lineName ||
-					route.route_name ||
-					route.lineNumber ||
-					route.routeName ||
-					route.tripShort ||
-					route.tripId ||
-					""
-				)
-					.toString()
+		if (term.length < 3) return lpp;
+
+		const seenIds = new Set(lpp.map(getRouteId));
+		const combined = [...lpp];
+		for (const route of allActiveRoutes) {
+			const label =
+				route.lineName ||
+				route.route_name ||
+				route.lineNumber ||
+				route.routeName ||
+				route.tripShort ||
+				route.tripId ||
+				"";
+			const id = getRouteId(route);
+			if (!String(label).toLowerCase().includes(term) || seenIds.has(id))
+				continue;
+			seenIds.add(id);
+			combined.push(route);
+		}
+		return combined;
+	}, [term, lppNumberedRoutes, allActiveRoutes]);
+
+	const resolvedLikedRoutes = useMemo(() => {
+		const activeById = new Map(
+			allActiveRoutes.map((r) => [getRouteId(r), r]),
+		);
+		return likedRoutes
+			.filter((liked) =>
+				(liked.name || liked.lineNumber || "")
 					.toLowerCase()
 					.includes(term),
+			)
+			.map(
+				(liked) =>
+					activeById.get(liked.id) || {
+						lineName: liked.name,
+						lineNumber: liked.lineNumber,
+						operator: liked.operator,
+						headsign: liked.headsign,
+						displayName: liked.displayName || liked.name,
+						tripId: liked.tripId,
+						tripShort: liked.tripShort,
+						lineId: liked.lineId,
+						routeId: liked.routeId,
+					},
 			);
-
-			// Combine and deduplicate
-			const combined = [...filteredLpp];
-			const seenIds = new Set(combined.map((r) => getRouteId(r)));
-
-			for (const route of filteredActive) {
-				const id = getRouteId(route);
-				if (!seenIds.has(id)) {
-					seenIds.add(id);
-					combined.push(route);
-				}
-			}
-
-			return combined;
-		}
-
-		return filteredLpp;
-	}, [debouncedSearchTerm, lppNumberedRoutes, allActiveRoutes, getRouteId]);
-
-	// Filtered liked routes
-	const filteredLikedRoutes = useMemo(() => {
-		return likedRoutes.filter((liked) =>
-			(liked.name || liked.lineNumber || "")
-				.toLowerCase()
-				.includes(debouncedSearchTerm.toLowerCase()),
-		);
-	}, [likedRoutes, debouncedSearchTerm]);
-
-	// Liked routes matched against live GPS data, precomputed once instead of
-	// calling allActiveRoutes.find() inside the render loop for every item.
-	const resolvedLikedRoutes = useMemo(() => {
-		return filteredLikedRoutes.map((liked) => {
-			const activeRoute = allActiveRoutes.find(
-				(r) => getRouteId(r) === liked.id,
-			);
-			return (
-				activeRoute || {
-					lineName: liked.name,
-					lineNumber: liked.lineNumber,
-					operator: liked.operator,
-					headsign: liked.headsign,
-					displayName: liked.displayName || liked.name,
-					tripId: liked.tripId,
-					tripShort: liked.tripShort,
-					lineId: liked.lineId,
-					routeId: liked.routeId,
-				}
-			);
-		});
-	}, [filteredLikedRoutes, allActiveRoutes, getRouteId]);
+	}, [likedRoutes, allActiveRoutes, term]);
 
 	const handleRouteClick = useCallback(
-		async (item, type) => {
-			// Don't try to fetch if there's no valid ID
+		(item, type) => {
 			if (!item.tripId && !item.lineId && !item.routeId) {
 				console.warn("No valid trip/line ID for route", item);
 				return;
 			}
-
 			const operatorType =
 				type ||
 				(item.type === "SZ" ||
 				item.tripShort ||
-				item.operator?.toLowerCase().includes("slovenske železnice")
+				isSzOperator(item.operator)
 					? "SZ"
-					: item.operator
-								?.toLowerCase()
-								.includes("ljubljanski potniški promet")
+					: isLppOperator(item.operator)
 						? "LPP"
 						: "IJPP");
-			const route = await getTripFromId(item, operatorType);
-			if (route) {
-				try {
-					sessionStorage.setItem("openRouteDrawer", "1");
-				} catch {}
-				window.location.hash = "/map";
-			}
+			onSelectRoute(item, operatorType);
 		},
-		[getTripFromId],
+		[onSelectRoute],
 	);
 
 	return (
 		<div className="insideDiv">
 			<div className="lines-header">
-				<h2>Linije {"(" + activeStation?.name + ")"}</h2>
+				<h2>Linije ({activeStation?.name})</h2>
 				<button
+					type="button"
 					className={`like-btn ${isStationLiked ? "liked" : ""}`}
 					onClick={toggleLikeStation}
+					disabled={stationId == null}
+					aria-pressed={isStationLiked}
 					aria-label={
 						isStationLiked
-							? "Odstrani iz priljubljenih"
-							: "Dodaj med priljubljene"
+							? "Odstrani postajo iz priljubljenih"
+							: "Dodaj postajo med priljubljene"
 					}>
 					<Heart
 						size={20}
@@ -536,45 +441,30 @@ const LinesTab = ({
 				</button>
 			</div>
 			<input
-				type="text"
+				type="search"
 				placeholder={
 					page === "arrivals"
 						? "Išči po številki linije..."
 						: "Išči linije..."
 				}
+				aria-label="Iskanje linij"
 				className="search-input"
 				value={searchTerm}
-				onChange={(e) => setSearchTerm(e.target.value)}
+				onChange={(event) => setSearchTerm(event.target.value)}
 			/>
-			<div className="top-nav">
-				<button
-					className={page === "arrivals" ? "active" : ""}
-					onClick={() => setPage("arrivals")}>
-					Prihodi
-				</button>
-				<button
-					className={page === "all" ? "active" : ""}
-					onClick={() => setPage("all")}>
-					Vse
-				</button>
-				<button
-					className={page === "liked" ? "active" : ""}
-					onClick={() => setPage("liked")}>
-					Priljubljene
-				</button>
-			</div>
+			<SubTabs
+				label="Prikaz linij"
+				tabs={LINE_TABS}
+				value={page}
+				onChange={setPage}
+			/>
 			<div className="results">
 				{page === "arrivals" && (
 					<div className="arrival-list">
-						{arrivalsLoading && (
-							<>
-								<SkeletonArrivalItem />
-								<SkeletonArrivalItem />
-								<SkeletonArrivalItem />
-								<SkeletonArrivalItem />
-								<SkeletonArrivalItem />
-							</>
-						)}
+						{arrivalsLoading &&
+							[0, 1, 2, 3, 4].map((i) => (
+								<SkeletonArrivalItem key={i} />
+							))}
 						{!arrivalsLoading && allArrivals.length === 0 && (
 							<p className="empty-message">
 								Ni prihodov na tej postaji.
@@ -583,8 +473,9 @@ const LinesTab = ({
 						{!arrivalsLoading &&
 							allArrivals.map((arrival, index) => (
 								<ArrivalItem
-									key={`${arrival.type}-${arrival.tripId ?? arrival.routeId ?? index}`}
+									key={arrivalKeys[index]}
 									arrival={arrival}
+									index={index}
 									onRouteClick={handleRouteClick}
 								/>
 							))}
@@ -623,11 +514,11 @@ const LinesTab = ({
 							</p>
 						)}
 						<ul className="route-list">
-							{resolvedLikedRoutes.map((routeData, index) => (
+							{resolvedLikedRoutes.map((route, index) => (
 								<RouteItem
-									key={getRouteId(routeData) ?? index}
-									item={routeData}
-									isLiked={true}
+									key={getRouteId(route) ?? index}
+									item={route}
+									isLiked
 									onToggleLike={toggleLikeRoute}
 									onClick={handleRouteClick}
 								/>
@@ -640,4 +531,4 @@ const LinesTab = ({
 	);
 };
 
-export default LinesTab;
+export default memo(LinesTab);

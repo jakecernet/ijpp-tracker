@@ -1,48 +1,40 @@
 :root {
 	line-height: 1.5;
 	font-weight: 400;
-
-	color: rgba(255, 255, 255, 0.87);
-	background-color: #242424;
-
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
 
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+	-webkit-tap-highlight-color: transparent;
+}
+
 a {
 	font-weight: 500;
-	color: #646cff;
+	color: var(--active-color, #2563eb);
 	text-decoration: inherit;
 }
 
-h1 {
-	font-size: 3.2em;
-	line-height: 1.1;
+a:hover {
+	text-decoration: underline;
+}
+
+button,
+input {
+	font: inherit;
+	color: inherit;
 }
 
 button {
-	border-radius: 8px;
-	padding: 0.6em 1.2em;
-	font-size: 1em;
-	font-weight: 500;
-	font-family: inherit;
 	cursor: pointer;
-	transition: border-color 0.25s;
 }
 
-@media (prefers-color-scheme: light) {
-	:root {
-		color: #213547;
-		background-color: #ffffff;
-	}
-
-	a:hover {
-		color: #747bff;
-	}
-
-	button {
-		background-color: #f9f9f9;
-	}
+button:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
 }

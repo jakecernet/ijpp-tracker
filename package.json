@@ -12,7 +12,6 @@
 		"deploy": "gh-pages -d build"
 	},
 	"dependencies": {
-		"date-fns": "^4.4.0",
 		"gh-pages": "^6.3.0",
 		"lucide-react": "^1.47.0",
 		"maplibre-gl": ">=6.4.1",

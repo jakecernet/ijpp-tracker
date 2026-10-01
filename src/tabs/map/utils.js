@@ -1,3 +1,5 @@
+import { isUsableLatLon } from "../../utils/geo";
+
 const HTML_ENTITIES = {
 	"&": "&amp;",
 	"<": "&lt;",
@@ -11,47 +13,49 @@ export function escapeHTML(value) {
 }
 
 export function toGeoJSONPoints(items, getCoord, getProps) {
-	return {
-		type: "FeatureCollection",
-		features: (items || [])
-			.map((item) => {
-				const coord = getCoord(item) || [];
-				const [lat, lng] = coord;
-				if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-				return {
-					type: "Feature",
-					geometry: { type: "Point", coordinates: [lng, lat] },
-					properties: getProps ? getProps(item, coord) : {},
-				};
-			})
-			.filter(Boolean),
-	};
+	const features = [];
+	for (const item of items || []) {
+		const coord = getCoord(item) || [];
+		const [lat, lng] = coord;
+		if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+		features.push({
+			type: "Feature",
+			geometry: { type: "Point", coordinates: [lng, lat] },
+			properties: getProps ? getProps(item, coord) : {},
+		});
+	}
+	return { type: "FeatureCollection", features };
 }
 
-export function loadImage(map, id, src) {
-	return new Promise((resolve) => {
-		if (map.hasImage(id)) {
-			resolve();
-			return;
-		}
-		const img = new Image();
-		img.crossOrigin = "anonymous";
-		img.onload = () => {
+const decodedIcons = new Map();
+
+function decodeIcon(src) {
+	if (!decodedIcons.has(src)) {
+		decodedIcons.set(
+			src,
+			new Promise((resolve) => {
+				const img = new Image();
+				img.onload = () => resolve(img);
+				img.onerror = () => resolve(null);
+				img.src = src;
+			}),
+		);
+	}
+	return decodedIcons.get(src);
+}
+
+export async function ensureIcons(map, iconSources) {
+	await Promise.all(
+		iconSources.map(async ({ id, image }) => {
+			if (map.hasImage(id)) return;
+			const img = await decodeIcon(image);
+			if (!img || map.hasImage(id)) return;
 			try {
 				map.addImage(id, img, { sdf: false });
 			} catch (err) {
 				console.warn(`Ne morem dodati slike "${id}":`, err);
 			}
-			resolve();
-		};
-		img.onerror = () => resolve();
-		img.src = src;
-	});
-}
-
-export function ensureIcons(map, iconSources) {
-	return Promise.all(
-		iconSources.map(({ id, image }) => loadImage(map, id, image)),
+		}),
 	);
 }
 
@@ -65,7 +69,7 @@ export function extractStopCoord(stop) {
 	// Try gpsLocation array first
 	if (Array.isArray(stop.gpsLocation)) {
 		const [lat, lon] = stop.gpsLocation;
-		if (Number.isFinite(lat) && Number.isFinite(lon)) return [lat, lon];
+		if (isUsableLatLon(lat, lon)) return [lat, lon];
 	}
 
 	// Try stop_location (LPP format)
@@ -134,15 +138,13 @@ export function parseTrainCoord(gpsLocation) {
 }
 
 /**
- * Get coordinates from stop with gpsLocation array or lat/lon props
+ * Koordinate postaje kot [lat, lon] (iz gpsLocation ali lat/lon). Vrednosti
+ * `null` se NE pretvorijo v 0 (prej so takšne postaje pristale pri 0°, 0°).
  */
 export function getStopCoord(stop) {
 	if (!stop) return null;
-	const lat = Number(
-		Array.isArray(stop.gpsLocation) ? stop.gpsLocation[0] : stop.lat,
-	);
-	const lon = Number(
-		Array.isArray(stop.gpsLocation) ? stop.gpsLocation[1] : stop.lon,
-	);
-	return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
+	const [lat, lon] = Array.isArray(stop.gpsLocation)
+		? stop.gpsLocation
+		: [stop.lat, stop.lon];
+	return isUsableLatLon(lat, lon) ? [lat, lon] : null;
 }

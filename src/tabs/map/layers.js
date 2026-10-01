@@ -6,37 +6,35 @@ import {
 	HALO_RADIUS,
 } from "./config";
 
-// Shared brand color expression for line/circle coloring
-export const BRAND_COLOR_EXPR = [
-	"match",
-	["coalesce", ["get", "brand"], ["get", "icon"]],
-	"arriva",
-	BRAND_COLORS.arriva.stroke,
-	"sz",
-	BRAND_COLORS.sz.stroke,
-	"nomago",
-	BRAND_COLORS.nomago.stroke,
-	"lpp",
-	BRAND_COLORS.lpp.stroke,
-	"marprom",
-	BRAND_COLORS.marprom.stroke,
-	"murska",
-	BRAND_COLORS.arriva.stroke,
-	"kranj",
-	BRAND_COLORS.marprom.stroke,
-	BRAND_COLORS.default.stroke,
-];
+const BRAND_COLOR_KEY = {
+	arriva: "arriva",
+	sz: "sz",
+	nomago: "nomago",
+	lpp: "lpp",
+	marprom: "marprom",
+	murska: "arriva",
+	kranj: "marprom",
+};
+
+function brandColorExpr(part) {
+	const expr = ["match", ["coalesce", ["get", "brand"], ["get", "icon"]]];
+	for (const [brand, key] of Object.entries(BRAND_COLOR_KEY)) {
+		expr.push(brand, BRAND_COLORS[key][part]);
+	}
+	expr.push(BRAND_COLORS.default[part]);
+	return expr;
+}
+
+// Izrazi za barvo črte/krogov (obroba = temnejši odtenek).
+export const BRAND_COLOR_EXPR = brandColorExpr("stroke");
+const HALO_COLOR_EXPR = brandColorExpr("fill");
+const HALO_STROKE_EXPR = BRAND_COLOR_EXPR;
 
 const TRIP_LINE_WIDTH = [
 	"interpolate",
 	["linear"],
 	["zoom"],
-	10,
-	3,
-	14,
-	5,
-	16,
-	7,
+	...[10, 3, 14, 5, 16, 7],
 ];
 
 const EMPTY_LINE = {
@@ -121,46 +119,6 @@ export function updateTripOverlay(
 	if (stopsSrc?.setData) stopsSrc.setData(stopsData);
 }
 
-const HALO_COLOR_EXPR = [
-	"match",
-	["coalesce", ["get", "brand"], ["get", "icon"]],
-	"arriva",
-	BRAND_COLORS.arriva.fill,
-	"sz",
-	BRAND_COLORS.sz.fill,
-	"nomago",
-	BRAND_COLORS.nomago.fill,
-	"lpp",
-	BRAND_COLORS.lpp.fill,
-	"marprom",
-	BRAND_COLORS.marprom.fill,
-	"murska",
-	BRAND_COLORS.arriva.fill,
-	"kranj",
-	BRAND_COLORS.marprom.fill,
-	BRAND_COLORS.default.fill,
-];
-
-const HALO_STROKE_EXPR = [
-	"match",
-	["coalesce", ["get", "brand"], ["get", "icon"]],
-	"arriva",
-	BRAND_COLORS.arriva.stroke,
-	"sz",
-	BRAND_COLORS.sz.stroke,
-	"nomago",
-	BRAND_COLORS.nomago.stroke,
-	"lpp",
-	BRAND_COLORS.lpp.stroke,
-	"marprom",
-	BRAND_COLORS.marprom.stroke,
-	"murska",
-	BRAND_COLORS.arriva.stroke,
-	"kranj",
-	BRAND_COLORS.marprom.stroke,
-	BRAND_COLORS.default.stroke,
-];
-
 export function registerHaloLayer(map, prefix) {
 	const id = `${prefix}-halo`;
 	if (map.getLayer(id)) return;
@@ -206,13 +164,7 @@ function ensureClusterLayers(map, id, color) {
 				"circle-radius": [
 					"step",
 					["get", "point_count"],
-					14,
-					10,
-					18,
-					50,
-					22,
-					100,
-					26,
+					...[14, 10, 18, 50, 22, 100, 26],
 				],
 				"circle-opacity": 0.85,
 			},
@@ -265,11 +217,12 @@ function registerClusterInteraction(map, prefix) {
 		});
 		const clusterId = features[0]?.properties?.cluster_id;
 		if (!clusterId) return;
-		const source = map.getSource(prefix);
-		source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-			if (err) return;
-			map.easeTo({ center: features[0].geometry.coordinates, zoom });
-		});
+		map.getSource(prefix)
+			?.getClusterExpansionZoom(clusterId)
+			.then((zoom) =>
+				map.easeTo({ center: features[0].geometry.coordinates, zoom }),
+			)
+			.catch(() => {});
 	});
 
 	map.on("mouseenter", `${prefix}-clusters`, () => {
@@ -300,8 +253,13 @@ export function setupSourcesAndLayers(map, dataBySource) {
 		if (!["busStops", "trainStops"].includes(id)) {
 			registerHaloLayer(map, id);
 		}
-		registerClusterInteraction(map, id);
 	});
+}
+
+export function registerClusterInteractions(map) {
+	Object.keys(CLUSTER_CONFIG).forEach((id) =>
+		registerClusterInteraction(map, id),
+	);
 }
 
 export function updateSourceData(map, id, data) {
