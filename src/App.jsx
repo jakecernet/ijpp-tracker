@@ -406,9 +406,6 @@ function AppShell() {
 							<Route path="/" element={null} />
 							<Route path="/map" element={null} />
 							<Route
-								path="/saved"
-								element={<a>nigger</a>}></Route>
-							<Route
 								path="/stations"
 								element={
 									<StationsTab
@@ -458,14 +455,6 @@ function AppShell() {
 				</ErrorBoundary>
 			</div>
 			<nav aria-label="Glavna navigacija">
-				<NavLink to="/saved" onClick={clearSelectedVehicle}>
-					<Bookmark size={24} />
-					<span>Shranjeno</span>
-				</NavLink>
-				<NavLink to="/stations" onClick={clearSelectedVehicle}>
-					<TramFront size={24} />
-					<span>Postaje</span>
-				</NavLink>
 				<NavLink
 					to="/map"
 					end
@@ -475,6 +464,10 @@ function AppShell() {
 					onClick={clearSelectedVehicle}>
 					<MapIcon size={24} />
 					<span>Zemljevid</span>
+				</NavLink>
+				<NavLink to="/stations" onClick={clearSelectedVehicle}>
+					<TramFront size={24} />
+					<span>Postaje</span>
 				</NavLink>
 				<NavLink to="/lines" onClick={clearSelectedVehicle}>
 					<RouteIcon size={24} />
