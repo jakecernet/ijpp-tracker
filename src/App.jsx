@@ -23,6 +23,7 @@ import {
 	Route as RouteIcon,
 	Settings2,
 	TramFront,
+	Bookmark,
 } from "lucide-react";
 import "./App.css";
 
@@ -373,16 +374,6 @@ function AppShell() {
 		return () => clearTimeout(id);
 	}, []);
 
-	const navItems = useMemo(
-		() => [
-			{ to: "/map", label: "Zemljevid", Icon: MapIcon },
-			{ to: "/stations", label: "Postaje", Icon: TramFront },
-			{ to: "/lines", label: "Linije", Icon: RouteIcon },
-			{ to: "/settings", label: "Nastavitve", Icon: Settings2 },
-		],
-		[],
-	);
-
 	return (
 		<div className="container">
 			<div className="content">
@@ -414,6 +405,9 @@ function AppShell() {
 						<Routes>
 							<Route path="/" element={null} />
 							<Route path="/map" element={null} />
+							<Route
+								path="/saved"
+								element={<a>nigger</a>}></Route>
 							<Route
 								path="/stations"
 								element={
@@ -464,17 +458,32 @@ function AppShell() {
 				</ErrorBoundary>
 			</div>
 			<nav aria-label="Glavna navigacija">
-				{navItems.map(({ to, label, Icon }) => (
-					<NavLink
-						key={to}
-						to={to}
-						onClick={
-							to === "/map" ? undefined : clearSelectedVehicle
-						}>
-						<Icon size={24} aria-hidden="true" />
-						<span>{label}</span>
-					</NavLink>
-				))}
+				<NavLink to="/saved" onClick={clearSelectedVehicle}>
+					<Bookmark size={24} />
+					<span>Shranjeno</span>
+				</NavLink>
+				<NavLink to="/stations" onClick={clearSelectedVehicle}>
+					<TramFront size={24} />
+					<span>Postaje</span>
+				</NavLink>
+				<NavLink
+					to="/map"
+					end
+					className={({ isActive }) =>
+						`mid-nav${isActive || isOnMapTab ? " active" : ""}`
+					}
+					onClick={clearSelectedVehicle}>
+					<MapIcon size={24} />
+					<span>Zemljevid</span>
+				</NavLink>
+				<NavLink to="/lines" onClick={clearSelectedVehicle}>
+					<RouteIcon size={24} />
+					<span>Linije</span>
+				</NavLink>
+				<NavLink to="/settings" onClick={clearSelectedVehicle}>
+					<Settings2 size={24} />
+					<spna>Nastavitve</spna>
+				</NavLink>
 			</nav>
 		</div>
 	);

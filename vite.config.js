@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-const icons =[
+const icons = [
 	{
 		src: "/icons/192x192.png",
 		sizes: "192x192",
@@ -15,7 +15,7 @@ const icons =[
 		type: "image/png",
 		purpose: "any maskable",
 	},
-]
+];
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -43,10 +43,15 @@ export default defineConfig({
 	build: {
 		outDir: "build",
 		emptyOutDir: true,
-		rollupOptions: {
+		rolldownOptions: {
 			output: {
-				manualChunks: {
-					maplibre: ["maplibre-gl"],
+				advancedChunks: {
+					groups: [
+						{
+							name: "maplibre",
+							test: /node_modules[\\/]maplibre-gl/,
+						},
+					],
 				},
 			},
 		},
