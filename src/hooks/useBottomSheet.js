@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const DISMISS_THRESHOLD = 90;
 const SNAP_THRESHOLD = 60;
+// Višina prostora na dnu, ki ga prekriva plavajoča navigacija.
+const NAV_SPACE = 80;
 
 export function useBottomSheet({ peekHeight = 160, onDismiss } = {}) {
 	const ref = useRef(null);
@@ -25,7 +27,7 @@ export function useBottomSheet({ peekHeight = 160, onDismiss } = {}) {
 		return () => observer.disconnect();
 	}, []);
 
-	const peekOffset = Math.max(0, height - peekHeight);
+	const peekOffset = Math.max(0, height - peekHeight - NAV_SPACE);
 	const restingOffset = snap === "full" ? 0 : peekOffset;
 
 	const open = useCallback(() => {

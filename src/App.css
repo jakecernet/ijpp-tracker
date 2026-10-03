@@ -111,34 +111,45 @@ html {
 
 	nav {
 		position: fixed;
-		bottom: 0;
-		width: 100%;
+		bottom: 10px;
+		left: 12px;
+		right: 12px;
+		width: auto;
 		display: grid;
-		grid-template-columns: 1fr 1fr 1.2fr 1fr 1fr;
+		grid-template-columns: repeat(5, 1fr);
+		align-items: center;
+		gap: 2px;
+		padding: 0 10px;
 		background: var(--nav-bg);
-		backdrop-filter: blur(12px);
-		height: 80px;
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		height: 65px;
+		border-radius: 999px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 		z-index: 10;
 
 		a {
 			width: 100%;
+			height: 55px;
 			display: flex;
+			flex-direction: column;
 			justify-content: center;
-			padding: 10px 0;
-			border-top: 4px solid transparent;
-			touch-action: manipulation;
 			align-items: center;
-			gap: 20px;
+			gap: 2px;
+			padding: 0;
+			border-radius: 999px;
+			touch-action: manipulation;
 			color: var(--hover-color);
 			text-decoration: none;
 			transition:
 				color var(--transition-speed) var(--transition-ease),
-				border-color var(--transition-speed) var(--transition-ease),
+				background var(--transition-speed) var(--transition-ease),
 				transform 0.1s var(--transition-ease);
 
 			span {
-				font-size: 1.17em;
+				font-size: 0.7em;
 				font-weight: 700;
+				line-height: 1;
 			}
 
 			&:hover {
@@ -146,18 +157,19 @@ html {
 			}
 
 			&:active {
-				transform: scale(0.97);
+				transform: scale(0.95);
 			}
 		}
 
 		a.active {
 			color: var(--active-color);
+			background: var(--hover-bg);
 		}
 	}
 
 	.content {
-		height: calc(100vh - 80px);
-		height: calc(100dvh - 80px);
+		height: 100vh;
+		height: 100dvh;
 		background: var(--content-bg);
 		animation: fadeIn 0.3s var(--transition-ease);
 
@@ -181,8 +193,8 @@ html {
 		.map-container {
 			position: relative;
 			overflow: hidden;
-			height: calc(100vh - 80px);
-			height: calc(100dvh - 80px);
+			height: 100vh;
+			height: 100dvh;
 
 			.map-canvas {
 				height: 100%;
@@ -216,6 +228,7 @@ html {
 				border-top: 1px solid var(--selector-border);
 				will-change: transform;
 				backface-visibility: hidden;
+				padding-bottom: 80px;
 			}
 
 			.route-drawer--open {
@@ -323,6 +336,7 @@ html {
 
 			.arrival-list {
 				height: 100%;
+				padding-bottom: 80px;
 				overflow-y: auto;
 				-webkit-overflow-scrolling: touch;
 				overscroll-behavior: contain;
@@ -675,6 +689,7 @@ html {
 
 			.results {
 				flex: 1;
+				padding-bottom: 80px;
 				overflow-y: auto;
 				-webkit-overflow-scrolling: touch;
 				overscroll-behavior: contain;
@@ -771,8 +786,8 @@ html {
 					padding: 0;
 					display: flex;
 					flex-direction: column;
-					max-height: calc(100vh - 190px);
-					max-height: calc(100dvh - 190px);
+					max-height: calc(100vh - 270px);
+					max-height: calc(100dvh - 270px);
 					overflow-y: auto;
 					-webkit-overflow-scrolling: touch;
 					overscroll-behavior: contain;
@@ -923,8 +938,9 @@ html {
 			.inside {
 				display: flex;
 				flex-direction: column;
-				max-height: calc(100vh - 140px);
-				max-height: calc(100dvh - 140px);
+				max-height: calc(100vh - 60px);
+				max-height: calc(100dvh - 60px);
+				padding-bottom: 80px;
 				overflow-y: scroll;
 
 				h3 {
@@ -1069,21 +1085,22 @@ html {
 		height: 100dvh;
 
 		nav {
-			a {
-				flex-direction: column;
-				gap: 2px;
-				font-size: 0.7em;
-				min-height: 44px;
+			left: 8px;
+			right: 8px;
+			padding: 0 6px;
+
+			a span {
+				font-size: 0.62em;
 			}
 		}
 
 		.content {
-			height: calc(100svh - 80px);
-			height: calc(100dvh - 80px);
+			height: 100svh;
+			height: 100dvh;
 
 			.map-container {
-				height: calc(100svh - 80px);
-				height: calc(100dvh - 80px);
+				height: 100svh;
+				height: 100dvh;
 			}
 		}
 
@@ -1262,7 +1279,7 @@ html {
 
 .map-route-loading {
 	position: absolute;
-	bottom: 20px;
+	bottom: 90px;
 	left: 50%;
 	transform: translateX(-50%);
 	background: var(--nav-bg);

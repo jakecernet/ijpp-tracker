@@ -482,7 +482,7 @@ function AppShell() {
 				</NavLink>
 				<NavLink to="/settings" onClick={clearSelectedVehicle}>
 					<Settings2 size={24} />
-					<spna>Nastavitve</spna>
+					<span>Nastavitve</span>
 				</NavLink>
 			</nav>
 		</div>
