@@ -41,14 +41,16 @@ export default defineConfig({
 	},
 	base: "./",
 	build: {
-		outDir: "build",
-		emptyOutDir: true,
-		rollupOptions: {
-			output: {
-				manualChunks: {
-					maplibre: ["maplibre-gl"],
-				},
-			},
-		},
-	},
+    outDir: "build",
+    emptyOutDir: true,
+    rolldownOptions: {
+        output: {
+            advancedChunks: {
+                groups: [
+                    { name: "maplibre", test: /node_modules[\\/]maplibre-gl/ },
+                ],
+            },
+        },
+    },
+},
 });
