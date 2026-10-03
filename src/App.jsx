@@ -115,6 +115,8 @@ const systemTheme = () =>
 
 const FALLBACK = <div className="suspense-fallback">Nalaganje...</div>;
 
+const NAV_PATHS = ["/map", "/stations", "/lines", "/settings"];
+
 function AppShell() {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
@@ -125,6 +127,7 @@ function AppShell() {
 
 	const isOnMapTab = pathname === "/" || pathname === "/map";
 	const isOnLinesTab = pathname === "/lines";
+	const navIndex = isOnMapTab ? 0 : NAV_PATHS.indexOf(pathname);
 
 	const [activeStation, setActiveStation] = usePersistentState(
 		"activeStation",
@@ -454,7 +457,13 @@ function AppShell() {
 					</Suspense>
 				</ErrorBoundary>
 			</div>
-			<nav aria-label="Glavna navigacija">
+			<nav
+				aria-label="Glavna navigacija"
+				style={{ "--nav-index": Math.max(navIndex, 0) }}>
+				<span
+					className={`nav-indicator${navIndex < 0 ? " nav-indicator--hidden" : ""}`}
+					aria-hidden="true"
+				/>
 				<NavLink
 					to="/map"
 					end
