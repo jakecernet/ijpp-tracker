@@ -4,6 +4,7 @@ import {
 	ICON_ANCHOR_BY_LAYER,
 	BRAND_COLORS,
 	HALO_RADIUS,
+	HALO_ARROW_SIZE,
 } from "./config";
 
 const BRAND_COLOR_KEY = {
@@ -133,8 +134,73 @@ export function registerHaloLayer(map, prefix) {
 				"circle-color": HALO_COLOR_EXPR,
 				"circle-radius": HALO_RADIUS,
 				"circle-stroke-color": HALO_STROKE_EXPR,
-				"circle-stroke-width": 2.8,
-				"circle-opacity": 0.6,
+				"circle-stroke-width": 3,
+				"circle-opacity": 0.8,
+				"circle-stroke-opacity": 1,
+			},
+		},
+		`${prefix}-points`,
+	);
+}
+
+// Puščica smeri vožnje: SDF ikona (barva po operaterju), vrtimo jo po
+// `heading` (avtobusi) oziroma `bearing` (vlaki). Brez znane smeri je ni.
+export const ARROW_ICON_ID = "heading-arrow";
+const HEADING_EXPR = [
+	"to-number",
+	["coalesce", ["get", "bearing"], ["get", "heading"]],
+	-1,
+];
+
+export function ensureArrowIcon(map) {
+	if (map.hasImage(ARROW_ICON_ID)) return;
+	const size = 144;
+	const c = size / 2;
+	const R = 32; // polmer kroga na ikoni (16 px pri size 1)
+	const canvas = document.createElement("canvas");
+	canvas.width = canvas.height = size;
+	const ctx = canvas.getContext("2d");
+	ctx.fillStyle = "#000";
+	// Raven trikotnik: osnova je široka kot krog (premer 2R), stranici gresta
+	// ravno v konico. Del znotraj kroga izrežemo, vidi se le konica.
+	ctx.beginPath();
+	ctx.moveTo(c - R, c);
+	ctx.lineTo(c, 2);
+	ctx.lineTo(c + R, c);
+	ctx.closePath();
+	ctx.fill();
+	ctx.globalCompositeOperation = "destination-out";
+	ctx.beginPath();
+	ctx.arc(c, c, R - 2, 0, Math.PI * 2);
+	ctx.fill();
+	const data = ctx.getImageData(0, 0, size, size);
+	map.addImage(ARROW_ICON_ID, data, { sdf: true, pixelRatio: 2 });
+}
+
+export function registerArrowLayer(map, prefix) {
+	const id = `${prefix}-arrow`;
+	if (map.getLayer(id)) return;
+	ensureArrowIcon(map);
+	map.addLayer(
+		{
+			id,
+			type: "symbol",
+			source: prefix,
+			filter: ["all", ["!", ["has", "point_count"]], [">=", HEADING_EXPR, 0]],
+			layout: {
+				"icon-image": ARROW_ICON_ID,
+				"icon-rotate": HEADING_EXPR,
+				"icon-rotation-alignment": "map",
+				"icon-pitch-alignment": "map",
+				"icon-allow-overlap": true,
+				"icon-ignore-placement": true,
+				// pixelRatio 2 → ikona je 72 px; polmer kroga na ikoni = 16 px
+				"icon-size": HALO_ARROW_SIZE,
+			},
+			paint: {
+				"icon-color": BRAND_COLOR_EXPR,
+				"icon-halo-color": "#ffffff",
+				"icon-halo-width": 0,
 			},
 		},
 		`${prefix}-points`,
@@ -252,6 +318,7 @@ export function setupSourcesAndLayers(map, dataBySource) {
 		);
 		if (!["busStops", "trainStops"].includes(id)) {
 			registerHaloLayer(map, id);
+			registerArrowLayer(map, id);
 		}
 	});
 }
@@ -274,6 +341,7 @@ export function setPrefixVisible(map, prefix, visible) {
 		`${prefix}-clusters`,
 		`${prefix}-cluster-count`,
 		`${prefix}-halo`,
+		`${prefix}-arrow`,
 	];
 	layers.forEach((layerId) => {
 		if (

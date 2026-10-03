@@ -57,9 +57,9 @@ const zoomRamp = (...stops) => [
 ];
 
 export const ICON_SIZE_BY_LAYER = {
-	buses: zoomRamp([10, 0.32], [13, 0.42], [15, 0.52], [17, 0.6]),
+	buses: zoomRamp([10, 0.2], [13, 0.25], [15, 0.31], [17, 0.36]),
 	busStops: zoomRamp([10, 0.28], [13, 0.36], [15, 0.44], [17, 0.52]),
-	trainPositions: zoomRamp([10, 0.34], [13, 0.44], [15, 0.54], [17, 0.62]),
+	trainPositions: zoomRamp([10, 0.2], [13, 0.25], [15, 0.31], [17, 0.36]),
 	trainStops: zoomRamp([10, 0.28], [13, 0.36], [15, 0.44], [17, 0.52]),
 };
 
@@ -91,4 +91,12 @@ export const operatorToIcon = {
 	"SŽ - Potniški promet, d.o.o.": "sz",
 };
 
-export const HALO_RADIUS = zoomRamp([10, 12], [13, 16], [15, 20], [17, 24]);
+export const HALO_RADIUS = zoomRamp([10, 14], [13, 18], [15, 22], [17, 26]);
+
+// Velikost puščice, usklajena s polmerom kroga (ikona ima krog polmera 16 px pri size 1).
+export const HALO_ARROW_SIZE = zoomRamp(
+	[10, 0.875],
+	[13, 1.125],
+	[15, 1.375],
+	[17, 1.625],
+);
