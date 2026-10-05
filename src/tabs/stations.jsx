@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { BusFrontIcon, Heart, TrainFrontIcon } from "lucide-react";
+import { BusFrontIcon, Heart, TrainFrontIcon, LocateFixedIcon } from "lucide-react";
 import { List } from "react-window";
 import SubTabs from "../components/SubTabs";
 import { useElementHeight } from "../hooks/useElementHeight";
@@ -19,12 +19,13 @@ const MIN_ALL_SEARCH_LENGTH = 3;
 const MIN_LIST_HEIGHT = 200;
 const BASE_ROW_HEIGHT = 52;
 const ROUTES_ROW_HEIGHT = 26;
-const MAX_ROUTE_BADGES = 6;
+const MAX_ROUTE_BADGES = 5;
+const ROW_GAP = 8;
 
 const STATION_TABS = [
-	["nearMe", "V bližini"],
-	["all", "Vse"],
-	["liked", "Priljubljene"],
+	["nearMe", "V bližini", "LocateFixedIcon" ],
+	["all", "Vse", "SquareText"],
+	["liked", "Priljubljene", "Heart"],
 ];
 
 const formatDistance = (km) =>
@@ -50,7 +51,8 @@ const toEntry = (station, kind, userLocation) => ({
 
 const getRowHeight = (entry) =>
 	BASE_ROW_HEIGHT +
-	(entry?.station?.routes_on_stop?.length ? ROUTES_ROW_HEIGHT : 0);
+	(entry?.station?.routes_on_stop?.length ? ROUTES_ROW_HEIGHT : 0) +
+	ROW_GAP;
 
 const StationItem = memo(({ entry, isLiked, onSelect, onToggleLike }) => {
 	const { station, kind, distance } = entry;
@@ -128,7 +130,9 @@ const StationRow = memo(
 	}) => {
 		const entry = entries[index];
 		return (
-			<div style={style} {...ariaAttributes}>
+			<div
+				style={{ ...style, paddingBottom: ROW_GAP }}
+				{...ariaAttributes}>
 				<StationItem
 					entry={entry}
 					isLiked={likedIds.has(getStationId(entry.station))}
@@ -266,7 +270,6 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 
 	return (
 		<div className="insideDiv">
-			<h2>Postaje</h2>
 			<input
 				type="search"
 				placeholder={
@@ -285,7 +288,6 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 				value={page}
 				onChange={setPage}
 			/>
-
 			<div className="results station-list" ref={listRef}>
 				{page === "nearMe" &&
 					(nearMeEntries.length === 0 ? (

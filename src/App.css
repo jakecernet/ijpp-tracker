@@ -249,12 +249,12 @@ html {
 				background: var(--nav-bg);
 				will-change: transform;
 				backface-visibility: hidden;
-                border-radius: 20px;
+				border-radius: 20px;
 			}
 
 			.route-drawer--open {
 				transform: translateY(0);
-                bottom: 80px;
+				bottom: 80px;
 			}
 
 			.route-drawer__header {
@@ -328,10 +328,125 @@ html {
 			height: 100%;
 			min-height: 0;
 
+			.route-item {
+				display: flex;
+				flex-direction: row;
+				justify-content: space-around;
+				padding: 10px;
+				align-items: center;
+				border-bottom: 1px solid var(--selector-border);
+				text-align: center;
+				transition:
+					background var(--transition-speed) var(--transition-ease),
+					transform 0.1s var(--transition-ease);
+				color: var(--text-color);
+				gap: 12px;
+				cursor: pointer;
+				touch-action: manipulation;
+				animation: slideIn 0.3s var(--transition-ease);
+				animation-fill-mode: both;
+
+				&:hover {
+					background: var(--hover-bg);
+				}
+
+				&:active {
+					transform: scale(0.99);
+				}
+
+				h2 {
+					padding: 10px;
+				}
+
+				h3 {
+					flex: 1;
+					text-align: left;
+				}
+
+				p {
+					padding: 10px;
+				}
+
+				.circle {
+					padding: 20px;
+					border-radius: 50%;
+					height: 4rem;
+					width: 4rem;
+					min-width: 4rem;
+					border: 1px solid var(--selector-border);
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					color: var(--text-color);
+				}
+
+				.route-item:last-child {
+					border-bottom: none;
+				}
+			}
+
 			h2 {
 				text-align: center;
 				padding: 10px 0;
 				color: var(--text-color);
+			}
+
+			input {
+				appearance: none;
+				border-radius: 10px;
+				height: 3rem;
+				outline: none;
+				border: none;
+				padding: 10px;
+				background: var(--button-bg);
+				color: var(--text-color);
+				transition: all var(--transition-speed) var(--transition-ease);
+				margin: 10px;
+
+				&::placeholder {
+					color: #64748b;
+				}
+
+				&:focus {
+					background: var(--input-focus);
+				}
+			}
+
+			.top-nav {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				justify-content: space-around;
+				margin: 0 5px;
+
+				button {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					flex-direction: row;
+					gap: 10px;
+					padding: 12px;
+					color: var(--hover-color);
+					border: 1px solid transparent;
+					transition: all var(--transition-speed)
+						var(--transition-ease);
+					border-radius: 10px;
+					cursor: pointer;
+					background: var(--button-bg);
+					outline: none;
+				}
+
+				button:hover {
+					color: var(--active-color);
+				}
+
+				button:active {
+					transform: scale(0.98);
+				}
+
+				button.active {
+					color: var(--active-color);
+				}
 			}
 
 			.lines-header {
@@ -511,215 +626,119 @@ html {
 				}
 			}
 
-			.route-item {
-				display: flex;
-				flex-direction: row;
-				justify-content: space-around;
-				padding: 10px;
-				align-items: center;
-				border-bottom: 1px solid var(--selector-border);
-				text-align: center;
-				transition:
-					background var(--transition-speed) var(--transition-ease),
-					transform 0.1s var(--transition-ease);
-				color: var(--text-color);
-				gap: 12px;
-				cursor: pointer;
-				touch-action: manipulation;
-				animation: slideIn 0.3s var(--transition-ease);
-				animation-fill-mode: both;
-
-				&:hover {
-					background: var(--hover-bg);
-				}
-
-				&:active {
-					transform: scale(0.99);
-				}
-
-				h2 {
-					padding: 10px;
-				}
-
-				h3 {
-					flex: 1;
-					text-align: left;
-				}
-
-				p {
-					padding: 10px;
-				}
-
-				.circle {
-					padding: 20px;
-					border-radius: 50%;
-					height: 4rem;
-					width: 4rem;
-					min-width: 4rem;
-					border: 1px solid var(--selector-border);
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					color: var(--text-color);
-				}
-
-				.route-item:last-child {
-					border-bottom: none;
-				}
-			}
-
 			.station-list {
 				display: flex;
 				flex-direction: column;
-				gap: 10px;
 				overflow-y: auto;
-				margin-top: 10px;
+				margin: 10px 10px 0px 10px;
 				color: var(--text-color);
-			}
-
-			.top-nav {
-				display: flex;
-				flex-direction: row;
-				align-items: center;
-				justify-content: space-evenly;
-
-				button {
-					width: 100%;
-					background: none;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					flex-direction: row;
-					gap: 20px;
-					padding: 15px 0;
-					color: var(--hover-color);
-					border: 1px solid transparent;
-					transition: all var(--transition-speed)
-						var(--transition-ease);
-					background: rgba(0, 0, 0, 0.3);
-					border-radius: 0px;
-					cursor: pointer;
-				}
-
-				button:hover {
-					color: var(--active-color);
-					background: rgba(0, 0, 0, 0.25);
-				}
-
-				button:active {
-					transform: scale(0.98);
-					outline: none;
-				}
-
-				button.active {
-					color: var(--active-color);
-					background: none;
-					outline: none;
-				}
-			}
-
-			.station-item-search {
-				padding: 10px;
-				border-bottom: 1px solid var(--selector-border);
-				display: flex;
-				flex-direction: row;
-				align-items: center;
-				justify-content: space-between;
-				gap: 12px;
-				transition:
-					background var(--transition-speed) var(--transition-ease),
-					transform 0.1s var(--transition-ease);
-				color: var(--text-color);
-				cursor: pointer;
-				box-sizing: border-box;
-				height: 100%;
-				touch-action: manipulation;
-				animation: slideIn 0.3s var(--transition-ease);
-				animation-fill-mode: both;
-
-				.station-content {
-					display: flex;
-					flex-direction: row;
-					align-items: center;
-					gap: 10px;
-					flex: 1;
-					min-width: 0;
-					flex-wrap: wrap;
-
-					.name {
-						flex: 0 0 auto;
-						min-width: 0;
-						display: flex;
-						flex-direction: row;
-						gap: 10px;
-						align-items: center;
-						font-size: 0.9em;
-					}
-
-					.direction-badge {
-						height: fit-content;
-						margin: auto 0;
-						padding: 2px 6px;
-						border-radius: 4px;
-						font-size: 11px;
-						color: var(--text-color);
-						white-space: nowrap;
-
-						&.direction-badge--in {
-							background-color: darkgreen;
-						}
-
-						&.direction-badge--out {
-							background-color: #ba8e23;
-						}
-					}
-
-					.station-info {
-						list-style: none;
-						padding: 0;
-						margin: 0;
-						display: flex;
-						flex-direction: row;
-						align-items: center;
-						justify-content: flex-end;
-						gap: 4px;
-						left: 0;
-
-						li {
-							border: 1px solid var(--selector-border);
-							border-radius: 4px;
-							color: var(--active-color);
-							font-weight: 600;
-							font-size: 0.75em;
-							padding: 2px 6px;
-							display: flex;
-							align-items: center;
-							justify-content: center;
-						}
-					}
-				}
-
-				&:hover {
-					background: var(--hover-bg);
-				}
-
-				&:active {
-					transform: scale(0.99);
-				}
-			}
-
-			.results {
 				flex: 1;
-				padding-bottom: 80px;
 				overflow-y: auto;
 				-webkit-overflow-scrolling: touch;
 				overscroll-behavior: contain;
 				min-height: 0;
 
-				ul {
-					list-style: none;
-				}
+				.station-item-search {
+					padding: 10px;
+					display: flex;
+					flex-direction: row;
+					align-items: center;
+					justify-content: space-between;
+					transition:
+						background var(--transition-speed)
+							var(--transition-ease),
+						transform 0.1s var(--transition-ease);
+					color: var(--text-color);
+					cursor: pointer;
+					box-sizing: border-box;
+					height: 100%;
+					touch-action: manipulation;
+					animation: slideIn 0.3s var(--transition-ease);
+					animation-fill-mode: both;
+					background: rgba(0, 0, 0, 0.3);
+					border-radius: 8px;
 
+					.station-content {
+						display: flex;
+						flex-direction: row;
+						align-items: center;
+						gap: 10px;
+						flex: 1;
+						min-width: 0;
+						flex-wrap: wrap;
+
+						.name {
+							flex: 0 1 auto;
+							min-width: 0;
+							display: flex;
+							flex-direction: row;
+							gap: 10px;
+							align-items: center;
+							font-size: 0.9em;
+
+							h3 {
+								min-width: 0;
+								overflow: hidden;
+								text-overflow: ellipsis;
+								white-space: nowrap;
+							}
+						}
+
+						.direction-badge {
+							height: fit-content;
+							margin: auto 0;
+							padding: 2px 6px;
+							border-radius: 4px;
+							font-size: 11px;
+							color: #fff;
+							white-space: nowrap;
+							flex-shrink: 0;
+
+							&.direction-badge--in {
+								background-color: darkgreen;
+							}
+
+							&.direction-badge--out {
+								background-color: #ba8e23;
+							}
+						}
+
+						.station-info {
+							list-style: none;
+							padding: 0;
+							margin: 0;
+							display: flex;
+							flex-direction: row;
+							align-items: center;
+							justify-content: flex-end;
+							gap: 4px;
+							left: 0;
+
+							li {
+								border: 1px solid var(--selector-border);
+								border-radius: 4px;
+								color: var(--active-color);
+								font-weight: 600;
+								font-size: 0.75em;
+								padding: 2px 6px;
+								display: flex;
+								align-items: center;
+								justify-content: center;
+							}
+						}
+					}
+
+					&:hover {
+						background: var(--hover-bg);
+					}
+
+					&:active {
+						transform: scale(0.99);
+					}
+				}
+			}
+
+			.results {
 				.empty-message {
 					text-align: center;
 					color: var(--hover-color);
@@ -762,29 +781,6 @@ html {
 
 				&.liked {
 					color: #ef4444;
-				}
-			}
-
-			input {
-				width: 100%;
-				appearance: none;
-				border-radius: 0;
-				height: 3rem;
-				outline: none;
-				border: 1px solid var(--selector-border);
-				padding: 10px;
-				background: var(--content-bg);
-				color: var(--text-color);
-				transition: all var(--transition-speed) var(--transition-ease);
-
-				&::placeholder {
-					color: #64748b;
-				}
-
-				&:focus {
-					background: var(--input-focus);
-					border-color: var(--active-color);
-					box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
 				}
 			}
 		}
@@ -1382,7 +1378,7 @@ html {
 .maplibregl-popup-content .popup-button--block {
 	width: 100%;
 	margin-top: 12px;
-    background: rgba(96, 165, 250, 0.15);
+	background: rgba(96, 165, 250, 0.15);
 }
 
 .popup-badges {
