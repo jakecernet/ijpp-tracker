@@ -17,7 +17,7 @@ const LINE_TABS = [
 	["all", "Vse linije", "SquareText"],
 	["liked", "Shranjene", "Heart"],
 ];
-const MAX_ANIMATED_ITEMS = 10;
+const ROW_GAP = 8;
 
 const includesTerm = (value, term) =>
 	typeof value === "string" && value.toLowerCase().includes(term);
@@ -115,20 +115,21 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => {
 	);
 });
 
-const ArrivalItem = memo(({ arrival, index, onRouteClick }) => {
+const ArrivalItem = memo(({ arrival, onRouteClick }) => {
 	const open = () => onRouteClick(arrival, arrival.type);
 	return (
 		<div
 			className="arrival-item"
 			role="button"
 			tabIndex={0}
-			style={{ "--i": Math.min(index, MAX_ANIMATED_ITEMS) }}
 			onClick={open}
 			onKeyDown={onActivateKey(open)}>
-			<div className="left">
+			<div className="left"
+                style={{
+                    background: `linear-gradient(150deg, ${bgColorMap(arrival)} 0%, #0000 60%)`,
+                }}>
 				<div
-					className="circle"
-					style={{ background: bgColorMap(arrival) }}>
+					className="circle">
 					<h2 className={arrival.type === "SZ" ? "sz" : ""}>
 						{arrival.type === "LPP"
 							? arrival.routeName
@@ -156,6 +157,10 @@ const ArrivalItem = memo(({ arrival, index, onRouteClick }) => {
 		</div>
 	);
 });
+
+const ArrivalRow = memo(({ children }) => (
+	<div style={{ paddingBottom: ROW_GAP }}>{children}</div>
+));
 
 const SkeletonArrivalItem = memo(() => (
 	<div className="arrival-item skeleton" aria-hidden="true">
@@ -463,7 +468,9 @@ const LinesTab = ({
 					<div className="arrival-list">
 						{arrivalsLoading &&
 							[0, 1, 2, 3, 4].map((i) => (
-								<SkeletonArrivalItem key={i} />
+								<ArrivalRow key={i}>
+									<SkeletonArrivalItem />
+								</ArrivalRow>
 							))}
 						{!arrivalsLoading && allArrivals.length === 0 && (
 							<p className="empty-message">
@@ -472,12 +479,12 @@ const LinesTab = ({
 						)}
 						{!arrivalsLoading &&
 							allArrivals.map((arrival, index) => (
-								<ArrivalItem
-									key={arrivalKeys[index]}
-									arrival={arrival}
-									index={index}
-									onRouteClick={handleRouteClick}
-								/>
+								<ArrivalRow key={arrivalKeys[index]}>
+									<ArrivalItem
+										arrival={arrival}
+										onRouteClick={handleRouteClick}
+									/>
+								</ArrivalRow>
 							))}
 					</div>
 				)}
