@@ -13,9 +13,9 @@ import { isLppOperator, isSzOperator } from "../utils/operators";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const LINE_TABS = [
-	["arrivals", "Prihodi"],
-	["all", "Vse"],
-	["liked", "Priljubljene"],
+	["arrivals", "Prihodi", "BusIcon"],
+	["all", "Vse linije", "SquareText"],
+	["liked", "Shranjene", "Heart"],
 ];
 const MAX_ANIMATED_ITEMS = 10;
 
@@ -422,7 +422,7 @@ const LinesTab = ({
 	return (
 		<div className="insideDiv">
 			<div className="lines-header">
-				<h2>Linije ({activeStation?.name})</h2>
+				<h2>{activeStation?.name}</h2>
 				<button
 					type="button"
 					className={`like-btn ${isStationLiked ? "liked" : ""}`}

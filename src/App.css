@@ -632,11 +632,6 @@ html {
 				overflow-y: auto;
 				margin: 10px 10px 0px 10px;
 				color: var(--text-color);
-				flex: 1;
-				overflow-y: auto;
-				-webkit-overflow-scrolling: touch;
-				overscroll-behavior: contain;
-				min-height: 0;
 
 				.station-item-search {
 					padding: 10px;
@@ -739,6 +734,12 @@ html {
 			}
 
 			.results {
+				flex: 1;
+				overflow-y: auto;
+				-webkit-overflow-scrolling: touch;
+				overscroll-behavior: contain;
+				min-height: 0;
+
 				.empty-message {
 					text-align: center;
 					color: var(--hover-color);
