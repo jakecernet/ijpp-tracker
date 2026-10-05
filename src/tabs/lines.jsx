@@ -89,15 +89,21 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => {
 			tabIndex={0}
 			onClick={open}
 			onKeyDown={onActivateKey(open)}>
-			<div className="circle" style={{ background: bgColorMap(item) }}>
-				{item.lineNumber ??
-					item.routeName ??
-					item.routeShortName ??
-					item.tripShort ??
-					item.tripId?.slice(5) ??
-					"?"}
+			<div
+				className="left"
+				style={{
+					background: `linear-gradient(150deg, ${bgColorMap(item)} 0%, #0000 60%)`,
+				}}>
+				<div className="circle">
+					{item.lineNumber ??
+						item.routeName ??
+						item.routeShortName ??
+						item.tripShort ??
+						item.tripId?.slice(5) ??
+						"?"}
+				</div>
+				<h3>{getRouteDisplayName(item)}</h3>
 			</div>
-			<h3>{getRouteDisplayName(item)}</h3>
 			<button
 				type="button"
 				className={`like-btn ${isLiked ? "liked" : ""}`}
@@ -124,12 +130,12 @@ const ArrivalItem = memo(({ arrival, onRouteClick }) => {
 			tabIndex={0}
 			onClick={open}
 			onKeyDown={onActivateKey(open)}>
-			<div className="left"
-                style={{
-                    background: `linear-gradient(150deg, ${bgColorMap(arrival)} 0%, #0000 60%)`,
-                }}>
-				<div
-					className="circle">
+			<div
+				className="left"
+				style={{
+					background: `linear-gradient(150deg, ${bgColorMap(arrival)} 0%, #0000 60%)`,
+				}}>
+				<div className="circle">
 					<h2 className={arrival.type === "SZ" ? "sz" : ""}>
 						{arrival.type === "LPP"
 							? arrival.routeName
