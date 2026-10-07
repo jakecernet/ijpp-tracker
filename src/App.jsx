@@ -40,6 +40,7 @@ import {
 	fetchSzStops,
 	fetchSzTrip,
 	fetchTrainPositions,
+	prefetchRoute,
 } from "./Api";
 
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -330,7 +331,7 @@ function AppShell() {
 		setRouteLoading(true);
 		getTripFromId(
 			selectedVehicle,
-			detectVehicleType(selectedVehicle),
+			selectedVehicle.routeType ?? detectVehicleType(selectedVehicle),
 		).finally(() => {
 			if (current) setRouteLoading(false);
 		});
@@ -356,13 +357,10 @@ function AppShell() {
 		[setActiveStation],
 	);
 
-	const handleSelectRoute = useCallback(
-		async (item, type) => {
-			const route = await getTripFromId(item, type);
-			if (route) navigateRef.current("/map");
-		},
-		[getTripFromId],
-	);
+	const handleSelectRoute = useCallback((item, type) => {
+		setSelectedVehicle({ ...item, routeType: type });
+		navigateRef.current("/map");
+	}, []);
 
 	useEffect(() => {
 		const preload = () =>
@@ -429,6 +427,7 @@ function AppShell() {
 										lppArrivals={lppArrivals}
 										szArrivals={szArrivals}
 										onSelectRoute={handleSelectRoute}
+										onPrefetchRoute={prefetchRoute}
 										arrivalsLoading={arrivalsLoading}
 										trains={trains}
 									/>

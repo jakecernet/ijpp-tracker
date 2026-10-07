@@ -200,6 +200,13 @@ const createLikedRouteEntry = (route) => ({
 	routeId: route.routeId,
 });
 
+const routeTypeOf = (item) =>
+	item.type === "SZ" || item.tripShort || isSzOperator(item.operator)
+		? "SZ"
+		: isLppOperator(item.operator)
+			? "LPP"
+			: "IJPP";
+
 const LinesTab = ({
 	gpsPositions,
 	activeStation,
@@ -207,6 +214,7 @@ const LinesTab = ({
 	lppArrivals,
 	szArrivals,
 	onSelectRoute,
+	onPrefetchRoute,
 	arrivalsLoading,
 	trains,
 }) => {
@@ -416,18 +424,17 @@ const LinesTab = ({
 				console.warn("No valid trip/line ID for route", item);
 				return;
 			}
-			const operatorType =
-				type ||
-				(item.type === "SZ" ||
-				item.tripShort ||
-				isSzOperator(item.operator)
-					? "SZ"
-					: isLppOperator(item.operator)
-						? "LPP"
-						: "IJPP");
-			onSelectRoute(item, operatorType);
+			onSelectRoute(item, type || routeTypeOf(item));
 		},
 		[onSelectRoute],
+	);
+
+	const handlePrefetch = useCallback(
+		(item, type) => {
+			if (!item.tripId && !item.lineId && !item.routeId) return;
+			onPrefetchRoute?.(item, type || routeTypeOf(item));
+		},
+		[onPrefetchRoute],
 	);
 
 	return (
@@ -489,6 +496,7 @@ const LinesTab = ({
 									<ArrivalItem
 										arrival={arrival}
 										onRouteClick={handleRouteClick}
+										onPrefetch={handlePrefetch}
 									/>
 								</ArrivalRow>
 							))}
@@ -513,6 +521,7 @@ const LinesTab = ({
 									isLiked={isRouteLiked(route)}
 									onToggleLike={toggleLikeRoute}
 									onClick={handleRouteClick}
+									onPrefetch={handlePrefetch}
 								/>
 							))}
 						</ul>
@@ -534,6 +543,7 @@ const LinesTab = ({
 									isLiked
 									onToggleLike={toggleLikeRoute}
 									onClick={handleRouteClick}
+									onPrefetch={handlePrefetch}
 								/>
 							))}
 						</ul>

@@ -123,8 +123,6 @@ html {
 		--nav-gap: 2px;
 		padding: 0 var(--nav-pad);
 		background: var(--nav-bg);
-		backdrop-filter: blur(16px);
-		-webkit-backdrop-filter: blur(16px);
 		height: 65px;
 		border-radius: 999px;
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
@@ -795,7 +793,6 @@ html {
 		.route {
 			.data {
 				background: var(--content-bg);
-				backdrop-filter: blur(8px);
 				padding: 14px 16px;
 				text-align: center;
 				color: var(--text-color);
@@ -1144,7 +1141,6 @@ html {
 
 .maplibregl-popup-content {
 	background: var(--popup-bg) !important;
-	backdrop-filter: blur(12px) !important;
 	color: var(--text-color) !important;
 	max-width: none;
 	width: fit-content;
@@ -1305,7 +1301,6 @@ html {
 	left: 50%;
 	transform: translateX(-50%);
 	background: var(--nav-bg);
-	backdrop-filter: blur(12px);
 	border: 1px solid var(--selector-border);
 	border-radius: 999px;
 	padding: 8px 18px;

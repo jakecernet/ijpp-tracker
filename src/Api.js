@@ -19,16 +19,20 @@ const busStopsLink =
 const szStopsLink =
 	"https://raw.githubusercontent.com/jakecernet/ijpp-json/refs/heads/main/sz_stops.json";
 
-const lppLocationsLink = "https://mestnipromet.cyou/api/v1/resources/buses/info";
+const lppLocationsLink =
+	"https://mestnipromet.cyou/api/v1/resources/buses/info";
 const ijppLocationsLink = "https://api.beta.brezavta.si/vehicles/locations";
 
 const ijppArrivalsLink = "https://api.beta.brezavta.si/stops/";
-const lppArrivalsLink = "https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
+const lppArrivalsLink =
+	"https://tracker.cernetic.cc/api/lpp-arrivals?station-code=";
 const lppRouteLink = "https://tracker.cernetic.cc/api/lpp-route?trip-id=";
-const lppRoutePointsLink = "https://tracker.cernetic.cc/api/lpp-route-points?route-id=";
+const lppRoutePointsLink =
+	"https://tracker.cernetic.cc/api/lpp-route-points?route-id=";
 const lppAllRoutesLink = "https://tracker.cernetic.cc/api/lpp-all-routes";
 const ijppRouteLink = "https://api.beta.brezavta.si/trips/";
-const szRouteLink = "https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
+const szRouteLink =
+	"https://mapper-motis.ojpp-gateway.derp.si/api/v2/trip?tripId=";
 const szArrivalsLink =
 	"https://mapper-motis.ojpp-gateway.derp.si/api/v1/stoptimes?stopId=";
 
@@ -75,6 +79,7 @@ const CACHE_TTL = {
 	routes: 60 * 1000,
 	lppRoutes: 30 * 1000, // ETA-ji so relativni na čas prenosa, zato kratek TTL
 	routeList: 10 * 60 * 1000,
+	geometry: 6 * 60 * 60 * 1000, // geometrija linij se skoraj nikoli ne spremeni
 };
 
 const cache = new Map();
@@ -108,7 +113,7 @@ function pruneCache() {
 }
 
 // Predpomnilnik podrobnosti vožnje (vsebuje geometrijo, zato je omejen).
-const ROUTE_CACHE_MAX = 30;
+const ROUTE_CACHE_MAX = 60;
 const routeCache = new Map();
 const routeInFlight = new Map();
 
@@ -303,8 +308,10 @@ const fetchSzStops = async () => {
 /** Seznam vseh LPP linij (za iskanje). */
 const fetchLppAllRoutes = async () => {
 	try {
-		const raw = await cachedFetch(lppAllRoutesLink, CACHE_TTL.routeList, () =>
-			fetchJson(lppAllRoutesLink),
+		const raw = await cachedFetch(
+			lppAllRoutesLink,
+			CACHE_TTL.routeList,
+			() => fetchJson(lppAllRoutesLink),
 		);
 		return Array.isArray(raw?.data) ? raw.data : [];
 	} catch (error) {
@@ -323,8 +330,10 @@ const fetchLppAllRoutes = async () => {
  */
 const fetchLPPPositions = async () => {
 	try {
-		const data = await cachedFetch(lppLocationsLink, CACHE_TTL.positions, () =>
-			fetchJson(lppLocationsLink),
+		const data = await cachedFetch(
+			lppLocationsLink,
+			CACHE_TTL.positions,
+			() => fetchJson(lppLocationsLink),
 		);
 		if (!Array.isArray(data?.data)) {
 			throw new Error("Unexpected LPP payload");
@@ -353,8 +362,10 @@ const fetchLPPPositions = async () => {
 /** Pozicije ostalih (IJPP) avtobusov, brez LPP in SŽ. Ob napaki `undefined`. */
 const fetchIJPPPositions = async () => {
 	try {
-		const data = await cachedFetch(ijppLocationsLink, CACHE_TTL.positions, () =>
-			fetchJson(ijppLocationsLink),
+		const data = await cachedFetch(
+			ijppLocationsLink,
+			CACHE_TTL.positions,
+			() => fetchJson(ijppLocationsLink),
 		);
 		if (!Array.isArray(data)) throw new Error("Unexpected IJPP payload");
 
@@ -383,7 +394,9 @@ const fetchIJPPPositions = async () => {
 };
 
 function buildTrain(train) {
-	const coords = decodePolylineOnce(train.polyline || "", 5).filter(isValidCoord);
+	const coords = decodePolylineOnce(train.polyline || "", 5).filter(
+		isValidCoord,
+	);
 	const departure = new Date(train.departure).getTime();
 	const arrival = new Date(train.arrival).getTime();
 	const delay =
@@ -447,7 +460,8 @@ const fetchTrainPositions = async () => {
 		return data
 			.filter(
 				(train) =>
-					train.routeColor === SZ_TRAIN_ROUTE_COLOR && train.trips?.[0]?.tripId,
+					train.routeColor === SZ_TRAIN_ROUTE_COLOR &&
+					train.trips?.[0]?.tripId,
 			)
 			.map(buildTrain);
 	} catch (error) {
@@ -467,12 +481,15 @@ export function getInterpolatedPosition(path, now) {
 	const last = path.length - 1;
 
 	if (now <= path[0].time) {
-		const bearing = last > 0 ? bearingDegrees(path[0].coord, path[1].coord) : 0;
+		const bearing =
+			last > 0 ? bearingDegrees(path[0].coord, path[1].coord) : 0;
 		return { coord: path[0].coord, bearing };
 	}
 	if (now >= path[last].time) {
 		const bearing =
-			last > 0 ? bearingDegrees(path[last - 1].coord, path[last].coord) : 0;
+			last > 0
+				? bearingDegrees(path[last - 1].coord, path[last].coord)
+				: 0;
 		return { coord: path[last].coord, bearing };
 	}
 
@@ -507,7 +524,8 @@ const fetchIJPPTrip = async (trip) => {
 	if (!trip) return null;
 	const tripId = trip.tripId || trip;
 	const operator =
-		(typeof trip === "object" && (trip.operatorName || trip.operator)) || "";
+		(typeof trip === "object" && (trip.operatorName || trip.operator)) ||
+		"";
 
 	return loadRoute(tripId, async () => {
 		try {
@@ -526,7 +544,10 @@ const fetchIJPPTrip = async (trip) => {
 					passed: stop.passed,
 					name: stop.stop?.name ?? "",
 					gtfsId: stop.stop?.gtfs_id,
-					gpsLocation: [stop.stop?.lat ?? null, stop.stop?.lon ?? null],
+					gpsLocation: [
+						stop.stop?.lat ?? null,
+						stop.stop?.lon ?? null,
+					],
 				})),
 				geometry: geometry?.coordinates || [],
 				operator,
@@ -544,13 +565,28 @@ const fetchIJPPTrip = async (trip) => {
  * Geometrija LPP linije. Vrne `[{ tripId, routeNumber, routeName, points }]`
  * s točkami v [lat, lon] (kot pričakuje zemljevid) ali `null`.
  */
-const fetchLppPoints = async (routeId, tripId = null) => {
-	if (!routeId) return null;
+const fetchLppPoints = (routeId, tripId = null) =>
+	routeId
+		? loadRoute(
+				`lpp-shape:${routeId}:${tripId ?? ""}`,
+				() => loadLppPoints(routeId, tripId),
+				CACHE_TTL.geometry,
+			)
+		: Promise.resolve(null);
+
+const loadLppPoints = async (routeId, tripId) => {
 	try {
-		const raw = await fetchJson(lppRoutePointsLink + routeId);
-		const shapes = (raw.data ?? []).filter((point) => point.geojson_shape != null);
+		const raw = await cachedFetch(
+			lppRoutePointsLink + routeId,
+			CACHE_TTL.geometry,
+			() => fetchJson(lppRoutePointsLink + routeId),
+		);
+		const shapes = (raw.data ?? []).filter(
+			(point) => point.geojson_shape != null,
+		);
 		const shape =
-			(tripId && shapes.find((point) => point.trip_id === tripId)) || shapes[0];
+			(tripId && shapes.find((point) => point.trip_id === tripId)) ||
+			shapes[0];
 		if (!shape?.geojson_shape?.type) return null;
 
 		const { type, coordinates } = shape.geojson_shape;
@@ -591,7 +627,10 @@ const fetchLppRoute = async (lppRoute) => {
 			try {
 				const [raw, geometry] = await Promise.all([
 					fetchJson(lppRouteLink + lppRoute.tripId),
-					fetchLppPoints(lppRoute.lineId || lppRoute.routeId, lppRoute.tripId),
+					fetchLppPoints(
+						lppRoute.lineId || lppRoute.routeId,
+						lppRoute.tripId,
+					),
 				]);
 
 				return {
@@ -601,7 +640,8 @@ const fetchLppRoute = async (lppRoute) => {
 					tripId: lppRoute.tripId || "",
 					tripName: lppRoute.lineName || lppRoute.tripName || "",
 					lineNumber: lppRoute.lineNumber || lppRoute.routeName || "",
-					operator: "Javno podjetje Ljubljanski potniški promet d.o.o.",
+					operator:
+						"Javno podjetje Ljubljanski potniški promet d.o.o.",
 					stops: Array.isArray(raw.data)
 						? raw.data.map((stop) => ({
 								name: stop.name || "",
@@ -610,9 +650,11 @@ const fetchLppRoute = async (lppRoute) => {
 									stop.latitude ?? null,
 									stop.longitude ?? null,
 								],
-								arrivals: (stop.arrivals ?? []).map((arrival) => ({
-									eta_min: arrival.eta_min,
-								})),
+								arrivals: (stop.arrivals ?? []).map(
+									(arrival) => ({
+										eta_min: arrival.eta_min,
+									}),
+								),
 							}))
 						: [],
 					geometry: geometry || [],
@@ -657,7 +699,11 @@ const fetchSzTrip = async (tripId) => {
 				tripId: leg.tripId || "",
 				tripShort: leg.routeShortName || "",
 				brand: "sz",
-				stops: [from, ...(leg.intermediateStops ?? []).map(toSzStop), to],
+				stops: [
+					from,
+					...(leg.intermediateStops ?? []).map(toSzStop),
+					to,
+				],
 				geometry: leg.legGeometry
 					? decodePolylineToPoints(leg.legGeometry.points || "", 6)
 					: [],
@@ -681,8 +727,12 @@ const fetchLppArrivals = async (stationCode) => {
 	if (!stationCode) return [];
 	try {
 		const url = lppArrivalsLink + stationCode;
-		const raw = await cachedFetch(url, CACHE_TTL.arrivals, () => fetchJson(url));
-		const list = Array.isArray(raw?.data?.arrivals) ? raw.data.arrivals : [];
+		const raw = await cachedFetch(url, CACHE_TTL.arrivals, () =>
+			fetchJson(url),
+		);
+		const list = Array.isArray(raw?.data?.arrivals)
+			? raw.data.arrivals
+			: [];
 		return list
 			.map((arrival) => ({
 				...computeEtaAndTime({ etaMinutes: arrival.eta_min }),
@@ -707,7 +757,9 @@ const fetchIjppArrivals = async (ijppId) => {
 	if (!ijppId) return [];
 	try {
 		const url = `${ijppArrivalsLink}${ijppId}?current=true`;
-		const raw = await cachedFetch(url, CACHE_TTL.arrivals, () => fetchJson(url));
+		const raw = await cachedFetch(url, CACHE_TTL.arrivals, () =>
+			fetchJson(url),
+		);
 		const list = Array.isArray(raw?.arrivals) ? raw.arrivals : [];
 		return list.map((arrival) => {
 			const eta = computeEtaAndTime({
@@ -722,7 +774,9 @@ const fetchIjppArrivals = async (ijppId) => {
 				scheduledArrival: secondsToClock(arrival?.arrival_scheduled),
 				realtimeArrival: secondsToClock(arrival?.arrival_realtime),
 				arrivalDelay: arrival?.arrival_delay,
-				scheduledDeparture: secondsToClock(arrival?.departure_scheduled),
+				scheduledDeparture: secondsToClock(
+					arrival?.departure_scheduled,
+				),
 				realtimeDeparture: secondsToClock(arrival?.departure_realtime),
 				departureDelay: arrival?.departure_delay,
 				tripId: arrival?.trip_id,
@@ -743,7 +797,9 @@ const fetchSzArrivals = async (stationCode) => {
 	if (!stationCode) return [];
 	try {
 		const url = `${szArrivalsLink}${encodeURIComponent(stationCode)}&n=100`;
-		const raw = await cachedFetch(url, CACHE_TTL.arrivals, () => fetchJson(url));
+		const raw = await cachedFetch(url, CACHE_TTL.arrivals, () =>
+			fetchJson(url),
+		);
 
 		// API vrne UTC časovne žige, zato primerjamo z UTC datumoma.
 		const today = new Date().toISOString().split("T")[0];
@@ -764,7 +820,9 @@ const fetchSzArrivals = async (stationCode) => {
 				const actualDeparture = realTime ? place.departure : null;
 
 				const delayMs = (actual, scheduled) =>
-					actual && scheduled ? new Date(actual) - new Date(scheduled) : 0;
+					actual && scheduled
+						? new Date(actual) - new Date(scheduled)
+						: 0;
 
 				const eta = computeEtaAndTime({
 					realtimeArrival: actualArrival,
@@ -783,7 +841,10 @@ const fetchSzArrivals = async (stationCode) => {
 					realtimeArrival: actualArrival,
 					realtimeDeparture: actualDeparture,
 					arrivalDelay: delayMs(actualArrival, scheduledArrival),
-					departureDelay: delayMs(actualDeparture, scheduledDeparture),
+					departureDelay: delayMs(
+						actualDeparture,
+						scheduledDeparture,
+					),
 					etaMinutes: eta.etaMinutes,
 					arrivalTime: eta.arrivalTime,
 					operatorName: "Slovenske železnice d.o.o.",
@@ -793,6 +854,18 @@ const fetchSzArrivals = async (stationCode) => {
 		console.error("Error fetching SZ arrivals:", error);
 		return [];
 	}
+};
+
+export const prefetchRoute = (item, type) => {
+	if (!item) return;
+	const kind = type || detectVehicleType(item);
+	const request =
+		kind === "LPP"
+			? fetchLppRoute(typeof item === "object" ? item : { tripId: item })
+			: kind === "SZ"
+				? fetchSzTrip(item.tripId ?? item)
+				: fetchIJPPTrip(item);
+	request?.catch?.(() => {});
 };
 
 /** Katera vrsta prevoznika je vozilo/vožnja? Določa, kateri API naložimo. */
