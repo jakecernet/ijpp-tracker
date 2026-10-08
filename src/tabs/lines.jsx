@@ -88,20 +88,17 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => {
 			role="button"
 			tabIndex={0}
 			onClick={open}
-			onKeyDown={onActivateKey(open)}>
-			<div
-				className="left"
-				style={{
-					background: `linear-gradient(150deg, ${bgColorMap(item)} 0%, #0000 60%)`,
-				}}>
-				<div className="circle">
+			onKeyDown={onActivateKey(open)}
+			style={{ "--operator-color": bgColorMap(item) }}>
+			<div className="left">
+				<span className="line-badge">
 					{item.lineNumber ??
 						item.routeName ??
 						item.routeShortName ??
 						item.tripShort ??
 						item.tripId?.slice(5) ??
 						"?"}
-				</div>
+				</span>
 				<h3>{getRouteDisplayName(item)}</h3>
 			</div>
 			<button
@@ -129,19 +126,14 @@ const ArrivalItem = memo(({ arrival, onRouteClick }) => {
 			role="button"
 			tabIndex={0}
 			onClick={open}
-			onKeyDown={onActivateKey(open)}>
-			<div
-				className="left"
-				style={{
-					background: `linear-gradient(150deg, ${bgColorMap(arrival)} 0%, #0000 60%)`,
-				}}>
-				<div className="circle">
-					<h2 className={arrival.type === "SZ" ? "sz" : ""}>
-						{arrival.type === "LPP"
-							? arrival.routeName
-							: arrival.routeShortName || arrival.tripName}
-					</h2>
-				</div>
+			onKeyDown={onActivateKey(open)}
+			style={{ "--operator-color": bgColorMap(arrival) }}>
+			<div className="left">
+				<span className="line-badge">
+					{arrival.type === "LPP"
+						? arrival.routeName
+						: arrival.routeShortName || arrival.tripName}
+				</span>
 				<div className="info">
 					<h3>{arrival.tripName || arrival.headsign}</h3>
 					<h4>{arrival.operatorName}</h4>
