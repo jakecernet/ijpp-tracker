@@ -328,23 +328,18 @@ html {
 			height: 100%;
 			min-height: 0;
 
-			/* ---------- Shared line badge (Lines tab) ---------- */
 			.line-badge {
 				flex-shrink: 0;
-				width: 4.5rem;
+				width: 4rem;
 				text-align: center;
-				padding: 4px 6px;
-				border: 1px solid var(--selector-border);
-				border-radius: 4px;
-				color: var(--active-color);
-				font-weight: 600;
-				font-size: 0.85em;
-				white-space: nowrap;
-				overflow: hidden;
-				text-overflow: ellipsis;
+				font-weight: 700;
+				font-size: 1em;
+				line-height: 1.15;
+				color: var(--text-color);
+				white-space: normal;
+				overflow-wrap: anywhere;
 			}
 
-			/* ---------- Route list items (Vse linije / Shranjene) ---------- */
 			.route-item {
 				display: grid;
 				grid-template-columns: minmax(0, 1fr) auto;
@@ -460,7 +455,6 @@ html {
 				}
 			}
 
-			/* ---------- Header with station name + heart ---------- */
 			.lines-header {
 				position: relative;
 				display: flex;
@@ -487,7 +481,7 @@ html {
 
 			.arrival-list {
 				margin: 10px;
-				padding-bottom: 90px; 
+				padding-bottom: 65px;
 
 				.arrival-item {
 					display: grid;
@@ -535,7 +529,6 @@ html {
 						min-width: 0;
 						padding: 0;
 						border-radius: 0;
-						/* overrides any leftover inline gradient from the JSX */
 						background: none !important;
 
 						.info {
@@ -573,8 +566,8 @@ html {
 				}
 
 				.skeleton-circle {
-					width: 4.5rem;
-					height: 1.7rem;
+					width: 4rem;
+					height: 1.2rem;
 					border-radius: 4px;
 					flex-shrink: 0;
 				}
@@ -718,7 +711,7 @@ html {
 				.route-list {
 					list-style: none;
 					padding-top: 10px;
-					padding-bottom: 90px; /* clears the floating nav */
+					padding-bottom: 80px;
 				}
 			}
 
