@@ -1,6 +1,12 @@
 import { bearingDegrees, haversineMeters, isUsableLatLon } from "./utils/geo";
 import { isLppOperator, isSzOperator } from "./utils/operators";
 import {
+	getStoredBusStops,
+	getStoredLppShape,
+	getStoredSzStops,
+} from "./utils/offlineData";
+import { decodePolylineOnce } from "./utils/polyline";
+import {
 	clockToDate,
 	formatEta,
 	formatHHmm,
@@ -206,33 +212,6 @@ export function formatPrecomputedArrival(arrival) {
 // Polyline
 // ---------------------------------------------------------------------------
 
-function decodePolylineOnce(str, precision) {
-	const factor = 10 ** precision;
-	let index = 0;
-	let lat = 0;
-	let lng = 0;
-	const points = [];
-
-	const read = () => {
-		let result = 0;
-		let shift = 0;
-		let byte;
-		do {
-			byte = str.charCodeAt(index++) - 63;
-			result |= (byte & 0x1f) << shift;
-			shift += 5;
-		} while (byte >= 0x20);
-		return result & 1 ? ~(result >> 1) : result >> 1;
-	};
-
-	while (index < str.length) {
-		lat += read();
-		lng += read();
-		points.push([lng / factor, lat / factor]);
-	}
-	return points;
-}
-
 function isValidCoord([lon, lat]) {
 	return (
 		Number.isFinite(lat) &&
@@ -261,9 +240,11 @@ export function decodePolylineToPoints(str, precision) {
 /** Vse avtobusne postaje (LPP + IJPP, združene). */
 const fetchAllBusStops = async () => {
 	try {
-		const raw = await cachedFetch(busStopsLink, CACHE_TTL.stops, () =>
-			fetchJson(busStopsLink),
-		);
+		const raw =
+			getStoredBusStops() ??
+			(await cachedFetch(busStopsLink, CACHE_TTL.stops, () =>
+				fetchJson(busStopsLink),
+			));
 		if (!Array.isArray(raw)) return [];
 
 		const stops = [];
@@ -295,9 +276,11 @@ const fetchAllBusStops = async () => {
 
 const fetchSzStops = async () => {
 	try {
-		const raw = await cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
-			fetchJson(szStopsLink),
-		);
+		const raw =
+			getStoredSzStops() ??
+			(await cachedFetch(szStopsLink, CACHE_TTL.stops, () =>
+				fetchJson(szStopsLink),
+			));
 		return Array.isArray(raw) ? raw : [];
 	} catch (error) {
 		console.error("Error fetching SZ stops:", error);
@@ -562,11 +545,11 @@ const fetchIJPPTrip = async (trip) => {
 };
 
 /**
- * Geometrija LPP linije. Vrne `[{ tripId, routeNumber, routeName, points }]`
+ * Geometrija LPP linije (najprej shranjene linije, nato splet). Vrne `[{ tripId, routeNumber, routeName, points }]`
  * s točkami v [lat, lon] (kot pričakuje zemljevid) ali `null`.
  */
 const fetchLppPoints = (routeId, tripId = null) =>
-	routeId
+	routeId || tripId
 		? loadRoute(
 				`lpp-shape:${routeId}:${tripId ?? ""}`,
 				() => loadLppPoints(routeId, tripId),
@@ -575,6 +558,10 @@ const fetchLppPoints = (routeId, tripId = null) =>
 		: Promise.resolve(null);
 
 const loadLppPoints = async (routeId, tripId) => {
+	const stored = getStoredLppShape(tripId);
+	if (stored) return stored;
+	if (!routeId) return null;
+
 	try {
 		const raw = await cachedFetch(
 			lppRoutePointsLink + routeId,

@@ -1045,6 +1045,54 @@ html {
 					}
 				}
 
+				.offline-data {
+					display: flex;
+					flex-direction: column;
+					gap: 12px;
+					padding: 10px;
+					border: 1px solid var(--selector-border);
+					border-radius: 8px;
+					margin-bottom: 20px;
+					background: rgba(0, 0, 0, 0.3);
+					color: var(--text-color);
+
+					.offline-data__row {
+						display: flex;
+						flex-direction: column;
+						gap: 6px;
+						margin: 0;
+						padding: 0;
+						text-align: center;
+						font-size: 0.9em;
+					}
+
+					.offline-data__error {
+						color: #ff6b6b;
+					}
+
+					.offline-data__buttons {
+						display: flex;
+						justify-content: center;
+						gap: 8px;
+						margin: 0;
+						padding: 0;
+
+						button {
+							padding: 6px 14px;
+							border: 1px solid var(--selector-border);
+							border-radius: 6px;
+							background: var(--button-bg);
+							color: var(--text-color);
+							cursor: pointer;
+
+							&:disabled {
+								opacity: 0.6;
+								cursor: progress;
+							}
+						}
+					}
+				}
+
 				.about {
 					text-align: center;
 					padding: 10px;

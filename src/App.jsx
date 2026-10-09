@@ -198,11 +198,12 @@ function AppShell() {
 
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
 
-	// Fetcha postaje ob zagonu
-	useEffect(() => {
+	// Fetcha postaje ob zagonu (in po prenosu postaj v nastavitvah)
+	const reloadStops = useCallback(() => {
 		fetchAllBusStops().then(setBusStops);
 		fetchSzStops().then(setSzStops);
 	}, []);
+	useEffect(reloadStops, [reloadStops]);
 
 	// Uporabnikova lokacija
 	useEffect(() => {
@@ -445,6 +446,7 @@ function AppShell() {
 										setTheme={setTheme}
 										mapTheme={mapTheme}
 										setMapTheme={setMapTheme}
+										onStopsUpdated={reloadStops}
 									/>
 								}
 							/>

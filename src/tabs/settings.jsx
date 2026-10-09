@@ -1,5 +1,13 @@
-import { memo, useId } from "react";
+import { memo, useId, useState } from "react";
 import { usePersistentState } from "../hooks/usePersistentState";
+import {
+	clearLppRoutes,
+	clearStops,
+	downloadLppRoutes,
+	downloadStops,
+	getLppRoutesInfo,
+	getStopsInfo,
+} from "../utils/offlineData";
 
 const DEFAULT_RADIUS = { busRadius: 5, szRadius: 20 };
 
@@ -96,6 +104,73 @@ function RadiusSlider({ label, value, min, max, onChange }) {
 	);
 }
 
+function formatDate(timestamp) {
+	return new Date(timestamp).toLocaleString("sl-SI", {
+		day: "numeric",
+		month: "numeric",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
+function OfflineDataRow({
+	title,
+	describe,
+	getInfo,
+	download,
+	clear,
+	onChanged,
+}) {
+	const [info, setInfo] = useState(getInfo);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+
+	const handleDownload = async () => {
+		setBusy(true);
+		setError("");
+		try {
+			setInfo(await download());
+			onChanged?.();
+		} catch (err) {
+			console.error(`Error downloading ${title}:`, err);
+			setError(err?.message || "Prenos ni uspel.");
+			setInfo(getInfo());
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	const handleClear = () => {
+		clear();
+		setInfo(null);
+		setError("");
+		onChanged?.();
+	};
+
+	return (
+		<div className="offline-data__row">
+			<strong>{title}</strong>
+			<span>
+				{info
+					? `${describe(info)} · posodobljeno ${formatDate(info.updatedAt)}`
+					: "Ni preneseno (uporablja se splet)"}
+			</span>
+			{error && <span className="offline-data__error">{error}</span>}
+			<div className="offline-data__buttons">
+				<button type="button" disabled={busy} onClick={handleDownload}>
+					{busy ? "Prenašam…" : info ? "Posodobi" : "Prenesi"}
+				</button>
+				{info && (
+					<button type="button" disabled={busy} onClick={handleClear}>
+						Izbriši
+					</button>
+				)}
+			</div>
+		</div>
+	);
+}
+
 const SettingsTab = ({
 	visibility,
 	setVisibility,
@@ -105,6 +180,7 @@ const SettingsTab = ({
 	setTheme,
 	mapTheme,
 	setMapTheme,
+	onStopsUpdated,
 }) => {
 	const [radius, setRadius] = usePersistentState(
 		"stationRadius",
@@ -176,6 +252,28 @@ const SettingsTab = ({
 						onChange={(szRadius) =>
 							setRadius((r) => ({ ...r, szRadius }))
 						}
+					/>
+				</div>
+				<h3 className="settings__heading settings__heading--divided">
+					Podatki v napravi
+				</h3>
+				<div className="offline-data">
+					<OfflineDataRow
+						title="LPP linije"
+						describe={(info) => `${info.count} poti`}
+						getInfo={getLppRoutesInfo}
+						download={downloadLppRoutes}
+						clear={clearLppRoutes}
+					/>
+					<OfflineDataRow
+						title="Postaje (avtobusne in železniške)"
+						describe={(info) =>
+							`${info.busCount} + ${info.szCount} postaj`
+						}
+						getInfo={getStopsInfo}
+						download={downloadStops}
+						clear={clearStops}
+						onChanged={onStopsUpdated}
 					/>
 				</div>
 
