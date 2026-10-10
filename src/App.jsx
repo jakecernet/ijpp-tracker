@@ -46,6 +46,7 @@ import {
 import ErrorBoundary from "./components/ErrorBoundary";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { usePolling } from "./hooks/usePolling";
+import { getStoredLppShape } from "./utils/offlineData";
 import { isLppOperator } from "./utils/operators";
 
 const loadMapTab = () => import("./tabs/map");
@@ -287,6 +288,7 @@ function AppShell() {
 	usePolling(loadArrivals, ARRIVALS_POLL_MS, isOnLinesTab);
 
 	const tripRequestRef = useRef(0);
+	const loadingKeyRef = useRef(null);
 
 	const getTripFromId = useCallback(async (tripData, type) => {
 		const request = ++tripRequestRef.current;
@@ -296,6 +298,16 @@ function AppShell() {
 
 			let route;
 			if (type === "LPP") {
+				// Shranjena geometrija je takoj na voljo; postaje (počasen klic)
+				// se dopolnijo, ko prispejo.
+				const stored = getStoredLppShape(tripId);
+				if (stored) {
+					setSelectedVehicle((prev) =>
+						request === tripRequestRef.current && prev
+							? { ...prev, geometry: stored }
+							: prev,
+					);
+				}
 				route = await fetchLppRoute(isObject ? tripData : { tripId });
 			} else if (type === "SZ") {
 				route = await fetchSzTrip(tripId);
@@ -325,20 +337,23 @@ function AppShell() {
 			(selectedVehicle.tripId || selectedVehicle.lineId);
 		if (!needsRoute) {
 			setRouteLoading(false);
+			if (!selectedVehicle) loadingKeyRef.current = null;
 			return;
 		}
 
-		let current = true;
+		const key = selectedVehicle.tripId ?? selectedVehicle.lineId;
+		if (loadingKeyRef.current === key) return;
+		loadingKeyRef.current = key;
+
 		setRouteLoading(true);
+		const request = tripRequestRef.current + 1; // getTripFromId ga poveča
 		getTripFromId(
 			selectedVehicle,
 			selectedVehicle.routeType ?? detectVehicleType(selectedVehicle),
 		).finally(() => {
-			if (current) setRouteLoading(false);
+			if (tripRequestRef.current === request) setRouteLoading(false);
+			if (loadingKeyRef.current === key) loadingKeyRef.current = null;
 		});
-		return () => {
-			current = false;
-		};
 	}, [selectedVehicle, getTripFromId]);
 
 	const handleSetSelectedVehicle = useCallback((vehicle) => {
