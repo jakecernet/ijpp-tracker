@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { BusFrontIcon, Heart, TrainFrontIcon, LocateFixedIcon } from "lucide-react";
 import { List } from "react-window";
 import SubTabs from "../components/SubTabs";
+import { useSwipeTabs } from "../hooks/useSwipeTabs";
 import { useElementHeight } from "../hooks/useElementHeight";
 import { useLikedList } from "../hooks/useLikedList";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -27,6 +28,7 @@ const STATION_TABS = [
 	["all", "Vse", "SquareText"],
 	["liked", "Priljubljene", "Heart"],
 ];
+const STATION_TAB_IDS = STATION_TABS.map(([id]) => id);
 
 const formatDistance = (km) =>
 	km < 1 ? `${Math.round(km * 10) * 100} m` : `${km.toFixed(1)} km`;
@@ -166,7 +168,13 @@ const StationList = ({ entries, height, likedIds, onToggleLike, onSelect }) => {
 	);
 };
 
-const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
+const StationsTab = ({
+	userLocation,
+	onSelectStation,
+	busStops,
+	szStops,
+	onSwipeEdge,
+}) => {
 	const [searchTerm, setSearchTerm] = usePersistentState(
 		STATION_SEARCH_KEY,
 		"",
@@ -177,6 +185,12 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 	// Začetna vrednost = shranjeni niz, sicer bi se seznam ~300 ms prikazoval nefiltriran.
 	const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 	const [page, setPage] = useState("nearMe"); // nearMe | all | liked
+	const swipe = useSwipeTabs({
+		ids: STATION_TAB_IDS,
+		value: page,
+		onChange: setPage,
+		onEdge: onSwipeEdge,
+	});
 	const [likedStations, toggleLikedStation] =
 		useLikedList(LIKED_STATIONS_KEY);
 	const [radius] = usePersistentState("stationRadius", DEFAULT_RADIUS);
@@ -269,7 +283,7 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 	};
 
 	return (
-		<div className="insideDiv">
+		<div className="insideDiv" {...swipe}>
 			<input
 				type="search"
 				placeholder={

@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Heart } from "lucide-react";
 import { fetchLppAllRoutes, formatPrecomputedArrival } from "../Api";
 import SubTabs from "../components/SubTabs";
+import { useSwipeTabs } from "../hooks/useSwipeTabs";
 import { useLikedList } from "../hooks/useLikedList";
 import {
 	LIKED_ROUTES_KEY,
@@ -17,6 +18,7 @@ const LINE_TABS = [
 	["all", "Vse linije", "SquareText"],
 	["liked", "Shranjene", "Heart"],
 ];
+const LINE_TAB_IDS = LINE_TABS.map(([id]) => id);
 const ROW_GAP = 8;
 
 const includesTerm = (value, term) =>
@@ -209,10 +211,17 @@ const LinesTab = ({
 	onPrefetchRoute,
 	arrivalsLoading,
 	trains,
+	onSwipeEdge,
 }) => {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [debouncedTerm, setDebouncedTerm] = useState("");
 	const [page, setPage] = useState("arrivals"); // arrivals | all | liked
+	const swipe = useSwipeTabs({
+		ids: LINE_TAB_IDS,
+		value: page,
+		onChange: setPage,
+		onEdge: onSwipeEdge,
+	});
 	const [likedRoutes, toggleLikedRoute] = useLikedList(LIKED_ROUTES_KEY);
 	const [likedStations, toggleLikedStation] =
 		useLikedList(LIKED_STATIONS_KEY);
@@ -430,7 +439,7 @@ const LinesTab = ({
 	);
 
 	return (
-		<div className="insideDiv">
+		<div className="insideDiv" {...swipe}>
 			<div className="lines-header">
 				<h2>{activeStation?.name}</h2>
 				<button

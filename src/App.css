@@ -175,8 +175,11 @@ html {
 				line-height: 1;
 			}
 
-			&:hover {
-				color: var(--active-color);
+			/* Samo za miško: na dotik :hover ostane "lepljiv" na zadnje tapnjenem gumbu. */
+			@media (hover: hover) {
+				&:hover {
+					color: var(--active-color);
+				}
 			}
 
 			&:active {

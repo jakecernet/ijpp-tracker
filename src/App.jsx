@@ -365,6 +365,17 @@ function AppShell() {
 		[handleSetSelectedVehicle],
 	);
 
+	// Poteza čez skrajni podzavihek -> sosednji glavni zavihek.
+	const handleSwipeEdge = useCallback(
+		(direction) => {
+			const target = NAV_PATHS[navIndex + direction];
+			if (!target) return;
+			clearSelectedVehicle();
+			navigateRef.current(target);
+		},
+		[navIndex, clearSelectedVehicle],
+	);
+
 	const handleSelectStation = useCallback(
 		(station) => {
 			setActiveStation(station);
@@ -430,6 +441,7 @@ function AppShell() {
 										busStops={busStops}
 										szStops={szStops}
 										userLocation={userLocation}
+										onSwipeEdge={handleSwipeEdge}
 									/>
 								}
 							/>
@@ -446,6 +458,7 @@ function AppShell() {
 										onPrefetchRoute={prefetchRoute}
 										arrivalsLoading={arrivalsLoading}
 										trains={trains}
+										onSwipeEdge={handleSwipeEdge}
 									/>
 								}
 							/>
@@ -462,6 +475,7 @@ function AppShell() {
 										mapTheme={mapTheme}
 										setMapTheme={setMapTheme}
 										onStopsUpdated={reloadStops}
+										onSwipeEdge={handleSwipeEdge}
 									/>
 								}
 							/>

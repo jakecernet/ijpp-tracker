@@ -1,5 +1,6 @@
 import { memo, useId, useState } from "react";
 import { usePersistentState } from "../hooks/usePersistentState";
+import { useSwipeTabs } from "../hooks/useSwipeTabs";
 import {
 	clearLppRoutes,
 	clearStops,
@@ -171,6 +172,8 @@ function OfflineDataRow({
 	);
 }
 
+const NO_SUBTABS = [];
+
 const SettingsTab = ({
 	visibility,
 	setVisibility,
@@ -181,15 +184,24 @@ const SettingsTab = ({
 	mapTheme,
 	setMapTheme,
 	onStopsUpdated,
+	onSwipeEdge,
 }) => {
 	const [radius, setRadius] = usePersistentState(
 		"stationRadius",
 		DEFAULT_RADIUS,
 	);
 
+	const swipe = useSwipeTabs({
+		ids: NO_SUBTABS,
+		value: "",
+		onChange: () => {},
+		onEdge: onSwipeEdge,
+	});
+
 	return (
-		<div className="settings">
+		<div className="settings" {...swipe}>
 			<div className="inside">
+				<h3 className="settings__heading">Zemljevid</h3>
 				<div className="map-settings">
 					<CheckboxGroup
 						title="Aktivni markerji"
