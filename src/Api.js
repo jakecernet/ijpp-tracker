@@ -731,6 +731,7 @@ const fetchLppArrivals = async (stationCode) => {
 				type: arrival.type,
 				depot: arrival.depot,
 				operatorName: "Ljubljanski potniški promet d.o.o.",
+				realTime: arrival.type === 0 || arrival.type === 2,
 			}))
 			.sort((a, b) => (a.etaMinutes ?? 999) - (b.etaMinutes ?? 999));
 	} catch (error) {

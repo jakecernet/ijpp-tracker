@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Heart } from "lucide-react";
+import { Heart, RadioIcon } from "lucide-react";
 import { fetchLppAllRoutes, formatPrecomputedArrival } from "../Api";
 import SubTabs from "../components/SubTabs";
 import { useSwipeTabs } from "../hooks/useSwipeTabs";
@@ -141,9 +141,15 @@ const ArrivalItem = memo(({ arrival, onRouteClick }) => {
 					<h4>{arrival.operatorName}</h4>
 				</div>
 			</div>
+            <div className="right">
+                {arrival.realTime ? (
+                    <>
+                        <RadioIcon size={16} />{" "}
+                    </>
+                ) : null}
 			<p className="arrival-item__eta">
 				{formatPrecomputedArrival(arrival)}
-			</p>
+			</p></div>
 			{arrival.type === "SZ" && arrival.realTime && (
 				<p>
 					Zamuda:

@@ -519,9 +519,19 @@ html {
 						text-align: right;
 					}
 
+                    .right {
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+
+                        .lucide-radio{
+                            animation: blink 2s ease-in-out infinite;
+                        }
+                    }
+
 					.arrival-item__eta {
 						font-size: 14px;
-						text-align: right;
+						text-align: center;
 						white-space: pre-line;
 					}
 
@@ -1230,6 +1240,16 @@ html {
 	to {
 		opacity: 1;
 	}
+}
+
+@keyframes blink {
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.1;
+    }
 }
 
 @keyframes popupSlideIn {
