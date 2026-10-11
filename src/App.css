@@ -908,18 +908,11 @@ html {
 		}
 
 		.settings {
-			h2 {
-				text-align: center;
-				padding: 10px 0;
-				color: var(--text-color);
-				border-bottom: 2px solid var(--selector-border);
-			}
-
 			.inside {
 				display: flex;
 				flex-direction: column;
-				max-height: calc(100vh - 60px);
-				max-height: calc(100dvh - 60px);
+				max-height: 100vh;
+				max-height: 100dvh;
 				padding-bottom: 80px;
 				overflow-y: scroll;
 

@@ -189,9 +189,7 @@ const SettingsTab = ({
 
 	return (
 		<div className="settings">
-			<h2>Nastavitve</h2>
 			<div className="inside">
-				<h3 className="settings__heading">Zemljevid</h3>
 				<div className="map-settings">
 					<CheckboxGroup
 						title="Aktivni markerji"
@@ -213,7 +211,6 @@ const SettingsTab = ({
 						}
 					/>
 				</div>
-
 				<ThemeSwitch
 					title="Temni način (aplikacija)"
 					label="Preklopi temni način"
@@ -230,7 +227,6 @@ const SettingsTab = ({
 						setMapTheme(mapTheme === "dark" ? "light" : "dark")
 					}
 				/>
-
 				<h3 className="settings__heading settings__heading--divided">
 					Radij postaj
 				</h3>
