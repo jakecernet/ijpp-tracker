@@ -363,7 +363,7 @@ const fetchIJPPPositions = async () => {
 			})
 			.map((vehicle) => ({
 				gpsLocation: [vehicle.lat, vehicle.lon],
-				operator: vehicle.vehicle?.operator_name || "/",
+				operator: vehicle.vehicle?.operator_name == "CELEBUS/Nomago" ? "Nomago d.o.o." : vehicle.vehicle?.operator_name,
 				lineName: vehicle.trip_headsign,
 				tripId: vehicle.trip_id,
 				vehicleId: vehicle.vehicle?.id,

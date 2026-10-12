@@ -1520,6 +1520,23 @@ html {
 		border: 1px solid var(--selector-border);
 		border-radius: 16px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+		scrollbar-width: thin;
+		scrollbar-color: var(--selector-border) transparent;
+
+		&::-webkit-scrollbar {
+			width: 8px;
+		}
+
+		&::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		&::-webkit-scrollbar-thumb {
+			border: 2px solid transparent;
+			border-radius: 999px;
+			background-clip: padding-box;
+			background-color: var(--selector-border);
+		}
 	}
 
 	.map-search__empty {
