@@ -15,6 +15,10 @@ export const normalize = (value) =>
 		.toLowerCase()
 		.trim();
 
+/** Ali ima izbrana vožnja pot, ki jo je mogoče naložiti? */
+export const hasRoute = (selection) =>
+	Boolean(selection?.tripId || selection?.lineId);
+
 const isLppBus = (pos) =>
 	isLppOperator(pos?.operator) ||
 	pos?.lineNumber !== undefined ||
@@ -49,6 +53,16 @@ function trainSelection(train) {
 		realTime: train.realtime === true,
 		from: train.from ?? null,
 		to: train.to ?? null,
+	};
+}
+
+/** Lastnosti, kot jih ima označba avtobusa na zemljevidu (za popup). */
+export function busPopupProps(pos) {
+	return {
+		...pos,
+		gpsLocation: undefined,
+		sourceType: isLppBus(pos) ? "lpp" : "ijpp",
+		operator: pos?.operator || "",
 	};
 }
 
@@ -112,6 +126,7 @@ export function buildSearchIndex({
 							[lineTitle, pos.lineName, pos.lineDestination, operatorName].join(" "),
 						),
 						selection: busSelection(pos),
+						pos,
 						center,
 					};
 					lines.set(key, line);
@@ -120,6 +135,7 @@ export function buildSearchIndex({
 				// Raje vozilo, ki ima znano vožnjo (potrebna za nalaganje poti).
 				if (!line.selection.tripId && pos.tripId) {
 					line.selection = busSelection(pos);
+					line.pos = pos;
 					line.center = center;
 				}
 			}
@@ -139,6 +155,7 @@ export function buildSearchIndex({
 						[plate, lineTitle, pos.lineName, pos.lineDestination, operatorName].join(" "),
 					),
 					selection: busSelection(pos),
+					pos,
 					center,
 				});
 			}

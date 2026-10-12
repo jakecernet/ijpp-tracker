@@ -519,15 +519,15 @@ html {
 						text-align: right;
 					}
 
-                    .right {
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
+					.right {
+						display: flex;
+						align-items: center;
+						gap: 10px;
 
-                        .lucide-radio{
-                            animation: blink 2s ease-in-out infinite;
-                        }
-                    }
+						.lucide-radio {
+							animation: blink 2s ease-in-out infinite;
+						}
+					}
 
 					.arrival-item__eta {
 						font-size: 14px;
@@ -1243,13 +1243,13 @@ html {
 }
 
 @keyframes blink {
-    0%,
-    100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.1;
-    }
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.1;
+	}
 }
 
 @keyframes popupSlideIn {
@@ -1458,8 +1458,7 @@ html {
 	position: absolute;
 	top: 10px;
 	left: 10px;
-	right: 56px; /* prostor za kontrole zemljevida (zoom, lokacija) */
-	max-width: 420px;
+	right: 10px;
 	z-index: 8;
 
 	.map-search__field {
@@ -1578,4 +1577,8 @@ html {
 		font-size: 12px;
 		color: var(--hover-color);
 	}
+}
+
+.map-container .maplibregl-ctrl-top-right {
+	top: 56px;
 }

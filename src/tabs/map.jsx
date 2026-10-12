@@ -31,6 +31,7 @@ import {
 	updateTripOverlay,
 } from "./map/layers";
 import MapSearch from "./map/MapSearch.jsx";
+import { busPopupProps, hasRoute } from "./map/search";
 import { ensureIcons } from "./map/utils";
 import RouteTab from "./route.jsx";
 
@@ -156,6 +157,7 @@ const MapTab = memo(function MapTab({
 	};
 
 	const handlersRef = useRef({});
+	const interactionsRef = useRef(null);
 	useEffect(() => {
 		handlersRef.current = {
 			onSelectStation,
@@ -257,7 +259,10 @@ const MapTab = memo(function MapTab({
 			if (mapRef.current !== map) return; // odstranjen med nalaganjem
 			// Poslušalce registriramo ENKRAT - preživijo menjavo sloga.
 			registerClusterInteractions(map);
-			registerMapInteractions(map, () => handlersRef.current);
+			interactionsRef.current = registerMapInteractions(
+				map,
+				() => handlersRef.current,
+			);
 			setIsMapLoaded(true);
 		});
 
@@ -394,10 +399,23 @@ const MapTab = memo(function MapTab({
 	// Izbira zadetka iskanja: izberemo vožnjo (naloži pot) in se pomaknemo k vozilu.
 	const handleSearchPick = useCallback(
 		(item) => {
+			const map = mapRef.current;
+			if (!map) return;
+
+			// Avtobus brez poti: samo pomik in popup (kot ob kliku na označbo).
+			if (item.kind !== "train" && !hasRoute(item.selection) && item.pos) {
+				setSelectedVehicle(null);
+				interactionsRef.current?.showBusPopup(
+					busPopupProps(item.pos),
+					item.center,
+				);
+				return;
+			}
+
 			setSelectedVehicle(item.selection);
-			mapRef.current?.flyTo({
+			map.flyTo({
 				center: item.center,
-				zoom: Math.max(mapRef.current.getZoom(), 14),
+				zoom: Math.max(map.getZoom(), 14),
 				duration: 800,
 			});
 		},
