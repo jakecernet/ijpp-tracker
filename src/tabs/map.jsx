@@ -30,6 +30,7 @@ import {
 	updateSourceData,
 	updateTripOverlay,
 } from "./map/layers";
+import MapSearch from "./map/MapSearch.jsx";
 import { ensureIcons } from "./map/utils";
 import RouteTab from "./route.jsx";
 
@@ -390,6 +391,19 @@ const MapTab = memo(function MapTab({
 		else pendingFitRef.current = bounds; // skrit zemljevid nima velikosti
 	}, [selectedVehicle, selectedVehicleKey, isMapLoaded, isActive]);
 
+	// Izbira zadetka iskanja: izberemo vožnjo (naloži pot) in se pomaknemo k vozilu.
+	const handleSearchPick = useCallback(
+		(item) => {
+			setSelectedVehicle(item.selection);
+			mapRef.current?.flyTo({
+				center: item.center,
+				zoom: Math.max(mapRef.current.getZoom(), 14),
+				duration: 800,
+			});
+		},
+		[setSelectedVehicle],
+	);
+
 	const handleClose = (event) => {
 		event.stopPropagation();
 		closeSheet();
@@ -400,6 +414,13 @@ const MapTab = memo(function MapTab({
 		<div>
 			<div className="map-container">
 				<div ref={containerRef} className="map-canvas" />
+				<MapSearch
+					gpsPositions={gpsPositions}
+					trains={trains}
+					busOperators={busOperators}
+					visibility={visibility}
+					onPick={handleSearchPick}
+				/>
 				{mapError && (
 					<div className="map-error" role="alert">
 						<p>Zemljevid se ne more naložiti</p>
