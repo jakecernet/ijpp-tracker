@@ -176,16 +176,14 @@ export function registerMapInteractions(map, getHandlers) {
 	});
 	setPointerCursor(map, "trainPositions-points");
 
-	map.on("click", "buses-points", (event) => {
-		const feature = event.features?.[0];
-		if (!feature) return;
-		const props = feature.properties || {};
+	/** Popup avtobusa (klik na označbo ali zadetek iskanja). */
+	function showBusPopup(props, lngLat) {
 		const { onSelectVehicle } = getHandlers();
 
 		let opened;
 		if (props.sourceType === "lpp") {
 			opened = openPopup(
-				event.lngLat,
+				lngLat,
 				renderLppPopup(props, (html) => opened?.update(html)),
 				() =>
 					onSelectVehicle({
@@ -197,7 +195,7 @@ export function registerMapInteractions(map, getHandlers) {
 			);
 		} else {
 			opened = openPopup(
-				event.lngLat,
+				lngLat,
 				renderIjppPopup(props, (html) => opened?.update(html)),
 				() =>
 					onSelectVehicle({
@@ -210,7 +208,12 @@ export function registerMapInteractions(map, getHandlers) {
 					}),
 			);
 		}
-		flyToPoint(event.lngLat);
+		flyToPoint(lngLat);
+	}
+
+	map.on("click", "buses-points", (event) => {
+		const feature = event.features?.[0];
+		if (feature) showBusPopup(feature.properties || {}, event.lngLat);
 	});
 
 	TRIP_STOP_LAYERS.forEach((layerId) => {
@@ -225,4 +228,6 @@ export function registerMapInteractions(map, getHandlers) {
 			flyToPoint([lng, lat]);
 		});
 	});
+
+	return { showBusPopup };
 }

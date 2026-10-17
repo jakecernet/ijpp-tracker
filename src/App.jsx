@@ -23,6 +23,7 @@ import {
 	Route as RouteIcon,
 	Settings2,
 	TramFront,
+	Bookmark,
 } from "lucide-react";
 import "./App.css";
 
@@ -39,11 +40,13 @@ import {
 	fetchSzStops,
 	fetchSzTrip,
 	fetchTrainPositions,
+	prefetchRoute,
 } from "./Api";
 
 import ErrorBoundary from "./components/ErrorBoundary";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { usePolling } from "./hooks/usePolling";
+import { getStoredLppShape } from "./utils/offlineData";
 import { isLppOperator } from "./utils/operators";
 
 const loadMapTab = () => import("./tabs/map");
@@ -114,6 +117,8 @@ const systemTheme = () =>
 
 const FALLBACK = <div className="suspense-fallback">Nalaganje...</div>;
 
+const NAV_PATHS = ["/map", "/stations", "/lines", "/settings"];
+
 function AppShell() {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
@@ -124,6 +129,7 @@ function AppShell() {
 
 	const isOnMapTab = pathname === "/" || pathname === "/map";
 	const isOnLinesTab = pathname === "/lines";
+	const navIndex = isOnMapTab ? 0 : NAV_PATHS.indexOf(pathname);
 
 	const [activeStation, setActiveStation] = usePersistentState(
 		"activeStation",
@@ -193,11 +199,12 @@ function AppShell() {
 
 	const deferredGpsPositions = useDeferredValue(gpsPositions);
 
-	// Fetcha postaje ob zagonu
-	useEffect(() => {
+	// Fetcha postaje ob zagonu (in po prenosu postaj v nastavitvah)
+	const reloadStops = useCallback(() => {
 		fetchAllBusStops().then(setBusStops);
 		fetchSzStops().then(setSzStops);
 	}, []);
+	useEffect(reloadStops, [reloadStops]);
 
 	// Uporabnikova lokacija
 	useEffect(() => {
@@ -281,6 +288,7 @@ function AppShell() {
 	usePolling(loadArrivals, ARRIVALS_POLL_MS, isOnLinesTab);
 
 	const tripRequestRef = useRef(0);
+	const loadingKeyRef = useRef(null);
 
 	const getTripFromId = useCallback(async (tripData, type) => {
 		const request = ++tripRequestRef.current;
@@ -290,6 +298,16 @@ function AppShell() {
 
 			let route;
 			if (type === "LPP") {
+				// Shranjena geometrija je takoj na voljo; postaje (počasen klic)
+				// se dopolnijo, ko prispejo.
+				const stored = getStoredLppShape(tripId);
+				if (stored) {
+					setSelectedVehicle((prev) =>
+						request === tripRequestRef.current && prev
+							? { ...prev, geometry: stored }
+							: prev,
+					);
+				}
 				route = await fetchLppRoute(isObject ? tripData : { tripId });
 			} else if (type === "SZ") {
 				route = await fetchSzTrip(tripId);
@@ -319,20 +337,23 @@ function AppShell() {
 			(selectedVehicle.tripId || selectedVehicle.lineId);
 		if (!needsRoute) {
 			setRouteLoading(false);
+			if (!selectedVehicle) loadingKeyRef.current = null;
 			return;
 		}
 
-		let current = true;
+		const key = selectedVehicle.tripId ?? selectedVehicle.lineId;
+		if (loadingKeyRef.current === key) return;
+		loadingKeyRef.current = key;
+
 		setRouteLoading(true);
+		const request = tripRequestRef.current + 1; // getTripFromId ga poveča
 		getTripFromId(
 			selectedVehicle,
-			detectVehicleType(selectedVehicle),
+			selectedVehicle.routeType ?? detectVehicleType(selectedVehicle),
 		).finally(() => {
-			if (current) setRouteLoading(false);
+			if (tripRequestRef.current === request) setRouteLoading(false);
+			if (loadingKeyRef.current === key) loadingKeyRef.current = null;
 		});
-		return () => {
-			current = false;
-		};
 	}, [selectedVehicle, getTripFromId]);
 
 	const handleSetSelectedVehicle = useCallback((vehicle) => {
@@ -344,6 +365,17 @@ function AppShell() {
 		[handleSetSelectedVehicle],
 	);
 
+	// Poteza čez skrajni podzavihek -> sosednji glavni zavihek.
+	const handleSwipeEdge = useCallback(
+		(direction) => {
+			const target = NAV_PATHS[navIndex + direction];
+			if (!target) return;
+			clearSelectedVehicle();
+			navigateRef.current(target);
+		},
+		[navIndex, clearSelectedVehicle],
+	);
+
 	const handleSelectStation = useCallback(
 		(station) => {
 			setActiveStation(station);
@@ -352,13 +384,10 @@ function AppShell() {
 		[setActiveStation],
 	);
 
-	const handleSelectRoute = useCallback(
-		async (item, type) => {
-			const route = await getTripFromId(item, type);
-			if (route) navigateRef.current("/map");
-		},
-		[getTripFromId],
-	);
+	const handleSelectRoute = useCallback((item, type) => {
+		setSelectedVehicle({ ...item, routeType: type });
+		navigateRef.current("/map");
+	}, []);
 
 	useEffect(() => {
 		const preload = () =>
@@ -372,16 +401,6 @@ function AppShell() {
 		const id = setTimeout(preload, 2000);
 		return () => clearTimeout(id);
 	}, []);
-
-	const navItems = useMemo(
-		() => [
-			{ to: "/map", label: "Zemljevid", Icon: MapIcon },
-			{ to: "/stations", label: "Postaje", Icon: TramFront },
-			{ to: "/lines", label: "Linije", Icon: RouteIcon },
-			{ to: "/settings", label: "Nastavitve", Icon: Settings2 },
-		],
-		[],
-	);
 
 	return (
 		<div className="container">
@@ -422,6 +441,7 @@ function AppShell() {
 										busStops={busStops}
 										szStops={szStops}
 										userLocation={userLocation}
+										onSwipeEdge={handleSwipeEdge}
 									/>
 								}
 							/>
@@ -435,8 +455,10 @@ function AppShell() {
 										lppArrivals={lppArrivals}
 										szArrivals={szArrivals}
 										onSelectRoute={handleSelectRoute}
+										onPrefetchRoute={prefetchRoute}
 										arrivalsLoading={arrivalsLoading}
 										trains={trains}
+										onSwipeEdge={handleSwipeEdge}
 									/>
 								}
 							/>
@@ -452,6 +474,8 @@ function AppShell() {
 										setTheme={setTheme}
 										mapTheme={mapTheme}
 										setMapTheme={setMapTheme}
+										onStopsUpdated={reloadStops}
+										onSwipeEdge={handleSwipeEdge}
 									/>
 								}
 							/>
@@ -463,18 +487,35 @@ function AppShell() {
 					</Suspense>
 				</ErrorBoundary>
 			</div>
-			<nav aria-label="Glavna navigacija">
-				{navItems.map(({ to, label, Icon }) => (
-					<NavLink
-						key={to}
-						to={to}
-						onClick={
-							to === "/map" ? undefined : clearSelectedVehicle
-						}>
-						<Icon size={24} aria-hidden="true" />
-						<span>{label}</span>
-					</NavLink>
-				))}
+			<nav
+				aria-label="Glavna navigacija"
+				style={{ "--nav-index": Math.max(navIndex, 0) }}>
+				<span
+					className={`nav-indicator${navIndex < 0 ? " nav-indicator--hidden" : ""}`}
+					aria-hidden="true"
+				/>
+				<NavLink
+					to="/map"
+					end
+					className={({ isActive }) =>
+						`mid-nav${isActive || isOnMapTab ? " active" : ""}`
+					}
+					onClick={clearSelectedVehicle}>
+					<MapIcon size={24} />
+					<span>Zemljevid</span>
+				</NavLink>
+				<NavLink to="/stations" onClick={clearSelectedVehicle}>
+					<TramFront size={24} />
+					<span>Postaje</span>
+				</NavLink>
+				<NavLink to="/lines" onClick={clearSelectedVehicle}>
+					<RouteIcon size={24} />
+					<span>Linije</span>
+				</NavLink>
+				<NavLink to="/settings" onClick={clearSelectedVehicle}>
+					<Settings2 size={24} />
+					<span>Nastavitve</span>
+				</NavLink>
 			</nav>
 		</div>
 	);

@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Heart } from "lucide-react";
+import { Heart, RadioIcon } from "lucide-react";
 import { fetchLppAllRoutes, formatPrecomputedArrival } from "../Api";
 import SubTabs from "../components/SubTabs";
+import { useSwipeTabs } from "../hooks/useSwipeTabs";
 import { useLikedList } from "../hooks/useLikedList";
 import {
 	LIKED_ROUTES_KEY,
@@ -13,11 +14,12 @@ import { isLppOperator, isSzOperator } from "../utils/operators";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const LINE_TABS = [
-	["arrivals", "Prihodi"],
-	["all", "Vse"],
-	["liked", "Priljubljene"],
+	["arrivals", "Prihodi", "BusIcon"],
+	["all", "Vse linije", "SquareText"],
+	["liked", "Shranjene", "Heart"],
 ];
-const MAX_ANIMATED_ITEMS = 10;
+const LINE_TAB_IDS = LINE_TABS.map(([id]) => id);
+const ROW_GAP = 8;
 
 const includesTerm = (value, term) =>
 	typeof value === "string" && value.toLowerCase().includes(term);
@@ -88,16 +90,19 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => {
 			role="button"
 			tabIndex={0}
 			onClick={open}
-			onKeyDown={onActivateKey(open)}>
-			<div className="circle" style={{ background: bgColorMap(item) }}>
-				{item.lineNumber ??
-					item.routeName ??
-					item.routeShortName ??
-					item.tripShort ??
-					item.tripId?.slice(5) ??
-					"?"}
+			onKeyDown={onActivateKey(open)}
+			style={{ "--operator-color": bgColorMap(item) }}>
+			<div className="left">
+				<span className="line-badge">
+					{item.lineNumber ??
+						item.routeName ??
+						item.routeShortName ??
+						item.tripShort ??
+						item.tripId?.slice(5) ??
+						"?"}
+				</span>
+				<h3>{getRouteDisplayName(item)}</h3>
 			</div>
-			<h3>{getRouteDisplayName(item)}</h3>
 			<button
 				type="button"
 				className={`like-btn ${isLiked ? "liked" : ""}`}
@@ -115,34 +120,36 @@ const RouteItem = memo(({ item, isLiked, onToggleLike, onClick }) => {
 	);
 });
 
-const ArrivalItem = memo(({ arrival, index, onRouteClick }) => {
+const ArrivalItem = memo(({ arrival, onRouteClick }) => {
 	const open = () => onRouteClick(arrival, arrival.type);
 	return (
 		<div
 			className="arrival-item"
 			role="button"
 			tabIndex={0}
-			style={{ "--i": Math.min(index, MAX_ANIMATED_ITEMS) }}
 			onClick={open}
-			onKeyDown={onActivateKey(open)}>
+			onKeyDown={onActivateKey(open)}
+			style={{ "--operator-color": bgColorMap(arrival) }}>
 			<div className="left">
-				<div
-					className="circle"
-					style={{ background: bgColorMap(arrival) }}>
-					<h2 className={arrival.type === "SZ" ? "sz" : ""}>
-						{arrival.type === "LPP"
-							? arrival.routeName
-							: arrival.routeShortName || arrival.tripName}
-					</h2>
-				</div>
+				<span className="line-badge">
+					{arrival.type === "LPP"
+						? arrival.routeName
+						: arrival.routeShortName || arrival.tripName}
+				</span>
 				<div className="info">
 					<h3>{arrival.tripName || arrival.headsign}</h3>
 					<h4>{arrival.operatorName}</h4>
 				</div>
 			</div>
+            <div className="right">
+                {arrival.realTime ? (
+                    <>
+                        <RadioIcon size={16} />{" "}
+                    </>
+                ) : null}
 			<p className="arrival-item__eta">
 				{formatPrecomputedArrival(arrival)}
-			</p>
+			</p></div>
 			{arrival.type === "SZ" && arrival.realTime && (
 				<p>
 					Zamuda:
@@ -156,6 +163,10 @@ const ArrivalItem = memo(({ arrival, index, onRouteClick }) => {
 		</div>
 	);
 });
+
+const ArrivalRow = memo(({ children }) => (
+	<div style={{ paddingBottom: ROW_GAP }}>{children}</div>
+));
 
 const SkeletonArrivalItem = memo(() => (
 	<div className="arrival-item skeleton" aria-hidden="true">
@@ -189,6 +200,13 @@ const createLikedRouteEntry = (route) => ({
 	routeId: route.routeId,
 });
 
+const routeTypeOf = (item) =>
+	item.type === "SZ" || item.tripShort || isSzOperator(item.operator)
+		? "SZ"
+		: isLppOperator(item.operator)
+			? "LPP"
+			: "IJPP";
+
 const LinesTab = ({
 	gpsPositions,
 	activeStation,
@@ -196,12 +214,20 @@ const LinesTab = ({
 	lppArrivals,
 	szArrivals,
 	onSelectRoute,
+	onPrefetchRoute,
 	arrivalsLoading,
 	trains,
+	onSwipeEdge,
 }) => {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [debouncedTerm, setDebouncedTerm] = useState("");
 	const [page, setPage] = useState("arrivals"); // arrivals | all | liked
+	const swipe = useSwipeTabs({
+		ids: LINE_TAB_IDS,
+		value: page,
+		onChange: setPage,
+		onEdge: onSwipeEdge,
+	});
 	const [likedRoutes, toggleLikedRoute] = useLikedList(LIKED_ROUTES_KEY);
 	const [likedStations, toggleLikedStation] =
 		useLikedList(LIKED_STATIONS_KEY);
@@ -405,24 +431,23 @@ const LinesTab = ({
 				console.warn("No valid trip/line ID for route", item);
 				return;
 			}
-			const operatorType =
-				type ||
-				(item.type === "SZ" ||
-				item.tripShort ||
-				isSzOperator(item.operator)
-					? "SZ"
-					: isLppOperator(item.operator)
-						? "LPP"
-						: "IJPP");
-			onSelectRoute(item, operatorType);
+			onSelectRoute(item, type || routeTypeOf(item));
 		},
 		[onSelectRoute],
 	);
 
+	const handlePrefetch = useCallback(
+		(item, type) => {
+			if (!item.tripId && !item.lineId && !item.routeId) return;
+			onPrefetchRoute?.(item, type || routeTypeOf(item));
+		},
+		[onPrefetchRoute],
+	);
+
 	return (
-		<div className="insideDiv">
+		<div className="insideDiv" {...swipe}>
 			<div className="lines-header">
-				<h2>Linije ({activeStation?.name})</h2>
+				<h2>{activeStation?.name}</h2>
 				<button
 					type="button"
 					className={`like-btn ${isStationLiked ? "liked" : ""}`}
@@ -463,7 +488,9 @@ const LinesTab = ({
 					<div className="arrival-list">
 						{arrivalsLoading &&
 							[0, 1, 2, 3, 4].map((i) => (
-								<SkeletonArrivalItem key={i} />
+								<ArrivalRow key={i}>
+									<SkeletonArrivalItem />
+								</ArrivalRow>
 							))}
 						{!arrivalsLoading && allArrivals.length === 0 && (
 							<p className="empty-message">
@@ -472,12 +499,13 @@ const LinesTab = ({
 						)}
 						{!arrivalsLoading &&
 							allArrivals.map((arrival, index) => (
-								<ArrivalItem
-									key={arrivalKeys[index]}
-									arrival={arrival}
-									index={index}
-									onRouteClick={handleRouteClick}
-								/>
+								<ArrivalRow key={arrivalKeys[index]}>
+									<ArrivalItem
+										arrival={arrival}
+										onRouteClick={handleRouteClick}
+										onPrefetch={handlePrefetch}
+									/>
+								</ArrivalRow>
 							))}
 					</div>
 				)}
@@ -500,6 +528,7 @@ const LinesTab = ({
 									isLiked={isRouteLiked(route)}
 									onToggleLike={toggleLikeRoute}
 									onClick={handleRouteClick}
+									onPrefetch={handlePrefetch}
 								/>
 							))}
 						</ul>
@@ -521,6 +550,7 @@ const LinesTab = ({
 									isLiked
 									onToggleLike={toggleLikeRoute}
 									onClick={handleRouteClick}
+									onPrefetch={handlePrefetch}
 								/>
 							))}
 						</ul>

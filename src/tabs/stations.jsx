@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { BusFrontIcon, Heart, TrainFrontIcon } from "lucide-react";
+import { BusFrontIcon, Heart, TrainFrontIcon, LocateFixedIcon } from "lucide-react";
 import { List } from "react-window";
 import SubTabs from "../components/SubTabs";
+import { useSwipeTabs } from "../hooks/useSwipeTabs";
 import { useElementHeight } from "../hooks/useElementHeight";
 import { useLikedList } from "../hooks/useLikedList";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -19,13 +20,15 @@ const MIN_ALL_SEARCH_LENGTH = 3;
 const MIN_LIST_HEIGHT = 200;
 const BASE_ROW_HEIGHT = 52;
 const ROUTES_ROW_HEIGHT = 26;
-const MAX_ROUTE_BADGES = 6;
+const MAX_ROUTE_BADGES = 5;
+const ROW_GAP = 8;
 
 const STATION_TABS = [
-	["nearMe", "V bližini"],
-	["all", "Vse"],
-	["liked", "Priljubljene"],
+	["nearMe", "V bližini", "LocateFixedIcon" ],
+	["all", "Vse", "SquareText"],
+	["liked", "Priljubljene", "Heart"],
 ];
+const STATION_TAB_IDS = STATION_TABS.map(([id]) => id);
 
 const formatDistance = (km) =>
 	km < 1 ? `${Math.round(km * 10) * 100} m` : `${km.toFixed(1)} km`;
@@ -50,7 +53,8 @@ const toEntry = (station, kind, userLocation) => ({
 
 const getRowHeight = (entry) =>
 	BASE_ROW_HEIGHT +
-	(entry?.station?.routes_on_stop?.length ? ROUTES_ROW_HEIGHT : 0);
+	(entry?.station?.routes_on_stop?.length ? ROUTES_ROW_HEIGHT : 0) +
+	ROW_GAP;
 
 const StationItem = memo(({ entry, isLiked, onSelect, onToggleLike }) => {
 	const { station, kind, distance } = entry;
@@ -128,7 +132,9 @@ const StationRow = memo(
 	}) => {
 		const entry = entries[index];
 		return (
-			<div style={style} {...ariaAttributes}>
+			<div
+				style={{ ...style, paddingBottom: ROW_GAP }}
+				{...ariaAttributes}>
 				<StationItem
 					entry={entry}
 					isLiked={likedIds.has(getStationId(entry.station))}
@@ -162,7 +168,13 @@ const StationList = ({ entries, height, likedIds, onToggleLike, onSelect }) => {
 	);
 };
 
-const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
+const StationsTab = ({
+	userLocation,
+	onSelectStation,
+	busStops,
+	szStops,
+	onSwipeEdge,
+}) => {
 	const [searchTerm, setSearchTerm] = usePersistentState(
 		STATION_SEARCH_KEY,
 		"",
@@ -173,6 +185,12 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 	// Začetna vrednost = shranjeni niz, sicer bi se seznam ~300 ms prikazoval nefiltriran.
 	const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 	const [page, setPage] = useState("nearMe"); // nearMe | all | liked
+	const swipe = useSwipeTabs({
+		ids: STATION_TAB_IDS,
+		value: page,
+		onChange: setPage,
+		onEdge: onSwipeEdge,
+	});
 	const [likedStations, toggleLikedStation] =
 		useLikedList(LIKED_STATIONS_KEY);
 	const [radius] = usePersistentState("stationRadius", DEFAULT_RADIUS);
@@ -265,8 +283,7 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 	};
 
 	return (
-		<div className="insideDiv">
-			<h2>Postaje</h2>
+		<div className="insideDiv" {...swipe}>
 			<input
 				type="search"
 				placeholder={
@@ -285,7 +302,6 @@ const StationsTab = ({ userLocation, onSelectStation, busStops, szStops }) => {
 				value={page}
 				onChange={setPage}
 			/>
-
 			<div className="results station-list" ref={listRef}>
 				{page === "nearMe" &&
 					(nearMeEntries.length === 0 ? (

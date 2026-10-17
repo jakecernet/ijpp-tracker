@@ -27,6 +27,15 @@ function busMatchesRoute(pos, selected) {
 			(selected.tripId && pos.tripId === selected.tripId),
 		);
 	}
+	// IJPP: vse vožnje iste relacije (enak naslov smeri in prevoznik), ne le izbrane.
+	if (selected.tripId && pos.tripId === selected.tripId) return true;
+	const headsign = selected.lineName || selected.tripName;
+	if (headsign) {
+		return (
+			pos.lineName === headsign &&
+			(!selected.operator || pos.operator === selected.operator)
+		);
+	}
 	return !(
 		pos.tripId !== undefined &&
 		selected.tripId &&
