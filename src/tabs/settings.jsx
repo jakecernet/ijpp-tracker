@@ -68,23 +68,26 @@ function CheckboxGroup({ title, options, values, onChange }) {
 
 function ThemeSwitch({ title, label, isDark, onToggle }) {
 	return (
-		<>
-			<h3 className="settings__heading settings__heading--divided">
-				{title}
-			</h3>
-			<div className="theme-switcher">
-				<p>Temno</p>
-				<button
-					type="button"
-					role="switch"
-					aria-checked={isDark}
-					aria-label={label}
-					onClick={onToggle}>
-					<span aria-hidden />
-				</button>
-				<p>Svetlo</p>
-			</div>
-		</>
+		<div className="settings__row">
+			<span>{title}</span>
+			<button
+				type="button"
+				role="switch"
+				aria-checked={isDark}
+				aria-label={label}
+				onClick={onToggle}>
+				<span aria-hidden />
+			</button>
+		</div>
+	);
+}
+
+function Section({ title, index, children }) {
+	return (
+		<section className="settings__section" style={{ "--i": index }}>
+			<h2>{title}</h2>
+			{children}
+		</section>
 	);
 }
 
@@ -150,14 +153,16 @@ function OfflineDataRow({
 	};
 
 	return (
-		<div className="offline-data__row">
-			<strong>{title}</strong>
-			<span>
-				{info
-					? `${describe(info)} · posodobljeno ${formatDate(info.updatedAt)}`
-					: "Ni preneseno (uporablja se splet)"}
-			</span>
-			{error && <span className="offline-data__error">{error}</span>}
+		<div className="settings__card offline-data__row">
+			<div className="offline-data__text">
+				<strong>{title}</strong>
+				<span>
+					{info
+						? `${describe(info)} · posodobljeno ${formatDate(info.updatedAt)}`
+						: "Ni preneseno (uporablja se splet)"}
+				</span>
+				{error && <span className="offline-data__error">{error}</span>}
+			</div>
 			<div className="offline-data__buttons">
 				<button type="button" disabled={busy} onClick={handleDownload}>
 					{busy ? "Prenašam…" : info ? "Posodobi" : "Prenesi"}
@@ -201,71 +206,74 @@ const SettingsTab = ({
 	return (
 		<div className="settings" {...swipe}>
 			<div className="inside">
-				<h3 className="settings__heading">Zemljevid</h3>
-				<div className="map-settings">
-					<CheckboxGroup
-						title="Aktivni markerji"
-						options={MARKER_OPTIONS}
-						values={visibility}
-						onChange={(key, checked) =>
-							setVisibility((v) => ({ ...v, [key]: checked }))
-						}
-					/>
-					<CheckboxGroup
-						title="Prevozniki"
-						options={OPERATOR_OPTIONS}
-						values={busOperators}
-						onChange={(key, checked) =>
-							setBusOperators((prev) => ({
-								...prev,
-								[key]: checked,
-							}))
-						}
-					/>
-				</div>
-				<ThemeSwitch
-					title="Temni način (aplikacija)"
-					label="Preklopi temni način"
-					isDark={theme === "dark"}
-					onToggle={() =>
-						setTheme(theme === "dark" ? "light" : "dark")
-					}
-				/>
-				<ThemeSwitch
-					title="Temni način (zemljevid)"
-					label="Preklopi temni način zemljevida"
-					isDark={mapTheme === "dark"}
-					onToggle={() =>
-						setMapTheme(mapTheme === "dark" ? "light" : "dark")
-					}
-				/>
-				<h3 className="settings__heading settings__heading--divided">
-					Radij postaj
-				</h3>
-				<div className="ranges">
-					<RadiusSlider
-						label="Avtobusne postaje"
-						value={radius.busRadius}
-						min={1}
-						max={20}
-						onChange={(busRadius) =>
-							setRadius((r) => ({ ...r, busRadius }))
-						}
-					/>
-					<RadiusSlider
-						label="Železniške postaje"
-						value={radius.szRadius}
-						min={5}
-						max={300}
-						onChange={(szRadius) =>
-							setRadius((r) => ({ ...r, szRadius }))
-						}
-					/>
-				</div>
-				<h3 className="settings__heading settings__heading--divided">
-					Podatki v napravi
-				</h3>
-				<div className="offline-data">
+				<Section title="Zemljevid" index={0}>
+					<div className="settings__card">
+						<CheckboxGroup
+							title="Aktivni markerji"
+							options={MARKER_OPTIONS}
+							values={visibility}
+							onChange={(key, checked) =>
+								setVisibility((v) => ({ ...v, [key]: checked }))
+							}
+						/>
+						<CheckboxGroup
+							title="Prevozniki"
+							options={OPERATOR_OPTIONS}
+							values={busOperators}
+							onChange={(key, checked) =>
+								setBusOperators((prev) => ({
+									...prev,
+									[key]: checked,
+								}))
+							}
+						/>
+					</div>
+				</Section>
+				<Section title="Videz" index={1}>
+					<div className="settings__card">
+						<ThemeSwitch
+							title="Temni način (aplikacija)"
+							label="Preklopi temni način"
+							isDark={theme === "dark"}
+							onToggle={() =>
+								setTheme(theme === "dark" ? "light" : "dark")
+							}
+						/>
+						<ThemeSwitch
+							title="Temni način (zemljevid)"
+							label="Preklopi temni način zemljevida"
+							isDark={mapTheme === "dark"}
+							onToggle={() =>
+								setMapTheme(
+									mapTheme === "dark" ? "light" : "dark",
+								)
+							}
+						/>
+					</div>
+				</Section>
+				<Section title="Radij postaj" index={2}>
+					<div className="settings__card">
+						<RadiusSlider
+							label="Avtobusne postaje"
+							value={radius.busRadius}
+							min={1}
+							max={20}
+							onChange={(busRadius) =>
+								setRadius((r) => ({ ...r, busRadius }))
+							}
+						/>
+						<RadiusSlider
+							label="Železniške postaje"
+							value={radius.szRadius}
+							min={5}
+							max={300}
+							onChange={(szRadius) =>
+								setRadius((r) => ({ ...r, szRadius }))
+							}
+						/>
+					</div>
+				</Section>
+				<Section title="Podatki v napravi" index={3}>
 					<OfflineDataRow
 						title="LPP linije"
 						describe={(info) => `${info.count} poti`}
@@ -274,7 +282,7 @@ const SettingsTab = ({
 						clear={clearLppRoutes}
 					/>
 					<OfflineDataRow
-						title="Postaje (avtobusne in železniške)"
+						title="Postaje"
 						describe={(info) =>
 							`${info.busCount} + ${info.szCount} postaj`
 						}
@@ -283,30 +291,28 @@ const SettingsTab = ({
 						clear={clearStops}
 						onChanged={onStopsUpdated}
 					/>
-				</div>
-
-				<h3 className="settings__heading settings__heading--divided">
-					O aplikaciji
-				</h3>
-				<p className="about">
-					Avtor:{" "}
-					<ExternalLink href="https://cernetic.cc">
-						Jaka Černetič
-					</ExternalLink>
-					<br />
-					Viri podatkov:{" "}
-					{SOURCE_LINKS.map(([href, label], index) => (
-						<span key={href}>
-							{index > 0 && ", "}
-							<ExternalLink href={href}>{label}</ExternalLink>
-						</span>
-					))}
-					<br />
-					Izvirna koda:{" "}
-					<ExternalLink href="https://github.com/jakecernet/ijpp-tracker">
-						GitHub
-					</ExternalLink>
-				</p>
+				</Section>
+				<Section title="O aplikaciji" index={4}>
+					<p className="settings__card about">
+						Avtor:{" "}
+						<ExternalLink href="https://cernetic.cc">
+							Jaka Černetič
+						</ExternalLink>
+						<br />
+						Viri podatkov:{" "}
+						{SOURCE_LINKS.map(([href, label], index) => (
+							<span key={href}>
+								{index > 0 && ", "}
+								<ExternalLink href={href}>{label}</ExternalLink>
+							</span>
+						))}
+						<br />
+						Izvirna koda:{" "}
+						<ExternalLink href="https://github.com/jakecernet/ijpp-tracker">
+							GitHub
+						</ExternalLink>
+					</p>
+				</Section>
 			</div>
 		</div>
 	);
