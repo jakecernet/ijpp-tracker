@@ -24,16 +24,17 @@
 	--hover-bg: rgba(242, 101, 34, 0.12);
 	--input-focus: rgba(55, 55, 55, 0.9);
 	--card-bg: rgba(58, 58, 58, 0.35);
+	--card-background: rgba(58, 58, 58, 0.35);
 }
 
 .light {
-	--bg-solid: #f4f4f4;
+	--bg-solid: #e4e4e4;
 	--nav-bg: rgba(255, 255, 255, 0.97);
 	--nav-bg-mid: rgb(226, 226, 226);
 	--content-bg: linear-gradient(
 		135deg,
 		#ffffff 0%,
-		#eeeeee 50%,
+		#d8d8d8 50%,
 		#ffffff 100%
 	);
 	--text-color: #1d1d1d;
@@ -52,6 +53,7 @@
 	--hover-bg: rgba(242, 101, 34, 0.1);
 	--input-focus: rgba(238, 238, 238, 0.9);
 	--card-bg: rgba(202, 201, 200, 0.95);
+	--card-background: rgba(255, 255, 255, 0.95);
 }
 
 :root {
@@ -350,7 +352,7 @@ html {
 				margin: 0 10px 8px 10px;
 				padding: 0;
 				border-radius: 8px;
-				background: rgba(0, 0, 0, 0.3);
+				background: var(--card-background);
 				box-shadow: inset 3px 0 0 var(--operator-color, transparent);
 				color: var(--text-color);
 				cursor: pointer;
@@ -483,7 +485,6 @@ html {
 			}
 
 			.arrival-list {
-				margin: 10px;
 				padding-bottom: 65px;
 
 				.arrival-item {
@@ -493,7 +494,7 @@ html {
 					gap: 10px;
 					padding: 10px;
 					border-radius: 8px;
-					background: rgba(0, 0, 0, 0.3);
+					background: var(--card-background);
 					box-shadow: inset 3px 0 0 var(--operator-color, transparent);
 					color: var(--text-color);
 					cursor: pointer;
@@ -625,7 +626,7 @@ html {
 					touch-action: manipulation;
 					animation: slideIn 0.3s var(--transition-ease);
 					animation-fill-mode: both;
-					background: rgba(0, 0, 0, 0.3);
+					background: var(--card-background);
 					border-radius: 8px;
 
 					.station-content {
@@ -714,6 +715,7 @@ html {
 				-webkit-overflow-scrolling: touch;
 				overscroll-behavior: contain;
 				min-height: 0;
+				margin: 10px;
 
 				.empty-message {
 					text-align: center;
@@ -955,7 +957,7 @@ html {
 					border: 1px solid var(--selector-border);
 					border-radius: 8px;
 					margin-bottom: 20px;
-					background: rgba(0, 0, 0, 0.3);
+					background: var(--card-background);
 					text-align: center;
 
 					.map-settings__group {
@@ -1037,7 +1039,7 @@ html {
 					border: 1px solid var(--selector-border);
 					border-radius: 8px;
 					margin-bottom: 20px;
-					background: rgba(0, 0, 0, 0.3);
+					background: var(--card-background);
 
 					label {
 						display: flex;
@@ -1059,7 +1061,7 @@ html {
 					border: 1px solid var(--selector-border);
 					border-radius: 8px;
 					margin-bottom: 20px;
-					background: rgba(0, 0, 0, 0.3);
+					background: var(--card-background);
 					color: var(--text-color);
 
 					.offline-data__row {
@@ -1104,7 +1106,7 @@ html {
 					padding: 10px;
 					margin: 10px;
 					color: var(--text-color);
-					background: rgba(0, 0, 0, 0.3);
+					background: var(--card-background);
 					border-radius: 8px;
 					border: 1px solid var(--selector-border);
 				}
