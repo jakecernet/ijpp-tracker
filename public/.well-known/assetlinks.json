@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "cc.cernetic.ijpptracker",
+    "sha256_cert_fingerprints": ["5E:59:6A:BC:7A:15:02:0D:2B:7C:1E:EE:9A:8D:6C:67:05:43:50:96:C1:5B:A4:4F:1C:9D:02:FA:64:F4:77:F1"]
+  }
+}]

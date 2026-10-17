@@ -24,3 +24,12 @@ build
 *.sln
 *.sw?
 ijpp-tracker.zip
+
+
+# android
+android/android.keystore
+android/app/
+android/*.apk
+android/*.aab
+android/.gradle/
+android/build/
