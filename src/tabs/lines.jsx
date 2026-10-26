@@ -15,7 +15,7 @@ import { isLppOperator, isSzOperator } from "../utils/operators";
 const SEARCH_DEBOUNCE_MS = 300;
 const LINE_TABS = [
 	["arrivals", "Prihodi", "BusIcon"],
-	["all", "Vse linije", "SquareText"],
+	["all", "Vse", "SquareText"],
 	["liked", "Shranjene", "Heart"],
 ];
 const LINE_TAB_IDS = LINE_TABS.map(([id]) => id);
