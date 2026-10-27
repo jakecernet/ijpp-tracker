@@ -160,7 +160,7 @@ export function ensureArrowIcon(map) {
 	const R = 32; // polmer kroga na ikoni (16 px pri size 1)
 	const canvas = document.createElement("canvas");
 	canvas.width = canvas.height = size;
-	const ctx = canvas.getContext("2d");
+	const ctx = canvas.getContext("2d", { willReadFrequently: true });
 	ctx.fillStyle = "#000";
 	// Raven trikotnik: osnova je široka kot krog (premer 2R), stranici gresta
 	// ravno v konico. Del znotraj kroga izrežemo, vidi se le konica.
@@ -187,7 +187,11 @@ export function registerArrowLayer(map, prefix) {
 			id,
 			type: "symbol",
 			source: prefix,
-			filter: ["all", ["!", ["has", "point_count"]], [">=", HEADING_EXPR, 0]],
+			filter: [
+				"all",
+				["!", ["has", "point_count"]],
+				[">=", HEADING_EXPR, 0],
+			],
 			layout: {
 				"icon-image": ARROW_ICON_ID,
 				"icon-rotate": HEADING_EXPR,
@@ -208,11 +212,25 @@ export function registerArrowLayer(map, prefix) {
 	);
 }
 
+const BLOB_SOURCES = new Set(["busStops", "trainStops"]);
+const blobUrls = new Map();
+
+function setBlobData(source, id, data) {
+	const url = URL.createObjectURL(
+		new Blob([JSON.stringify(data)], { type: "application/json" }),
+	);
+	const previous = blobUrls.get(id);
+	blobUrls.set(id, url);
+	source.setData(url);
+	// Worker lahko prejšnji URL še bere; sprostimo ga zamaknjeno.
+	if (previous) setTimeout(() => URL.revokeObjectURL(previous), 30000);
+}
+
 function ensureSource(map, id, data, cluster, radius, maxZoom) {
 	if (map.getSource(id)) return;
 	map.addSource(id, {
 		type: "geojson",
-		data,
+		data: BLOB_SOURCES.has(id) ? EMPTY_FEATURES : data,
 		cluster,
 		clusterRadius: radius,
 		clusterMaxZoom: maxZoom,
@@ -284,7 +302,12 @@ const STOP_CIRCLE_STYLE = {
 const STOP_CIRCLE_RADIUS = zoomRamp([10, 5], [13, 8], [15, 11], [17, 14]);
 const STOP_CIRCLE_STROKE = zoomRamp([10, 1.5], [15, 2], [17, 2.5]);
 // Simbol ~1,1 × polmer krogca; vsebina ikone je ~26 px pri size 1.
-const STOP_GLYPH_SIZE = zoomRamp([12, 0.26], [13, 0.34], [15, 0.47], [17, 0.59]);
+const STOP_GLYPH_SIZE = zoomRamp(
+	[12, 0.26],
+	[13, 0.34],
+	[15, 0.47],
+	[17, 0.59],
+);
 const STOP_GLYPH_MIN_ZOOM = 12;
 
 function roundRectPath(ctx, x, y, w, h, r) {
@@ -301,7 +324,7 @@ function drawGlyph(kind) {
 	const size = 64;
 	const canvas = document.createElement("canvas");
 	canvas.width = canvas.height = size;
-	const ctx = canvas.getContext("2d");
+	const ctx = canvas.getContext("2d", { willReadFrequently: true });
 	ctx.fillStyle = "#000";
 	ctx.strokeStyle = "#000";
 	ctx.lineCap = "round";
@@ -442,7 +465,12 @@ export function registerClusterInteractions(map) {
 
 export function updateSourceData(map, id, data) {
 	const source = map.getSource(id);
-	if (source && source.setData) source.setData(data);
+	if (!source || !source.setData) return;
+	if (BLOB_SOURCES.has(id) && data?.features?.length) {
+		setBlobData(source, id, data);
+	} else {
+		source.setData(data);
+	}
 }
 
 export function setPrefixVisible(map, prefix, visible) {
