@@ -43,13 +43,13 @@ export const ICON_SOURCES = [
 
 export const CLUSTER_CONFIG = {
 	buses: { radius: 50, maxZoom: 14, color: "#4CAF50" },
-	busStops: { radius: 60, maxZoom: 14, color: "#7E57C2" },
+	busStops: { radius: 60, maxZoom: 14, color: "#3b80c3" },
 	trainPositions: { radius: 90, maxZoom: 14, color: "#0091EA" },
-	trainStops: { radius: 70, maxZoom: 14, color: "#FF7043" },
+	trainStops: { radius: 70, maxZoom: 14, color: "#e64c3c" },
 };
 
 /** Velikost ikone glede na zoom: pari [zoom, velikost]. */
-const zoomRamp = (...stops) => [
+export const zoomRamp = (...stops) => [
 	"interpolate",
 	["linear"],
 	["zoom"],

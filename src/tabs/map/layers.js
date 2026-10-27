@@ -1,4 +1,5 @@
 import {
+	zoomRamp,
 	CLUSTER_CONFIG,
 	ICON_SIZE_BY_LAYER,
 	ICON_ANCHOR_BY_LAYER,
@@ -276,6 +277,114 @@ function ensurePointLayer(map, id, iconSize, anchor) {
 	});
 }
 
+const STOP_CIRCLE_STYLE = {
+	busStops: { color: "#3b80c3", glyph: "stop-glyph-bus" },
+	trainStops: { color: "#e64c3c", glyph: "stop-glyph-train" },
+};
+const STOP_CIRCLE_RADIUS = zoomRamp([10, 5], [13, 8], [15, 11], [17, 14]);
+const STOP_CIRCLE_STROKE = zoomRamp([10, 1.5], [15, 2], [17, 2.5]);
+// Simbol ~1,1 × polmer krogca; vsebina ikone je ~26 px pri size 1.
+const STOP_GLYPH_SIZE = zoomRamp([12, 0.26], [13, 0.34], [15, 0.47], [17, 0.59]);
+const STOP_GLYPH_MIN_ZOOM = 12;
+
+function roundRectPath(ctx, x, y, w, h, r) {
+	ctx.beginPath();
+	ctx.moveTo(x + r, y);
+	ctx.arcTo(x + w, y, x + w, y + h, r);
+	ctx.arcTo(x + w, y + h, x, y + h, r);
+	ctx.arcTo(x, y + h, x, y, r);
+	ctx.arcTo(x, y, x + w, y, r);
+	ctx.closePath();
+}
+
+function drawGlyph(kind) {
+	const size = 64;
+	const canvas = document.createElement("canvas");
+	canvas.width = canvas.height = size;
+	const ctx = canvas.getContext("2d");
+	ctx.fillStyle = "#000";
+	ctx.strokeStyle = "#000";
+	ctx.lineCap = "round";
+
+	if (kind === "bus") {
+		roundRectPath(ctx, 12, 8, 40, 40, 7);
+		ctx.fill();
+		ctx.fillRect(16, 46, 9, 10);
+		ctx.fillRect(39, 46, 9, 10);
+		ctx.globalCompositeOperation = "destination-out";
+		roundRectPath(ctx, 17, 14, 30, 15, 3);
+		ctx.fill();
+		for (const x of [23, 41]) {
+			ctx.beginPath();
+			ctx.arc(x, 38, 3.5, 0, Math.PI * 2);
+			ctx.fill();
+		}
+	} else {
+		roundRectPath(ctx, 14, 6, 36, 42, 9);
+		ctx.fill();
+		ctx.lineWidth = 5;
+		ctx.beginPath();
+		ctx.moveTo(23, 48);
+		ctx.lineTo(16, 59);
+		ctx.moveTo(41, 48);
+		ctx.lineTo(48, 59);
+		ctx.stroke();
+		ctx.globalCompositeOperation = "destination-out";
+		roundRectPath(ctx, 19, 12, 26, 15, 3);
+		ctx.fill();
+		for (const x of [24, 40]) {
+			ctx.beginPath();
+			ctx.arc(x, 38, 3.2, 0, Math.PI * 2);
+			ctx.fill();
+		}
+	}
+	return ctx.getImageData(0, 0, size, size);
+}
+
+function ensureStopGlyphs(map) {
+	for (const [id, kind] of [
+		["stop-glyph-bus", "bus"],
+		["stop-glyph-train", "train"],
+	]) {
+		if (!map.hasImage(id)) {
+			map.addImage(id, drawGlyph(kind), { sdf: true, pixelRatio: 2 });
+		}
+	}
+}
+
+function ensureStopCircleLayer(map, id) {
+	if (map.getLayer(`${id}-points`)) return;
+	const style = STOP_CIRCLE_STYLE[id];
+	map.addLayer({
+		id: `${id}-points`,
+		type: "circle",
+		source: id,
+		filter: ["!", ["has", "point_count"]],
+		paint: {
+			"circle-color": style.color,
+			"circle-radius": STOP_CIRCLE_RADIUS,
+			"circle-stroke-color": "#ffffff",
+			"circle-stroke-width": STOP_CIRCLE_STROKE,
+		},
+	});
+
+	ensureStopGlyphs(map);
+	map.addLayer({
+		id: `${id}-glyph`,
+		type: "symbol",
+		source: id,
+		minzoom: STOP_GLYPH_MIN_ZOOM,
+		filter: ["!", ["has", "point_count"]],
+		layout: {
+			"icon-image": style.glyph,
+			"icon-size": STOP_GLYPH_SIZE,
+			"icon-allow-overlap": true,
+			"icon-ignore-placement": true,
+		},
+		paint: { "icon-color": "#ffffff" },
+	});
+}
+
 function registerClusterInteraction(map, prefix) {
 	map.on("click", `${prefix}-clusters`, (event) => {
 		const features = map.queryRenderedFeatures(event.point, {
@@ -310,13 +419,15 @@ export function setupSourcesAndLayers(map, dataBySource) {
 			config.maxZoom,
 		);
 		ensureClusterLayers(map, id, config.color);
-		ensurePointLayer(
-			map,
-			id,
-			ICON_SIZE_BY_LAYER[id],
-			ICON_ANCHOR_BY_LAYER[id],
-		);
-		if (!["busStops", "trainStops"].includes(id)) {
+		if (id === "busStops" || id === "trainStops") {
+			ensureStopCircleLayer(map, id);
+		} else {
+			ensurePointLayer(
+				map,
+				id,
+				ICON_SIZE_BY_LAYER[id],
+				ICON_ANCHOR_BY_LAYER[id],
+			);
 			registerHaloLayer(map, id);
 			registerArrowLayer(map, id);
 		}
@@ -342,6 +453,7 @@ export function setPrefixVisible(map, prefix, visible) {
 		`${prefix}-cluster-count`,
 		`${prefix}-halo`,
 		`${prefix}-arrow`,
+		`${prefix}-glyph`,
 	];
 	layers.forEach((layerId) => {
 		if (
