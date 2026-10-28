@@ -3,7 +3,13 @@
 import { getInterpolatedPosition } from "../../Api";
 import { isLppOperator, isSzOperator } from "../../utils/operators";
 import { operatorToIcon } from "./config";
-import { getStopCoord, parseTrainCoord, stopsToFeatures, toGeoJSONPoints } from "./utils";
+import { getLppLineColor, lineIconId } from "./lineColors";
+import {
+	getStopCoord,
+	parseTrainCoord,
+	stopsToFeatures,
+	toGeoJSONPoints,
+} from "./utils";
 
 /** Ali izbrana vožnja pripada vlaku (SŽ)? */
 export function isTrainRoute(vehicle) {
@@ -59,11 +65,13 @@ export function buildBusesGeoJSON(gpsPositions, busOperators, selectedRoute) {
 				isLppOperator(pos?.operator) ||
 				pos?.lineNumber !== undefined ||
 				pos?.lineId !== undefined;
+			const lineColor = isLpp ? getLppLineColor(pos?.lineNumber) : null;
 			return {
 				...pos,
 				gpsLocation: undefined,
 				sourceType: isLpp ? "lpp" : "ijpp",
-				icon,
+				icon: lineColor ? lineIconId(pos.lineNumber) : icon,
+				lineColor,
 				brand: operatorToIcon[pos?.operator] || "generic",
 				operator: pos?.operator || "",
 			};
@@ -76,7 +84,12 @@ export function buildBusStopsGeoJSON(busStops) {
 		busStops,
 		(stop) => stop?.gpsLocation,
 		(stop) => ({
-			id: stop?.ijppID ?? stop?.refID ?? stop?.ref_id ?? stop?.id ?? stop?.name,
+			id:
+				stop?.ijppID ??
+				stop?.refID ??
+				stop?.ref_id ??
+				stop?.id ??
+				stop?.name,
 			name: stop?.name,
 			icon: "bus-stop",
 			ref_id: stop?.ref_id ?? stop?.refID ?? null,
@@ -103,7 +116,11 @@ export function buildTrainStopsGeoJSON(trainStops) {
  * Vlaki na trenutni čas: pozicijo interpoliramo po njihovi poti, zato je to
  * mogoče klicati vsako sekundo brez nalaganja novih podatkov.
  */
-export function buildTrainsGeoJSON(trains, now = Date.now(), onlyTripId = null) {
+export function buildTrainsGeoJSON(
+	trains,
+	now = Date.now(),
+	onlyTripId = null,
+) {
 	const list = onlyTripId
 		? (trains || []).filter((train) => train.tripId === onlyTripId)
 		: trains || [];
@@ -123,7 +140,9 @@ export function buildTrainsGeoJSON(trains, now = Date.now(), onlyTripId = null) 
 		(train) => parseTrainCoord(train?.gpsLocation),
 		(train) => ({
 			id: train?.tripId,
-			relation: [train?.from?.name, train?.to?.name].filter(Boolean).join(" - "),
+			relation: [train?.from?.name, train?.to?.name]
+				.filter(Boolean)
+				.join(" - "),
 			fromStation: train?.from?.name,
 			toStation: train?.to?.name,
 			departure: train?.departure,
@@ -154,15 +173,18 @@ export function buildTripOverlay(vehicle) {
 	const geometry = vehicle.geometry || [];
 	const hasLppPoints = geometry[0]?.points !== undefined;
 	const isLpp = vehicle.lineId !== undefined || hasLppPoints;
-	const isSz = vehicle.tripShort !== undefined && vehicle.lineNumber === undefined;
+	const isSz =
+		vehicle.tripShort !== undefined && vehicle.lineNumber === undefined;
 	const brand = operatorToIcon[vehicle.operator] || "generic";
 
 	let prefix;
 	let lineCoords;
 	let stopsFeatures;
 	let overlayBrand;
+	let lineColor = null;
 
 	if (isLpp) {
+		lineColor = getLppLineColor(vehicle.lineNumber ?? vehicle.routeName);
 		prefix = "lpp";
 		overlayBrand = "lpp";
 		// LPP vrača točke kot [lat, lon]; zemljevid potrebuje [lon, lat].
@@ -170,11 +192,19 @@ export function buildTripOverlay(vehicle) {
 			? geometry[0].points.filter(isCoordPair).map((c) => [c[1], c[0]])
 			: [];
 		stopsFeatures = stopsToFeatures(vehicle.stops, "lpp");
+		if (lineColor) {
+			for (const f of stopsFeatures) f.properties.lineColor = lineColor;
+		}
 	} else if (isSz) {
 		prefix = "sz";
 		overlayBrand = "sz";
 		lineCoords = geometry.filter(isCoordPair);
-		stopsFeatures = stopsToFeatures(vehicle.stops, "sz", vehicle.from, vehicle.to);
+		stopsFeatures = stopsToFeatures(
+			vehicle.stops,
+			"sz",
+			vehicle.from,
+			vehicle.to,
+		);
 	} else if (vehicle.tripId !== undefined) {
 		prefix = "ijpp";
 		overlayBrand = brand;
@@ -187,7 +217,8 @@ export function buildTripOverlay(vehicle) {
 	const isMulti = Array.isArray(lineCoords[0]?.[0]);
 	const allCoords = isMulti ? lineCoords.flat() : [...lineCoords];
 	for (const feature of stopsFeatures) {
-		if (feature?.geometry?.coordinates) allCoords.push(feature.geometry.coordinates);
+		if (feature?.geometry?.coordinates)
+			allCoords.push(feature.geometry.coordinates);
 	}
 
 	return {
@@ -195,6 +226,7 @@ export function buildTripOverlay(vehicle) {
 		lineCoords,
 		stopsFeatures,
 		brand: overlayBrand,
+		lineColor,
 		// Brez točk pri "null islandu" - te bi približale pogled na Atlantik.
 		fitCoords: allCoords.filter(
 			(c) =>

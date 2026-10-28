@@ -24,7 +24,7 @@ function brandColorExpr(part) {
 		expr.push(brand, BRAND_COLORS[key][part]);
 	}
 	expr.push(BRAND_COLORS.default[part]);
-	return expr;
+	return ["coalesce", ["get", "lineColor"], expr];
 }
 
 // Izrazi za barvo črte/krogov (obroba = temnejši odtenek).
@@ -99,6 +99,7 @@ export function updateTripOverlay(
 	lineCoords,
 	stopsFeatures,
 	brand,
+	lineColor = null,
 ) {
 	const lineSrc = map.getSource(`${prefix}-trip-line-src`);
 	const stopsSrc = map.getSource(`${prefix}-trip-stops-src`);
@@ -113,7 +114,7 @@ export function updateTripOverlay(
 		geometry: isMulti
 			? { type: "MultiLineString", coordinates: lineCoords }
 			: { type: "LineString", coordinates: lineCoords },
-		properties: { brand: brand || "generic" },
+		properties: { brand: brand || "generic", lineColor },
 	};
 	const stopsData = { type: "FeatureCollection", features: stopsFeatures };
 

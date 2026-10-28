@@ -31,6 +31,7 @@ import {
 	updateTripOverlay,
 } from "./map/layers";
 import MapSearch from "./map/MapSearch.jsx";
+import { registerLineIconGenerator } from "./map/lineColors";
 import { busPopupProps, hasRoute } from "./map/search";
 import { ensureIcons } from "./map/utils";
 import RouteTab from "./route.jsx";
@@ -254,6 +255,8 @@ const MapTab = memo(function MapTab({
 			"top-right",
 		);
 
+		registerLineIconGenerator(map);
+
 		map.on("load", async () => {
 			await setupMapContent(map, dataRef.current);
 			if (mapRef.current !== map) return; // odstranjen med nalaganjem
@@ -378,6 +381,7 @@ const MapTab = memo(function MapTab({
 			overlay.lineCoords,
 			overlay.stopsFeatures,
 			overlay.brand,
+			overlay.lineColor,
 		);
 
 		// Pogled prilagodimo le enkrat na vožnjo (ne ob menjavi teme ipd.).
@@ -403,7 +407,11 @@ const MapTab = memo(function MapTab({
 			if (!map) return;
 
 			// Avtobus brez poti: samo pomik in popup (kot ob kliku na označbo).
-			if (item.kind !== "train" && !hasRoute(item.selection) && item.pos) {
+			if (
+				item.kind !== "train" &&
+				!hasRoute(item.selection) &&
+				item.pos
+			) {
 				setSelectedVehicle(null);
 				interactionsRef.current?.showBusPopup(
 					busPopupProps(item.pos),
