@@ -70,7 +70,10 @@ export function buildBusesGeoJSON(gpsPositions, busOperators, selectedRoute) {
 				...pos,
 				gpsLocation: undefined,
 				sourceType: isLpp ? "lpp" : "ijpp",
-				icon: lineColor ? lineIconId(pos.lineNumber) : icon,
+				icon:
+					isLpp && String(pos?.lineNumber ?? "").trim()
+						? lineIconId(pos.lineNumber)
+						: icon,
 				lineColor,
 				brand: operatorToIcon[pos?.operator] || "generic",
 				operator: pos?.operator || "",

@@ -1,6 +1,8 @@
 // Barve LPP linij (colors.json) in ikone z oznako linije.
 import lineColors from "./colors.json";
 
+const DEFAULT_LINE_COLOR = "#4caf50"; // = BRAND_COLORS.lpp.fill
+
 export const LINE_ICON_PREFIX = "lpp-line:";
 
 const normalize = (line) => String(line ?? "").trim().toUpperCase();
@@ -64,8 +66,7 @@ export function registerLineIconGenerator(map) {
 		const id = event.id;
 		if (!id?.startsWith(LINE_ICON_PREFIX) || map.hasImage(id)) return;
 		const line = id.slice(LINE_ICON_PREFIX.length);
-		const color = getLppLineColor(line);
-		if (!color) return;
+		const color = getLppLineColor(line) ?? DEFAULT_LINE_COLOR;
 		map.addImage(id, drawLineIcon(line, color), { pixelRatio: 1 });
 	});
 }
