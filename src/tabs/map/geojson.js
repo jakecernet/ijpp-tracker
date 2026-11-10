@@ -3,7 +3,12 @@
 import { getInterpolatedPosition } from "../../Api";
 import { isLppOperator, isSzOperator } from "../../utils/operators";
 import { operatorToIcon } from "./config";
-import { getLppLineColor, lineIconId } from "./lineColors";
+import {
+	getLppLineColor,
+	lineIconId,
+	marpromLineIconId,
+	MARPROM_LINE_COLOR,
+} from "./lineColors";
 import {
 	getStopCoord,
 	parseTrainCoord,
@@ -61,18 +66,29 @@ export function buildBusesGeoJSON(gpsPositions, busOperators, selectedRoute) {
 		(pos) => pos?.gpsLocation,
 		(pos) => {
 			const icon = operatorToIcon[pos?.operator] || "bus-stop";
+			const isMarprom =
+				pos?.isMarprom === true || pos?.isMarprom === "true";
 			const isLpp =
 				isLppOperator(pos?.operator) ||
 				pos?.lineNumber !== undefined ||
 				pos?.lineId !== undefined;
-			const lineColor = isLpp ? getLppLineColor(pos?.lineNumber) : null;
+			const lineNumber = isMarprom
+				? pos?.lineNumberMarprom
+				: pos?.lineNumber;
+			const lineColor = isMarprom
+				? MARPROM_LINE_COLOR
+				: isLpp
+					? getLppLineColor(lineNumber)
+					: null;
 			return {
 				...pos,
 				gpsLocation: undefined,
 				sourceType: isLpp ? "lpp" : "ijpp",
 				icon:
-					isLpp && String(pos?.lineNumber ?? "").trim()
-						? lineIconId(pos.lineNumber)
+					(isLpp || isMarprom) && String(lineNumber ?? "").trim()
+						? isMarprom
+							? marpromLineIconId(lineNumber)
+							: lineIconId(lineNumber)
 						: icon,
 				lineColor,
 				brand: operatorToIcon[pos?.operator] || "generic",

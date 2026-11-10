@@ -4,6 +4,8 @@ import lineColors from "./colors.json";
 const DEFAULT_LINE_COLOR = "#4caf50"; // = BRAND_COLORS.lpp.fill
 
 export const LINE_ICON_PREFIX = "lpp-line:";
+export const MARPROM_LINE_ICON_PREFIX = "marprom-line:";
+export const MARPROM_LINE_COLOR = "#f44336";
 
 const normalize = (line) => String(line ?? "").trim().toUpperCase();
 
@@ -15,6 +17,8 @@ export function getLppLineColor(lineNumber) {
 
 export const lineIconId = (lineNumber) =>
 	LINE_ICON_PREFIX + normalize(lineNumber);
+export const marpromLineIconId = (lineNumber) =>
+	MARPROM_LINE_ICON_PREFIX + normalize(lineNumber);
 
 // Krog je enak polmeru "halo" kroga (ICON_SIZE_BY_LAYER * 72 px ≈ HALO_RADIUS),
 // da se puščica smeri prilega.
@@ -68,5 +72,13 @@ export function registerLineIconGenerator(map) {
 		const line = id.slice(LINE_ICON_PREFIX.length);
 		const color = getLppLineColor(line) ?? DEFAULT_LINE_COLOR;
 		map.addImage(id, drawLineIcon(line, color), { pixelRatio: 1 });
+	});
+	map.on("styleimagemissing", (event) => {
+		const id = event.id;
+		if (!id?.startsWith(MARPROM_LINE_ICON_PREFIX) || map.hasImage(id)) return;
+		const line = id.slice(MARPROM_LINE_ICON_PREFIX.length);
+		map.addImage(id, drawLineIcon(line, MARPROM_LINE_COLOR), {
+			pixelRatio: 1,
+		});
 	});
 }

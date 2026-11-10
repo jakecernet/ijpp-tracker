@@ -370,6 +370,11 @@ const fetchIJPPPositions = async () => {
 				stop: vehicle.stop?.name ?? "/",
 				stopStatus: vehicle.stop_status,
 				heading: vehicle.heading || 0,
+				isMarprom: vehicle.vehicle?.operator_name === "Marprom",
+				lineNumberMarprom:
+					vehicle.vehicle?.operator_name === "Marprom"
+						? vehicle.route_short_name
+						: null,
 			}));
 	} catch (error) {
 		console.error("Error fetching ijpp positions:", error);

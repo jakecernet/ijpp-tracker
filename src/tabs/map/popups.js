@@ -108,6 +108,27 @@ function buildLppPopupHtml(properties, info) {
 	);
 }
 
+function buildMarpromPopupHtml(properties) {
+	const title = [properties.lineNumberMarprom, properties.lineName]
+		.filter(Boolean)
+		.map((value) => escapeHTML(value))
+		.join(" | ");
+
+	return (
+		`<div class="popup">` +
+		(title ? `<div class="popup-title">${title}</div>` : "") +
+		textRow("Prevoznik", "Marprom") +
+		textRow(
+			properties.stopStatus === "STOPPED_AT"
+				? "Na postaji"
+				: "Naslednja postaja",
+			properties.stop,
+		) +
+		actionButton("view-route", "Prikaži linijo") +
+		`</div>`
+	);
+}
+
 export function renderLppPopup(properties, onUpdate) {
 	const busNumber = getLppBusNumber(properties.registrska);
 	fetchLppBusInfo(busNumber)
@@ -172,6 +193,10 @@ function buildIjppPopupHtml(properties, busInfo) {
 }
 
 export function renderIjppPopup(properties, onUpdate) {
+	if (properties.isMarprom === true || properties.isMarprom === "true") {
+		return buildMarpromPopupHtml(properties);
+	}
+
 	findKranjbusInfo(properties.tripId, properties.plate, properties.vehicleId)
 		.then((busInfo) => {
 			if (busInfo) onUpdate?.(buildIjppPopupHtml(properties, busInfo));
